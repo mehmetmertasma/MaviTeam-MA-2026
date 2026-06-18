@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function HomeScreen() {
@@ -11,11 +12,11 @@ export default function HomeScreen() {
         Manage schedules, teams, attendance, payments, and communication in one place.
       </Text>
 
-      <TouchableOpacity style={styles.primaryButton}>
+      <TouchableOpacity style={styles.primaryButton} onPress={() => router.push('/create-club')}>
         <Text style={styles.primaryButtonText}>Create / Manage a Club</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.secondaryButton}>
+      <TouchableOpacity style={styles.secondaryButton} onPress={() => router.push('/join-club')}>
         <Text style={styles.secondaryButtonText}>Join a Club</Text>
       </TouchableOpacity>
     </View>

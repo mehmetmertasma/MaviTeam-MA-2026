@@ -1,25 +1,36 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import type { PropsWithChildren } from "react";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
+export const unstable_settings = {
+  initialRouteName: "index",
+};
+
+const APP_BACKGROUND_COLOR = "#0f172a";
+
+function AppProviders({ children }: PropsWithChildren) {
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
+    <AppProviders>
+      <StatusBar style="light" />
+
       <Stack
         screenOptions={{
-          contentStyle: { backgroundColor: '#0B1120' },
-          headerStyle: { backgroundColor: '#0B1120' },
-          headerTintColor: '#FFFFFF',
-          headerTitleStyle: { fontWeight: '700' },
-        }}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="create-club" options={{ title: 'Create Club' }} />
-        <Stack.Screen name="join-club" options={{ title: 'Join Club' }} />
+          headerShown: false,
+          animation: "fade_from_bottom",
+          contentStyle: {
+            backgroundColor: APP_BACKGROUND_COLOR,
+          },
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="create-club" />
+        <Stack.Screen name="join-club" />
+        <Stack.Screen name="dashboard" />
       </Stack>
-    </ThemeProvider>
+    </AppProviders>
   );
 }

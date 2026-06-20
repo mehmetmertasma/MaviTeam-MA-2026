@@ -40,7 +40,6 @@ export default function LoginScreen() {
                 <Text>Giriş Yap</Text>
             </Pressable>
             {error ? <Text style={{ color: "red" }}>{error}</Text> : null}
-      
         </View>
         );
 

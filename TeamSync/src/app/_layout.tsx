@@ -27,6 +27,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
         <Stack.Screen name="create-club" />
         <Stack.Screen name="join-club" />
         <Stack.Screen name="dashboard" />

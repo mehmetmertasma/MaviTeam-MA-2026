@@ -1,5 +1,6 @@
-import { Link } from "expo-router";
-import { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -11,8 +12,23 @@ type AppRoute =
   | "/teams"
   | "/pending-approvals"
   | "/announcements"
+  | "/messages"
   | "/schedule"
-  | "/attendance";
+  | "/attendance"
+  | "/availability"
+  | "/statistics"
+  | "/replays"
+  | "/payments";
+
+type ProfileData = {
+  name: string;
+  email: string;
+  club: string;
+  team: string;
+  role: string;
+  season: string;
+  membership: string;
+};
 
 type RoleOption = {
   id: UserRole;
@@ -43,12 +59,24 @@ type DashboardData = {
   }[];
 };
 
+const PROFILE_STORAGE_KEY = "teamsync_profile_data";
+
+const startingProfileData: ProfileData = {
+  name: "Mert Asma",
+  email: "mertasma7580@gmail.com",
+  club: "İstanbul Voleybol Kulübü",
+  team: "U16 Erkek",
+  role: "Kulüp yöneticisi",
+  season: "2026 Bahar",
+  membership: "Kulüp öder, veli/sporcu ücretsiz",
+};
+
 const roleOptions: RoleOption[] = [
   {
     id: "admin",
     title: "Kulüp Yöneticisi",
     tag: "Admin",
-    description: "Kulübü, takımları, üyeleri ve davet kodlarını yönetir.",
+    description: "Kulübü, takımları, üyeleri ve ödemeleri yönetir.",
   },
   {
     id: "coach",
@@ -76,7 +104,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "İstanbul Voleybol Kulübü",
     heroTitle: "Kulüp yönetim paneli",
     heroSubtitle:
-      "Kulübünüzün üyelerini, takımlarını, antrenmanlarını, duyurularını ve davet kodlarını tek yerden yönetin.",
+      "Kulübünüzün üyelerini, takımlarını, antrenmanlarını, duyurularını, ödemelerini ve videolarını tek yerden yönetin.",
     stats: [
       { label: "Sporcu", value: "128" },
       { label: "Takım", value: "7" },
@@ -95,18 +123,39 @@ const dashboardData: Record<UserRole, DashboardData> = {
         route: "/pending-approvals",
       },
       {
-        title: "Program oluştur",
-        meta: "Takvim ekranına git",
-        route: "/schedule",
-      },
-      {
         title: "Duyuru yayınla",
-        meta: "Duyuru ekranına git",
+        meta: "Duyurular ekranına git",
         route: "/announcements",
       },
       {
-        title: "Kulüp ayarlarını düzenle",
-        meta: "Yakında aktif olacak",
+        title: "Mesajları yönet",
+        meta: "Koç, veli ve sporcu mesajları",
+        route: "/messages",
+      },
+      {
+        title: "Program oluştur",
+        meta: "Program ekranına git",
+        route: "/schedule",
+      },
+      {
+        title: "Yoklama yönet",
+        meta: "Yoklama ekranına git",
+        route: "/attendance",
+      },
+      {
+        title: "Ödemeleri kontrol et",
+        meta: "Ödeme ekranına git",
+        route: "/payments",
+      },
+      {
+        title: "İstatistikleri görüntüle",
+        meta: "Performans ekranına git",
+        route: "/statistics",
+      },
+      {
+        title: "Video / drill ekle",
+        meta: "Replays ekranına git",
+        route: "/replays",
       },
     ],
     overview: [
@@ -118,38 +167,55 @@ const dashboardData: Record<UserRole, DashboardData> = {
   },
   coach: {
     welcomeTitle: "Koç paneli",
-    clubSubtitle: "A Takım · İstanbul Voleybol Kulübü",
+    clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
     heroTitle: "Takımını yönet",
     heroSubtitle:
-      "Antrenman planlarını, oyuncu katılımını ve yaklaşan maçları hızlıca takip et.",
+      "Antrenman planlarını, oyuncu katılımını, uygunluk cevaplarını ve video içeriklerini hızlıca takip et.",
     stats: [
       { label: "Oyuncu", value: "18" },
       { label: "Bu hafta antrenman", value: "4" },
       { label: "Yaklaşan maç", value: "2" },
-      { label: "Eksik bildiren", value: "3" },
+      { label: "Cevap bekleyen", value: "3" },
     ],
     actions: [
       {
-        title: "Antrenman planla",
-        meta: "Takvim ekranına git",
+        title: "Programı yönet",
+        meta: "Antrenman / maç ekle",
         route: "/schedule",
       },
       {
         title: "Yoklama al",
-        meta: "Yoklama ekranına git",
+        meta: "Katılım durumlarını işaretle",
         route: "/attendance",
       },
       {
-        title: "Takım duyurusu gönder",
-        meta: "Yakında aktif olacak",
+        title: "Uygunluk cevaplarını gör",
+        meta: "Kim geliyor, kim gelmiyor?",
+        route: "/availability",
       },
       {
-        title: "Oyuncu durumlarını kontrol et",
-        meta: "Yakında aktif olacak",
+        title: "Takım duyurusu gönder",
+        meta: "Duyurular ekranına git",
+        route: "/announcements",
+      },
+      {
+        title: "Mesajları aç",
+        meta: "Veli ve sporcularla iletişim",
+        route: "/messages",
+      },
+      {
+        title: "Video / drill paylaş",
+        meta: "Replays ekranına git",
+        route: "/replays",
+      },
+      {
+        title: "İstatistikleri görüntüle",
+        meta: "Oyuncu performansını takip et",
+        route: "/statistics",
       },
     ],
     overview: [
-      { label: "Takım", value: "A Takım" },
+      { label: "Takım", value: "U17 Erkek" },
       { label: "Rolün", value: "Koç" },
       { label: "Sıradaki antrenman", value: "Bugün 18:30" },
       { label: "Katılım takibi", value: "Açık" },
@@ -160,7 +226,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "Efe Asma · İstanbul Voleybol Kulübü",
     heroTitle: "Çocuğunun takım sürecini takip et",
     heroSubtitle:
-      "Antrenman saatlerini, maç programını, duyuruları ve ödeme durumunu tek yerden gör.",
+      "Antrenman saatlerini, maç programını, duyuruları, videoları ve ödeme durumunu tek yerden gör.",
     stats: [
       { label: "Bu hafta antrenman", value: "3" },
       { label: "Yaklaşan maç", value: "1" },
@@ -170,35 +236,53 @@ const dashboardData: Record<UserRole, DashboardData> = {
     actions: [
       {
         title: "Programı görüntüle",
-        meta: "Takvim ekranına git",
+        meta: "Antrenman ve maç takvimi",
         route: "/schedule",
       },
       {
         title: "Duyuruları oku",
-        meta: "Yakında aktif olacak",
+        meta: "Kulüp ve takım duyuruları",
+        route: "/announcements",
+      },
+      {
+        title: "Koça mesaj gönder",
+        meta: "Takım iletişim ekranı",
+        route: "/messages",
+      },
+      {
+        title: "Uygunluk bildir",
+        meta: "Çocuğun için katılım bildir",
+        route: "/availability",
       },
       {
         title: "Ödeme durumunu kontrol et",
-        meta: "Yakında aktif olacak",
+        meta: "Aylık ödeme bilgileri",
+        route: "/payments",
       },
       {
-        title: "Koç mesajlarını gör",
-        meta: "Yakında aktif olacak",
+        title: "Video / drill izle",
+        meta: "Takıma özel içerikler",
+        route: "/replays",
+      },
+      {
+        title: "İstatistikleri gör",
+        meta: "Katılım ve performans özeti",
+        route: "/statistics",
       },
     ],
     overview: [
       { label: "Sporcu", value: "Efe Asma" },
       { label: "Rolün", value: "Veli" },
-      { label: "Takım", value: "U16 Erkek" },
+      { label: "Takım", value: "U17 Erkek" },
       { label: "Ödeme", value: "Haziran ödendi" },
     ],
   },
   athlete: {
     welcomeTitle: "Sporcu paneli",
-    clubSubtitle: "U16 Erkek · İstanbul Voleybol Kulübü",
+    clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
     heroTitle: "Kendi takım programını takip et",
     heroSubtitle:
-      "Antrenmanlarını, maçlarını ve takım duyurularını gör. Uygunluk durumunu koçuna bildir.",
+      "Antrenmanlarını, maçlarını, duyuruları ve takım videolarını gör. Uygunluk durumunu koçuna bildir.",
     stats: [
       { label: "Bu hafta antrenman", value: "3" },
       { label: "Yaklaşan maç", value: "1" },
@@ -207,27 +291,40 @@ const dashboardData: Record<UserRole, DashboardData> = {
     ],
     actions: [
       {
-        title: "Uygunum olarak işaretle",
-        meta: "Yakında aktif olacak",
-      },
-      {
         title: "Programımı görüntüle",
-        meta: "Takvim ekranına git",
+        meta: "Antrenman ve maç takvimi",
         route: "/schedule",
       },
       {
-        title: "Duyuruları oku",
-        meta: "Yakında aktif olacak",
+        title: "Uygunluk bildir",
+        meta: "Geliyorum / gelemiyorum",
+        route: "/availability",
       },
       {
-        title: "Maç bilgilerini gör",
-        meta: "Yakında aktif olacak",
+        title: "Duyuruları oku",
+        meta: "Takım duyurularını gör",
+        route: "/announcements",
+      },
+      {
+        title: "Koça mesaj gönder",
+        meta: "Takım iletişim ekranı",
+        route: "/messages",
+      },
+      {
+        title: "Video / drill izle",
+        meta: "Koçun paylaştığı içerikler",
+        route: "/replays",
+      },
+      {
+        title: "İstatistiklerimi gör",
+        meta: "Katılım ve performans özeti",
+        route: "/statistics",
       },
     ],
     overview: [
       { label: "Sporcu", value: "Mert Asma" },
       { label: "Rolün", value: "Sporcu" },
-      { label: "Takım", value: "U16 Erkek" },
+      { label: "Takım", value: "U17 Erkek" },
       { label: "Sıradaki etkinlik", value: "Bugün 18:30 antrenman" },
     ],
   },
@@ -235,7 +332,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
 
 const upcomingEvents = [
   {
-    title: "A Takım antrenmanı",
+    title: "U17 Erkek antrenmanı",
     time: "Bugün, 18:30",
     location: "Burhan Felek Spor Salonu",
   },
@@ -251,20 +348,144 @@ const upcomingEvents = [
   },
 ];
 
+function getInitials(name: string) {
+  const trimmedName = name.trim();
+
+  if (trimmedName.length === 0) {
+    return "TS";
+  }
+
+  const nameParts = trimmedName.split(" ");
+  const firstLetter = nameParts[0]?.charAt(0) ?? "";
+  const lastLetter =
+    nameParts.length > 1
+      ? nameParts[nameParts.length - 1]?.charAt(0) ?? ""
+      : "";
+
+  return `${firstLetter}${lastLetter}`.toUpperCase();
+}
+
+function getFirstName(name: string) {
+  const trimmedName = name.trim();
+
+  if (trimmedName.length === 0) {
+    return "Kullanıcı";
+  }
+
+  return trimmedName.split(" ")[0];
+}
+
 export default function DashboardScreen() {
   const [activeRole, setActiveRole] = useState<UserRole>("admin");
+  const [savedProfileData, setSavedProfileData] =
+    useState<ProfileData>(startingProfileData);
 
   const currentDashboard = dashboardData[activeRole];
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadSavedProfile() {
+        try {
+          const savedProfile = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
+
+          if (savedProfile === null) {
+            return;
+          }
+
+          const parsedProfile = JSON.parse(savedProfile) as ProfileData;
+
+          if (isActive) {
+            setSavedProfileData(parsedProfile);
+          }
+        } catch {
+          if (isActive) {
+            setSavedProfileData(startingProfileData);
+          }
+        }
+      }
+
+      loadSavedProfile();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const profileInitials = getInitials(savedProfileData.name);
+
+  const dashboardWelcome =
+    activeRole === "admin" || activeRole === "athlete"
+      ? `Hoş geldin, ${getFirstName(savedProfileData.name)}`
+      : currentDashboard.welcomeTitle;
+
+  const dashboardSubtitle =
+    activeRole === "admin" ? savedProfileData.club : currentDashboard.clubSubtitle;
+
+  const overviewItems = currentDashboard.overview.map((item) => {
+    if (item.label === "Aktif sezon") {
+      return {
+        ...item,
+        value: savedProfileData.season,
+      };
+    }
+
+    if (item.label === "Rolün" && activeRole === "admin") {
+      return {
+        ...item,
+        value: savedProfileData.role,
+      };
+    }
+
+    if (item.label === "Takım") {
+      return {
+        ...item,
+        value: savedProfileData.team,
+      };
+    }
+
+    if (item.label === "Üyelik modeli") {
+      return {
+        ...item,
+        value: savedProfileData.membership,
+      };
+    }
+
+    if (item.label === "Sporcu" && activeRole === "athlete") {
+      return {
+        ...item,
+        value: savedProfileData.name,
+      };
+    }
+
+    return item;
+  });
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.logo}>TeamSync</Text>
+          <View style={styles.headerTop}>
+            <Text style={styles.logo}>TeamSync</Text>
+
+            <Link href="/profile" asChild>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.profileButton,
+                  pressed && styles.profileButtonPressed,
+                ]}
+                accessibilityLabel="Profil sayfasına git"
+              >
+                <Text style={styles.profileButtonText}>{profileInitials}</Text>
+              </Pressable>
+            </Link>
+          </View>
 
           <View>
-            <Text style={styles.welcome}>{currentDashboard.welcomeTitle}</Text>
-            <Text style={styles.subtitle}>{currentDashboard.clubSubtitle}</Text>
+            <Text style={styles.welcome}>{dashboardWelcome}</Text>
+            <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
           </View>
         </View>
 
@@ -276,6 +497,15 @@ export default function DashboardScreen() {
           <Text style={styles.heroSubtitle}>
             {currentDashboard.heroSubtitle}
           </Text>
+
+          <Link href="/profile" asChild>
+            <AppButton
+              title="Profili düzenle"
+              variant="secondary"
+              accessibilityLabel="Profil düzenleme sayfasına git"
+              style={styles.editProfileButton}
+            />
+          </Link>
         </View>
 
         <View style={styles.section}>
@@ -398,8 +628,8 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kulüp özeti</Text>
 
-          {currentDashboard.overview.map((item, index) => {
-            const isLastItem = index === currentDashboard.overview.length - 1;
+          {overviewItems.map((item, index) => {
+            const isLastItem = index === overviewItems.length - 1;
 
             return (
               <View
@@ -446,10 +676,36 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing["2xl"],
     gap: theme.spacing.lg,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: theme.spacing.lg,
+  },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.brand.primary,
+  },
+  profileButton: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background.surface,
+    borderWidth: 2,
+    borderColor: theme.colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    ...theme.shadows.sm,
+  },
+  profileButtonPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.97 }],
+  },
+  profileButtonText: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
   },
   welcome: {
     fontSize: theme.fontSizes["5xl"],
@@ -493,6 +749,10 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.lg,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
+  },
+  editProfileButton: {
+    marginTop: theme.spacing["2xl"],
+    alignSelf: "flex-start",
   },
   section: {
     backgroundColor: theme.colors.background.surface,

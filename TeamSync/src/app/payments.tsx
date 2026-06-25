@@ -56,16 +56,42 @@ const initialPayments: PaymentRecord[] = [
   },
 ];
 
+const paymentStatusOptions: {
+  label: string;
+  status: PaymentStatus;
+}[] = [
+  {
+    label: "Ödendi",
+    status: "paid",
+  },
+  {
+    label: "Ödenmedi",
+    status: "pending",
+  },
+  {
+    label: "Gecikti",
+    status: "overdue",
+  },
+];
+
 function getStatusLabel(status: PaymentStatus) {
   if (status === "paid") {
     return "Ödendi";
   }
 
   if (status === "pending") {
-    return "Bekliyor";
+    return "Ödenmedi";
   }
 
   return "Gecikti";
+}
+
+function getPaymentMethodForStatus(status: PaymentStatus) {
+  if (status === "paid") {
+    return "Nakit";
+  }
+
+  return "Bekleniyor";
 }
 
 export default function PaymentsScreen() {
@@ -73,9 +99,11 @@ export default function PaymentsScreen() {
   const [activeView, setActiveView] = useState<PaymentView>("admin");
 
   const totalPaid = payments.filter((payment) => payment.status === "paid").length;
+
   const totalPending = payments.filter(
     (payment) => payment.status === "pending",
   ).length;
+
   const totalOverdue = payments.filter(
     (payment) => payment.status === "overdue",
   ).length;
@@ -86,7 +114,10 @@ export default function PaymentsScreen() {
 
   const visiblePayments = activeView === "admin" ? payments : parentPayments;
 
-  function handleMarkAsPaid(paymentId: number) {
+  function handleChangePaymentStatus(
+    paymentId: number,
+    newStatus: PaymentStatus,
+  ) {
     setPayments((currentPayments) =>
       currentPayments.map((payment) => {
         if (payment.id !== paymentId) {
@@ -95,8 +126,8 @@ export default function PaymentsScreen() {
 
         return {
           ...payment,
-          method: "Nakit",
-          status: "paid",
+          method: getPaymentMethodForStatus(newStatus),
+          status: newStatus,
         };
       }),
     );
@@ -110,9 +141,10 @@ export default function PaymentsScreen() {
 
           <View>
             <Text style={styles.pageTitle}>Ödemeler</Text>
+
             <Text style={styles.pageSubtitle}>
-              Kulüp aidatlarını takip et, nakit ödeme alanlarını işaretle ve
-              velilere ödeme durumunu göster.
+              Kulüp aidatlarını takip et, ödeme durumlarını düzenle ve velilere
+              güncel ödeme bilgisini göster.
             </Text>
           </View>
         </View>
@@ -123,8 +155,8 @@ export default function PaymentsScreen() {
           <Text style={styles.heroTitle}>Aidat ve ödeme takibi</Text>
 
           <Text style={styles.heroSubtitle}>
-            Şimdilik bu ekran demo veriyle çalışıyor. Firebase eklendiğinde bu
-            liste gerçek kulüp üyelerinden gelecek.
+            Admin yanlışlıkla bir ödemeyi ödendi olarak işaretlerse tekrar
+            ödenmedi veya gecikti durumuna çevirebilir.
           </Text>
         </View>
 
@@ -172,7 +204,7 @@ export default function PaymentsScreen() {
 
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{totalPending}</Text>
-            <Text style={styles.statLabel}>Bekleyen</Text>
+            <Text style={styles.statLabel}>Ödenmeyen</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -183,15 +215,16 @@ export default function PaymentsScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <View>
+            <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>
                 {activeView === "admin"
                   ? "Kulüp ödeme listesi"
                   : "Benim ödeme durumum"}
               </Text>
+
               <Text style={styles.sectionSubtitle}>
                 {activeView === "admin"
-                  ? "Admin nakit ödeme alınca ödeme kartını ödendi olarak işaretleyebilir."
+                  ? "Admin her ödeme için ödendi, ödenmedi veya gecikti durumunu seçebilir."
                   : "Veli sadece kendi sporcusunun ödeme durumunu görür."}
               </Text>
             </View>
@@ -208,8 +241,13 @@ export default function PaymentsScreen() {
                 <View key={payment.id} style={styles.paymentCard}>
                   <View style={styles.cardTopRow}>
                     <View style={styles.cardTitleGroup}>
-                      <Text style={styles.athleteName}>{payment.athleteName}</Text>
-                      <Text style={styles.parentName}>{payment.parentName}</Text>
+                      <Text style={styles.athleteName}>
+                        {payment.athleteName}
+                      </Text>
+
+                      <Text style={styles.parentName}>
+                        {payment.parentName}
+                      </Text>
                     </View>
 
                     <View
@@ -255,21 +293,42 @@ export default function PaymentsScreen() {
 
                   <View style={styles.bottomRow}>
                     <Text style={styles.methodText}>Yöntem: {payment.method}</Text>
-
-                    {activeView === "admin" && !isPaid ? (
-                      <Pressable
-                        onPress={() => handleMarkAsPaid(payment.id)}
-                        style={({ pressed }) => [
-                          styles.markPaidButton,
-                          pressed && styles.markPaidButtonPressed,
-                        ]}
-                      >
-                        <Text style={styles.markPaidButtonText}>
-                          Nakit ödendi işaretle
-                        </Text>
-                      </Pressable>
-                    ) : null}
                   </View>
+
+                  {activeView === "admin" && (
+                    <View style={styles.statusActions}>
+                      {paymentStatusOptions.map((option) => {
+                        const isSelected = payment.status === option.status;
+
+                        return (
+                          <Pressable
+                            key={option.status}
+                            onPress={() =>
+                              handleChangePaymentStatus(
+                                payment.id,
+                                option.status,
+                              )
+                            }
+                            style={({ pressed }) => [
+                              styles.statusActionButton,
+                              isSelected && styles.statusActionButtonActive,
+                              pressed && styles.statusActionButtonPressed,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.statusActionButtonText,
+                                isSelected &&
+                                  styles.statusActionButtonTextActive,
+                              ]}
+                            >
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
                 </View>
               );
             })}
@@ -277,10 +336,12 @@ export default function PaymentsScreen() {
         </View>
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Sonraki aşama</Text>
+          <Text style={styles.noteTitle}>Gerçek sistemde nasıl olacak?</Text>
+
           <Text style={styles.noteText}>
-            Firebase eklendiğinde burada her kulübün üyeleri, aylık aidatları ve
-            ödeme geçmişi gerçek database’den okunacak.
+            Firebase eklendiğinde adminin yaptığı her ödeme durumu değişikliği
+            database’e kaydedilecek. Böylece yanlışlıkla işaretlenen ödeme
+            tekrar düzeltilebilecek.
           </Text>
         </View>
 
@@ -434,6 +495,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
+  sectionHeaderText: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
@@ -543,20 +607,38 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.secondary,
   },
-  markPaidButton: {
-    backgroundColor: theme.colors.brand.primary,
+  statusActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+  },
+  statusActionButton: {
+    flexGrow: 1,
+    flexBasis: 120,
+    backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
+    alignItems: "center",
   },
-  markPaidButtonPressed: {
+  statusActionButtonActive: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  statusActionButtonPressed: {
     opacity: 0.84,
     transform: [{ scale: 0.99 }],
   },
-  markPaidButtonText: {
-    color: theme.colors.text.inverse,
+  statusActionButtonText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
+  },
+  statusActionButtonTextActive: {
+    color: theme.colors.text.inverse,
   },
   noteCard: {
     backgroundColor: theme.colors.background.surface,

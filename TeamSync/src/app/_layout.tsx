@@ -32,11 +32,17 @@ export default function RootLayout() {
         <Stack.Screen name="join-club" />
         <Stack.Screen name="join-request-sent" />
         <Stack.Screen name="dashboard" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="messages" />
         <Stack.Screen name="pending-approvals" />
         <Stack.Screen name="teams" />
         <Stack.Screen name="announcements" />
         <Stack.Screen name="schedule" />
         <Stack.Screen name="attendance" />
+        <Stack.Screen name="availability" />
+        <Stack.Screen name="statistics" />
+        <Stack.Screen name="replays" />
+        <Stack.Screen name="payments" />
       </Stack>
     </AppProviders>
   );

@@ -17,19 +17,24 @@ export default function CreateClubScreen() {
   const [city, setCity] = useState("");
   const [error, setError] = useState("");
 
+  const previewCode =
+    clubName.trim() === ""
+      ? "TS-2026"
+      : `${clubName.trim().slice(0, 2).toUpperCase()}-2026`;
+
   function handleCreateClub() {
     if (clubName.trim() === "") {
-      setError(t.createClub.validation.clubNameRequired);
+      setError("Lütfen kulüp adını giriniz.");
       return;
     }
 
     if (sport.trim() === "") {
-      setError(t.createClub.validation.sportRequired);
+      setError("Lütfen branş bilgisini giriniz.");
       return;
     }
 
     if (city.trim() === "") {
-      setError(t.createClub.validation.cityRequired);
+      setError("Lütfen şehir bilgisini giriniz.");
       return;
     }
 
@@ -38,20 +43,26 @@ export default function CreateClubScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.title}>{t.createClub.title}</Text>
+        <Text style={styles.badge}>Kulüp sahibi / yönetici</Text>
 
-        <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
+        <Text style={styles.title}>Yeni kulüp oluştur</Text>
+
+        <Text style={styles.subtitle}>
+          Kulübünüz için TeamSync çalışma alanını hazırlayın. Oyuncular,
+          veliler ve koçlar daha sonra kulüp kodu ile katılabilecek.
+        </Text>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.clubNameLabel}</Text>
+            <Text style={styles.label}>Kulüp adı</Text>
+
             <TextInput
               style={styles.input}
-              placeholder={t.createClub.clubNamePlaceholder}
+              placeholder="Örn. İstanbul Voleybol Kulübü"
               placeholderTextColor={theme.colors.text.muted}
               value={clubName}
               onChangeText={setClubName}
@@ -60,10 +71,11 @@ export default function CreateClubScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.sportLabel}</Text>
+            <Text style={styles.label}>Branş</Text>
+
             <TextInput
               style={styles.input}
-              placeholder={t.createClub.sportPlaceholder}
+              placeholder="Örn. Voleybol"
               placeholderTextColor={theme.colors.text.muted}
               value={sport}
               onChangeText={setSport}
@@ -72,10 +84,11 @@ export default function CreateClubScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.cityLabel}</Text>
+            <Text style={styles.label}>Şehir</Text>
+
             <TextInput
               style={styles.input}
-              placeholder={t.createClub.cityPlaceholder}
+              placeholder="Örn. İstanbul"
               placeholderTextColor={theme.colors.text.muted}
               value={city}
               onChangeText={setCity}
@@ -84,11 +97,20 @@ export default function CreateClubScreen() {
           </View>
         </View>
 
+        <View style={styles.codePreviewBox}>
+          <Text style={styles.codePreviewLabel}>Oluşacak örnek kulüp kodu</Text>
+          <Text style={styles.codePreviewValue}>{previewCode}</Text>
+          <Text style={styles.codePreviewHint}>
+            Bu kodu ileride oyuncu, veli ve koçlar kulübe katılmak için
+            kullanacak.
+          </Text>
+        </View>
+
         {error !== "" && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={t.createClub.submitButton}
+            title="Kulübü oluştur"
             onPress={handleCreateClub}
             accessibilityLabel="Kulübü oluştur ve kontrol paneline git"
             style={styles.button}
@@ -109,6 +131,10 @@ export default function CreateClubScreen() {
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: theme.colors.background.app,
+  },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -125,6 +151,18 @@ const styles = StyleSheet.create({
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
+  },
+  badge: {
+    alignSelf: "center",
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    marginBottom: theme.spacing["2xl"],
+    textAlign: "center",
   },
   title: {
     fontSize: theme.fontSizes["4xl"],
@@ -165,6 +203,33 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     fontSize: theme.fontSizes.lg,
     color: theme.colors.text.primary,
+  },
+  codePreviewBox: {
+    width: "100%",
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginTop: theme.spacing["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  codePreviewLabel: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.extrabold,
+    color: theme.colors.text.secondary,
+    marginBottom: theme.spacing.sm,
+  },
+  codePreviewValue: {
+    fontSize: theme.fontSizes["3xl"],
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.sm,
+  },
+  codePreviewHint: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
   errorText: {
     marginTop: theme.spacing.lg,

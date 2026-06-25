@@ -15,37 +15,68 @@ export default function JoinClubScreen() {
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
 
+  function handleInviteCodeChange(text: string) {
+    const formattedCode = text.toUpperCase().replace(/\s/g, "");
+
+    setInviteCode(formattedCode);
+
+    if (error !== "") {
+      setError("");
+    }
+  }
+
   function handleJoinClub() {
-    if (inviteCode.trim() === "") {
-      setError(t.joinClub.validation.invitationCodeRequired);
+    const cleanedCode = inviteCode.trim();
+
+    if (cleanedCode === "") {
+      setError("Lütfen takım/kulüp kodunu giriniz.");
+      return;
+    }
+
+    if (cleanedCode.length < 4) {
+      setError("Kod en az 4 karakter olmalıdır.");
       return;
     }
 
     setError("");
-    router.push("/dashboard");
+
+    // Önemli değişiklik:
+    // Eskiden dashboard'a gidiyordu.
+    // Artık admin onayı bekleme ekranına gidiyor.
+    router.push("/join-request-sent");
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.title}>{t.joinClub.title}</Text>
+        <Text style={styles.badge}>Takım kodu ile giriş</Text>
 
-        <Text style={styles.subtitle}>{t.joinClub.subtitle}</Text>
+        <Text style={styles.title}>Kulübüne katıl</Text>
+
+        <Text style={styles.subtitle}>
+          Kulüp yöneticinizden aldığınız takım kodunu girerek TeamSync çalışma
+          alanına katılma isteği gönderebilirsiniz.
+        </Text>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Kod örneği</Text>
+          <Text style={styles.infoText}>TS-2026 veya IVK-2026</Text>
+        </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.joinClub.invitationCodeLabel}</Text>
+            <Text style={styles.label}>Takım / kulüp kodu</Text>
 
             <TextInput
               style={styles.input}
-              placeholder={t.joinClub.invitationCodePlaceholder}
+              placeholder="Örn. TS-2026"
               placeholderTextColor={theme.colors.text.muted}
               value={inviteCode}
-              onChangeText={setInviteCode}
+              onChangeText={handleInviteCodeChange}
               autoCapitalize="characters"
-              accessibilityLabel="Davet kodu"
+              accessibilityLabel="Takım veya kulüp kodu"
             />
           </View>
         </View>
@@ -54,9 +85,9 @@ export default function JoinClubScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={t.joinClub.submitButton}
+            title="Katılma isteği gönder"
             onPress={handleJoinClub}
-            accessibilityLabel="Davet kodu ile kulübe katıl ve kontrol paneline git"
+            accessibilityLabel="Takım kodu ile katılma isteği gönder"
             style={styles.button}
           />
 
@@ -75,6 +106,10 @@ export default function JoinClubScreen() {
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: theme.colors.background.app,
+  },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -92,6 +127,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
+  badge: {
+    alignSelf: "center",
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    marginBottom: theme.spacing["2xl"],
+    textAlign: "center",
+  },
   title: {
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
@@ -106,6 +153,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
+  },
+  infoBox: {
+    width: "100%",
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  infoTitle: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  infoText: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
   form: {
     width: "100%",

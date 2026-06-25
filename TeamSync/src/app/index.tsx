@@ -1,29 +1,36 @@
 import { Link } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
 
-const t = translations[defaultLanguage];
+const features = [
+  "Kulüp sahipleri kendi kulübünü oluşturabilir",
+  "Oyuncu, veli ve koçlar takım kodu ile katılabilir",
+  "Antrenman, maç ve duyurular tek yerden takip edilir",
+  "Web, iPhone ve Android için ortak deneyim",
+];
 
 export default function HomeScreen() {
   return (
-    <View style={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard centered style={styles.card}>
-        <Text style={styles.logo}>{t.common.appName}</Text>
+        <Text style={styles.logo}>TeamSync</Text>
 
-        <Text style={styles.badge}>Türkiye Kulüp Yönetim Platformu</Text>
+        <Text style={styles.badge}>Spor kulüpleri için yönetim platformu</Text>
 
-        <Text style={styles.title}>{t.home.title}</Text>
+        <Text style={styles.title}>Kulübünüzü tek yerden yönetin</Text>
 
-        <Text style={styles.subtitle}>{t.home.subtitle}</Text>
+        <Text style={styles.subtitle}>
+          TeamSync; kulüp sahipleri, koçlar, veliler ve sporcular için takım
+          yönetimini daha kolay hale getirir.
+        </Text>
 
         <View style={styles.featureBox}>
-          <Text style={styles.featureTitle}>{t.home.featuresTitle}</Text>
+          <Text style={styles.featureTitle}>TeamSync ile neler yapacağız?</Text>
 
-          {t.home.features.map((feature) => (
+          {features.map((feature) => (
             <Text key={feature} style={styles.featureText}>
               ✓ {feature}
             </Text>
@@ -33,7 +40,7 @@ export default function HomeScreen() {
         <View style={styles.buttonGroup}>
           <Link href="/create-club" asChild>
             <AppButton
-              title={t.home.primaryAction}
+              title="Kulüp oluştur"
               accessibilityLabel="Yeni kulüp oluşturma sayfasına git"
               style={styles.button}
             />
@@ -41,25 +48,30 @@ export default function HomeScreen() {
 
           <Link href="/join-club" asChild>
             <AppButton
-              title={t.home.secondaryAction}
+              title="Takım kodu ile katıl"
               variant="secondary"
-              accessibilityLabel="Davet kodu ile kulübe katılma sayfasına git"
+              accessibilityLabel="Takım kodu ile kulübe katılma sayfasına git"
               style={styles.button}
             />
           </Link>
         </View>
 
         <Text style={styles.footerText}>
-          Voleybol, basketbol, futbol ve diğer spor kulüpleri için geliştirildi.
+          E-mail veya şifre sistemi daha sonra Firebase ile eklenecek. Şimdilik
+          ana giriş sistemi takım kodudur.
         </Text>
       </ScreenCard>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  scroll: {
     flex: 1,
+    backgroundColor: theme.colors.background.app,
+  },
+  screen: {
+    flexGrow: 1,
     backgroundColor: theme.colors.background.app,
     alignItems: "center",
     justifyContent: "center",

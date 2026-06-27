@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Link, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -104,7 +104,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "İstanbul Voleybol Kulübü",
     heroTitle: "Kulüp yönetim paneli",
     heroSubtitle:
-      "Kulübünüzün üyelerini, takımlarını, antrenmanlarını, duyurularını, ödemelerini ve videolarını tek yerden yönetin.",
+      "Üyeleri, takımları, duyuruları, programları, ödemeleri ve mesajları tek yerden yönet.",
     stats: [
       { label: "Sporcu", value: "128" },
       { label: "Takım", value: "7" },
@@ -112,51 +112,14 @@ const dashboardData: Record<UserRole, DashboardData> = {
       { label: "Etkinlik", value: "24" },
     ],
     actions: [
-      {
-        title: "Yeni takım oluştur",
-        meta: "Takım yönetimine git",
-        route: "/teams",
-      },
-      {
-        title: "Bekleyen üyeleri onayla",
-        meta: "Onay ekranına git",
-        route: "/pending-approvals",
-      },
-      {
-        title: "Duyuru yayınla",
-        meta: "Duyurular ekranına git",
-        route: "/announcements",
-      },
-      {
-        title: "Mesajları yönet",
-        meta: "Koç, veli ve sporcu mesajları",
-        route: "/messages",
-      },
-      {
-        title: "Program oluştur",
-        meta: "Program ekranına git",
-        route: "/schedule",
-      },
-      {
-        title: "Yoklama yönet",
-        meta: "Yoklama ekranına git",
-        route: "/attendance",
-      },
-      {
-        title: "Ödemeleri kontrol et",
-        meta: "Ödeme ekranına git",
-        route: "/payments",
-      },
-      {
-        title: "İstatistikleri görüntüle",
-        meta: "Performans ekranına git",
-        route: "/statistics",
-      },
-      {
-        title: "Video / drill ekle",
-        meta: "Replays ekranına git",
-        route: "/replays",
-      },
+      { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
+      { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
+      { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+      { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
+      { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+      { title: "Yoklama yönet", meta: "Katılım durumları", route: "/attendance" },
+      { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
+      { title: "İstatistikleri gör", meta: "Performans ve kulüp özeti", route: "/statistics" },
     ],
     overview: [
       { label: "Aktif sezon", value: "2026 Bahar" },
@@ -170,49 +133,20 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
     heroTitle: "Takımını yönet",
     heroSubtitle:
-      "Antrenman planlarını, oyuncu katılımını, uygunluk cevaplarını ve video içeriklerini hızlıca takip et.",
+      "Antrenman planlarını, oyuncu katılımını, uygunluk cevaplarını ve mesajları hızlıca takip et.",
     stats: [
       { label: "Oyuncu", value: "18" },
-      { label: "Bu hafta antrenman", value: "4" },
+      { label: "Bu hafta", value: "4" },
       { label: "Yaklaşan maç", value: "2" },
       { label: "Cevap bekleyen", value: "3" },
     ],
     actions: [
-      {
-        title: "Programı yönet",
-        meta: "Antrenman / maç ekle",
-        route: "/schedule",
-      },
-      {
-        title: "Yoklama al",
-        meta: "Katılım durumlarını işaretle",
-        route: "/attendance",
-      },
-      {
-        title: "Uygunluk cevaplarını gör",
-        meta: "Kim geliyor, kim gelmiyor?",
-        route: "/availability",
-      },
-      {
-        title: "Takım duyurusu gönder",
-        meta: "Duyurular ekranına git",
-        route: "/announcements",
-      },
-      {
-        title: "Mesajları aç",
-        meta: "Veli ve sporcularla iletişim",
-        route: "/messages",
-      },
-      {
-        title: "Video / drill paylaş",
-        meta: "Replays ekranına git",
-        route: "/replays",
-      },
-      {
-        title: "İstatistikleri görüntüle",
-        meta: "Oyuncu performansını takip et",
-        route: "/statistics",
-      },
+      { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
+      { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
+      { title: "Uygunluk cevapları", meta: "Kim geliyor, kim gelmiyor?", route: "/availability" },
+      { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
+      { title: "Mesajları aç", meta: "Veli ve sporcularla iletişim", route: "/messages" },
+      { title: "Video / drill paylaş", meta: "Replays ekranına git", route: "/replays" },
     ],
     overview: [
       { label: "Takım", value: "U17 Erkek" },
@@ -226,49 +160,20 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "Efe Asma · İstanbul Voleybol Kulübü",
     heroTitle: "Çocuğunun takım sürecini takip et",
     heroSubtitle:
-      "Antrenman saatlerini, maç programını, duyuruları, videoları ve ödeme durumunu tek yerden gör.",
+      "Antrenman saatlerini, maç programını, duyuruları, mesajları ve ödeme durumunu tek yerden gör.",
     stats: [
-      { label: "Bu hafta antrenman", value: "3" },
-      { label: "Yaklaşan maç", value: "1" },
-      { label: "Yeni duyuru", value: "2" },
-      { label: "Ödeme durumu", value: "OK" },
+      { label: "Antrenman", value: "3" },
+      { label: "Maç", value: "1" },
+      { label: "Duyuru", value: "2" },
+      { label: "Ödeme", value: "OK" },
     ],
     actions: [
-      {
-        title: "Programı görüntüle",
-        meta: "Antrenman ve maç takvimi",
-        route: "/schedule",
-      },
-      {
-        title: "Duyuruları oku",
-        meta: "Kulüp ve takım duyuruları",
-        route: "/announcements",
-      },
-      {
-        title: "Koça mesaj gönder",
-        meta: "Takım iletişim ekranı",
-        route: "/messages",
-      },
-      {
-        title: "Uygunluk bildir",
-        meta: "Çocuğun için katılım bildir",
-        route: "/availability",
-      },
-      {
-        title: "Ödeme durumunu kontrol et",
-        meta: "Aylık ödeme bilgileri",
-        route: "/payments",
-      },
-      {
-        title: "Video / drill izle",
-        meta: "Takıma özel içerikler",
-        route: "/replays",
-      },
-      {
-        title: "İstatistikleri gör",
-        meta: "Katılım ve performans özeti",
-        route: "/statistics",
-      },
+      { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+      { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+      { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+      { title: "Uygunluk bildir", meta: "Çocuğun için katılım bildir", route: "/availability" },
+      { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
+      { title: "İstatistikleri gör", meta: "Katılım ve performans özeti", route: "/statistics" },
     ],
     overview: [
       { label: "Sporcu", value: "Efe Asma" },
@@ -282,44 +187,20 @@ const dashboardData: Record<UserRole, DashboardData> = {
     clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
     heroTitle: "Kendi takım programını takip et",
     heroSubtitle:
-      "Antrenmanlarını, maçlarını, duyuruları ve takım videolarını gör. Uygunluk durumunu koçuna bildir.",
+      "Antrenmanlarını, maçlarını, duyuruları ve takım mesajlarını gör. Uygunluk durumunu koçuna bildir.",
     stats: [
-      { label: "Bu hafta antrenman", value: "3" },
-      { label: "Yaklaşan maç", value: "1" },
+      { label: "Antrenman", value: "3" },
+      { label: "Maç", value: "1" },
       { label: "Duyuru", value: "2" },
       { label: "Uygunluk", value: "✓" },
     ],
     actions: [
-      {
-        title: "Programımı görüntüle",
-        meta: "Antrenman ve maç takvimi",
-        route: "/schedule",
-      },
-      {
-        title: "Uygunluk bildir",
-        meta: "Geliyorum / gelemiyorum",
-        route: "/availability",
-      },
-      {
-        title: "Duyuruları oku",
-        meta: "Takım duyurularını gör",
-        route: "/announcements",
-      },
-      {
-        title: "Koça mesaj gönder",
-        meta: "Takım iletişim ekranı",
-        route: "/messages",
-      },
-      {
-        title: "Video / drill izle",
-        meta: "Koçun paylaştığı içerikler",
-        route: "/replays",
-      },
-      {
-        title: "İstatistiklerimi gör",
-        meta: "Katılım ve performans özeti",
-        route: "/statistics",
-      },
+      { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+      { title: "Uygunluk bildir", meta: "Geliyorum / gelemiyorum", route: "/availability" },
+      { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
+      { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+      { title: "Video / drill izle", meta: "Koçun paylaştığı içerikler", route: "/replays" },
+      { title: "İstatistiklerimi gör", meta: "Katılım ve performans özeti", route: "/statistics" },
     ],
     overview: [
       { label: "Sporcu", value: "Mert Asma" },
@@ -347,23 +228,6 @@ const upcomingEvents = [
     location: "Kulüp Toplantı Salonu",
   },
 ];
-
-function getInitials(name: string) {
-  const trimmedName = name.trim();
-
-  if (trimmedName.length === 0) {
-    return "TS";
-  }
-
-  const nameParts = trimmedName.split(" ");
-  const firstLetter = nameParts[0]?.charAt(0) ?? "";
-  const lastLetter =
-    nameParts.length > 1
-      ? nameParts[nameParts.length - 1]?.charAt(0) ?? ""
-      : "";
-
-  return `${firstLetter}${lastLetter}`.toUpperCase();
-}
 
 function getFirstName(name: string) {
   const trimmedName = name.trim();
@@ -414,8 +278,6 @@ export default function DashboardScreen() {
     }, [])
   );
 
-  const profileInitials = getInitials(savedProfileData.name);
-
   const dashboardWelcome =
     activeRole === "admin" || activeRole === "athlete"
       ? `Hoş geldin, ${getFirstName(savedProfileData.name)}`
@@ -426,38 +288,23 @@ export default function DashboardScreen() {
 
   const overviewItems = currentDashboard.overview.map((item) => {
     if (item.label === "Aktif sezon") {
-      return {
-        ...item,
-        value: savedProfileData.season,
-      };
+      return { ...item, value: savedProfileData.season };
     }
 
     if (item.label === "Rolün" && activeRole === "admin") {
-      return {
-        ...item,
-        value: savedProfileData.role,
-      };
+      return { ...item, value: savedProfileData.role };
     }
 
     if (item.label === "Takım") {
-      return {
-        ...item,
-        value: savedProfileData.team,
-      };
+      return { ...item, value: savedProfileData.team };
     }
 
     if (item.label === "Üyelik modeli") {
-      return {
-        ...item,
-        value: savedProfileData.membership,
-      };
+      return { ...item, value: savedProfileData.membership };
     }
 
     if (item.label === "Sporcu" && activeRole === "athlete") {
-      return {
-        ...item,
-        value: savedProfileData.name,
-      };
+      return { ...item, value: savedProfileData.name };
     }
 
     return item;
@@ -466,101 +313,24 @@ export default function DashboardScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.logo}>TeamSync</Text>
-
-            <Link href="/profile" asChild>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.profileButton,
-                  pressed && styles.profileButtonPressed,
-                ]}
-                accessibilityLabel="Profil sayfasına git"
-              >
-                <Text style={styles.profileButtonText}>{profileInitials}</Text>
-              </Pressable>
-            </Link>
-          </View>
-
-          <View>
-            <Text style={styles.welcome}>{dashboardWelcome}</Text>
-            <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
-          </View>
+        <View style={styles.pageHeader}>
+          <Text style={styles.logo}>TeamSync</Text>
+          <Text style={styles.welcome}>{dashboardWelcome}</Text>
+          <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Rol bazlı kontrol paneli</Text>
-
           <Text style={styles.heroTitle}>{currentDashboard.heroTitle}</Text>
+          <Text style={styles.heroSubtitle}>{currentDashboard.heroSubtitle}</Text>
 
-          <Text style={styles.heroSubtitle}>
-            {currentDashboard.heroSubtitle}
-          </Text>
-
-          <Link href="/profile" asChild>
-            <AppButton
-              title="Profili düzenle"
-              variant="secondary"
-              accessibilityLabel="Profil düzenleme sayfasına git"
-              style={styles.editProfileButton}
-            />
-          </Link>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rol seçimi</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            Şimdilik gerçek giriş sistemi yok. Bu bölümle farklı kullanıcı
-            rollerinin dashboard’da nasıl görüneceğini test ediyoruz.
-          </Text>
-
-          <View style={styles.roleGrid}>
-            {roleOptions.map((role) => {
-              const isActive = activeRole === role.id;
-
-              return (
-                <Pressable
-                  key={role.id}
-                  onPress={() => setActiveRole(role.id)}
-                  style={[
-                    styles.roleCard,
-                    isActive && styles.roleCardActive,
-                  ]}
-                >
-                  <View style={styles.roleHeader}>
-                    <Text
-                      style={[
-                        styles.roleTitle,
-                        isActive && styles.roleTitleActive,
-                      ]}
-                    >
-                      {role.title}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.roleTag,
-                        isActive && styles.roleTagActive,
-                      ]}
-                    >
-                      {role.tag}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.roleDescription,
-                      isActive && styles.roleDescriptionActive,
-                    ]}
-                  >
-                    {role.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <AppButton
+            title="Profili düzenle"
+            variant="secondary"
+            accessibilityLabel="Profil düzenleme sayfasına git"
+            style={styles.editProfileButton}
+            onPress={() => router.push("/profile" as never)}
+          />
         </View>
 
         <View style={styles.statsGrid}>
@@ -573,35 +343,67 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rol seçimi</Text>
+          <Text style={styles.sectionSubtitle}>
+            Şimdilik gerçek giriş sistemi yok. Bu bölümle farklı kullanıcı rollerinin dashboard’da nasıl görüneceğini test ediyoruz.
+          </Text>
+
+          <View style={styles.roleGrid}>
+            {roleOptions.map((role) => {
+              const isActive = activeRole === role.id;
+
+              return (
+                <Pressable
+                  key={role.id}
+                  onPress={() => setActiveRole(role.id)}
+                  style={({ pressed }) => [
+                    styles.roleCard,
+                    isActive ? styles.roleCardActive : null,
+                    pressed ? styles.cardPressed : null,
+                  ]}
+                >
+                  <View style={styles.roleHeader}>
+                    <Text style={[styles.roleTitle, isActive ? styles.roleTitleActive : null]}>
+                      {role.title}
+                    </Text>
+                    <Text style={[styles.roleTag, isActive ? styles.roleTagActive : null]}>
+                      {role.tag}
+                    </Text>
+                  </View>
+
+                  <Text style={[styles.roleDescription, isActive ? styles.roleDescriptionActive : null]}>
+                    {role.description}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
 
           <View style={styles.actionGrid}>
             {currentDashboard.actions.map((action) => {
-              if (action.route !== undefined) {
-                return (
-                  <Link key={action.title} href={action.route} asChild>
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.actionCard,
-                        styles.actionCardClickable,
-                        pressed && styles.actionCardPressed,
-                      ]}
-                    >
-                      <Text style={styles.actionText}>{action.title}</Text>
-                      <Text style={styles.actionMeta}>{action.meta}</Text>
-                    </Pressable>
-                  </Link>
-                );
-              }
-
               return (
-                <View
+                <Pressable
                   key={action.title}
-                  style={[styles.actionCard, styles.actionCardDisabled]}
+                  onPress={() => {
+                    if (action.route !== undefined) {
+                      router.push(action.route as never);
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    styles.actionCard,
+                    pressed ? styles.cardPressed : null,
+                  ]}
                 >
-                  <Text style={styles.actionText}>{action.title}</Text>
-                  <Text style={styles.actionMeta}>{action.meta}</Text>
-                </View>
+                  <View style={styles.actionTextArea}>
+                    <Text style={styles.actionText}>{action.title}</Text>
+                    <Text style={styles.actionMeta}>{action.meta}</Text>
+                  </View>
+                  <Text style={styles.actionArrow}>›</Text>
+                </Pressable>
               );
             })}
           </View>
@@ -632,25 +434,13 @@ export default function DashboardScreen() {
             const isLastItem = index === overviewItems.length - 1;
 
             return (
-              <View
-                key={item.label}
-                style={isLastItem ? styles.infoRowLast : styles.infoRow}
-              >
+              <View key={item.label} style={isLastItem ? styles.infoRowLast : styles.infoRow}>
                 <Text style={styles.infoLabel}>{item.label}</Text>
                 <Text style={styles.infoValue}>{item.value}</Text>
               </View>
             );
           })}
         </View>
-
-        <Link href="/" asChild>
-          <AppButton
-            title="Ana sayfaya dön"
-            variant="ghost"
-            accessibilityLabel="Ana sayfaya dön"
-            style={styles.backButton}
-          />
-        </Link>
       </View>
     </ScrollView>
   );
@@ -664,48 +454,22 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.lg,
   },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.brand.primary,
-  },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.background.surface,
-    borderWidth: 2,
-    borderColor: theme.colors.brand.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    ...theme.shadows.sm,
-  },
-  profileButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.97 }],
-  },
-  profileButtonText: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.md,
   },
   welcome: {
     fontSize: theme.fontSizes["5xl"],
@@ -753,6 +517,33 @@ const styles = StyleSheet.create({
   editProfileButton: {
     marginTop: theme.spacing["2xl"],
     alignSelf: "flex-start",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing["2xl"],
+  },
+  statCard: {
+    flexGrow: 1,
+    flexBasis: 145,
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    ...theme.shadows.sm,
+  },
+  statValue: {
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  statLabel: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.extrabold,
+    color: theme.colors.text.secondary,
   },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -817,7 +608,6 @@ const styles = StyleSheet.create({
   },
   roleTagActive: {
     backgroundColor: theme.colors.background.surface,
-    color: theme.colors.text.brand,
   },
   roleDescription: {
     fontSize: theme.fontSizes.md,
@@ -828,53 +618,21 @@ const styles = StyleSheet.create({
   roleDescriptionActive: {
     color: theme.colors.text.inverse,
   },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
-  },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 180,
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    ...theme.shadows.sm,
-  },
-  statValue: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  statLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
-  },
   actionGrid: {
     gap: theme.spacing.md,
   },
   actionCard: {
-    backgroundColor: theme.colors.background.subtle,
+    backgroundColor: theme.colors.brand.primarySoft,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  actionCardClickable: {
-    backgroundColor: theme.colors.brand.primarySoft,
     borderColor: theme.colors.brand.primarySoft,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
   },
-  actionCardDisabled: {
-    opacity: 0.72,
-  },
-  actionCardPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
+  actionTextArea: {
+    flex: 1,
   },
   actionText: {
     fontSize: theme.fontSizes.lg,
@@ -886,6 +644,11 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
+  },
+  actionArrow: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.black,
   },
   eventList: {
     gap: theme.spacing.md,
@@ -918,13 +681,13 @@ const styles = StyleSheet.create({
   eventTime: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.brand,
     marginBottom: theme.spacing.xs,
   },
   eventLocation: {
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
   },
   infoRow: {
     flexDirection: "row",
@@ -938,21 +701,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
   infoLabel: {
+    flex: 1,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
   },
   infoValue: {
     flex: 1,
+    textAlign: "right",
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-    textAlign: "right",
   },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
+  cardPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

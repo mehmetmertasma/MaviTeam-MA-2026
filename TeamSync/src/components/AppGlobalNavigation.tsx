@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   },
   topControls: {
     position: "absolute",
-    top: 54,
+    top: 10,
     left: 18,
     right: 18,
     zIndex: 901,

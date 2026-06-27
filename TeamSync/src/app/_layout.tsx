@@ -10,7 +10,7 @@ export const unstable_settings = {
 };
 
 const APP_BACKGROUND_COLOR = "#0f172a";
-const GLOBAL_NAV_TOP_SPACE = 88;
+const GLOBAL_NAV_TOP_SPACE = 64;
 
 const routesWithoutGlobalNavigation = [
   "/",

@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -51,8 +50,7 @@ const initialAnnouncements: Announcement[] = [
   {
     id: 1,
     title: "Antrenman saati güncellendi",
-    message:
-      "U16 Erkek takımı için cuma antrenmanı saat 18:30 olarak güncellendi.",
+    message: "U16 Erkek takımı için cuma antrenmanı saat 18:30 olarak güncellendi.",
     target: "U16 Erkek",
     createdAt: "Bugün",
     attachments: [],
@@ -119,16 +117,12 @@ function getMediaAttachmentName(asset: ImagePicker.ImagePickerAsset) {
 }
 
 export default function AnnouncementsScreen() {
-  const [announcements, setAnnouncements] =
-    useState<Announcement[]>(initialAnnouncements);
-
+  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTarget, setSelectedTarget] =
     useState<AnnouncementTarget>("Tüm Kulüp");
-  const [draftAttachments, setDraftAttachments] = useState<
-    AnnouncementAttachment[]
-  >([]);
+  const [draftAttachments, setDraftAttachments] = useState<AnnouncementAttachment[]>([]);
   const [statusMessage, setStatusMessage] = useState(
     "Duyurular local storage ile kaydedilecek."
   );
@@ -138,18 +132,13 @@ export default function AnnouncementsScreen() {
   useEffect(() => {
     async function loadSavedAnnouncements() {
       try {
-        const savedAnnouncements = await AsyncStorage.getItem(
-          ANNOUNCEMENTS_STORAGE_KEY
-        );
+        const savedAnnouncements = await AsyncStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
 
         if (savedAnnouncements === null) {
           return;
         }
 
-        const parsedAnnouncements = JSON.parse(
-          savedAnnouncements
-        ) as Announcement[];
-
+        const parsedAnnouncements = JSON.parse(savedAnnouncements) as Announcement[];
         setAnnouncements(parsedAnnouncements);
         setStatusMessage("Kaydedilmiş duyurular yüklendi.");
       } catch {
@@ -176,8 +165,7 @@ export default function AnnouncementsScreen() {
 
   async function pickMediaAttachment() {
     try {
-      const permissionResult =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResult.granted) {
         setStatusMessage("Fotoğraf/video seçmek için izin gerekli.");
@@ -209,7 +197,6 @@ export default function AnnouncementsScreen() {
         ...currentAttachments,
         newAttachment,
       ]);
-
       setStatusMessage("Fotoğraf/video duyuruya eklendi.");
     } catch {
       setStatusMessage("Fotoğraf/video eklenirken bir sorun oluştu.");
@@ -231,10 +218,9 @@ export default function AnnouncementsScreen() {
 
       const asset = result.assets[0];
 
-      const attachmentType: AnnouncementAttachmentType =
-        asset.mimeType?.startsWith("image/")
-          ? "image"
-          : asset.mimeType?.startsWith("video/")
+      const attachmentType: AnnouncementAttachmentType = asset.mimeType?.startsWith("image/")
+        ? "image"
+        : asset.mimeType?.startsWith("video/")
           ? "video"
           : "file";
 
@@ -251,7 +237,6 @@ export default function AnnouncementsScreen() {
         ...currentAttachments,
         newAttachment,
       ]);
-
       setStatusMessage("Dosya duyuruya eklendi.");
     } catch {
       setStatusMessage("Dosya eklenirken bir sorun oluştu.");
@@ -262,7 +247,6 @@ export default function AnnouncementsScreen() {
     setDraftAttachments((currentAttachments) =>
       currentAttachments.filter((attachment) => attachment.id !== attachmentId)
     );
-
     setStatusMessage("Ek kaldırıldı.");
   }
 
@@ -315,33 +299,59 @@ export default function AnnouncementsScreen() {
     }
   }
 
+  function renderAttachment(attachment: AnnouncementAttachment) {
+    const isImage = attachment.type === "image";
+
+    return (
+      <View key={attachment.id} style={styles.attachmentCard}>
+        {isImage ? (
+          <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
+        ) : null}
+
+        <View style={styles.attachmentInfo}>
+          <Text style={styles.attachmentType}>
+            {getAttachmentTypeLabel(attachment.type)}
+          </Text>
+          <Text style={styles.attachmentName} numberOfLines={1}>
+            {attachment.name}
+          </Text>
+          <Text style={styles.attachmentMeta}>{formatFileSize(attachment.size)}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>Duyurular</Text>
-            <Text style={styles.pageSubtitle}>
-              Kulüp veya takım üyelerine duyuru yayınla.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Duyurular</Text>
+          <Text style={styles.pageSubtitle}>
+            Kulüp veya takım üyelerine duyuru yayınla.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Kulüp iletişim merkezi</Text>
-
           <Text style={styles.heroTitle}>Yeni duyuru oluştur</Text>
-
           <Text style={styles.heroSubtitle}>
-            Admin olarak tüm kulübe veya seçili takıma önemli duyurular
-            gönderebilirsin. Duyuruya fotoğraf, video veya dosya ekleyebilirsin.
+            Admin olarak tüm kulübe veya seçili takıma önemli duyurular gönderebilirsin.
+            Fotoğraf, video veya dosya eki ekleyebilirsin.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Duyuru bilgileri</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Duyuru bilgileri</Text>
+              <Text style={styles.sectionSubtitle}>
+                Başlığı, mesajı ve hedef kitleyi seç.
+              </Text>
+            </View>
+
+            <Text style={styles.statusPill}>{announcements.length} aktif</Text>
+          </View>
 
           <Text style={styles.label}>Duyuru başlığı</Text>
           <TextInput
@@ -363,7 +373,6 @@ export default function AnnouncementsScreen() {
           />
 
           <Text style={styles.label}>Kimlere gönderilecek?</Text>
-
           <View style={styles.targetGrid}>
             {targetOptions.map((target) => {
               const isSelected = selectedTarget === target;
@@ -374,14 +383,14 @@ export default function AnnouncementsScreen() {
                   onPress={() => setSelectedTarget(target)}
                   style={({ pressed }) => [
                     styles.targetButton,
-                    isSelected && styles.targetButtonSelected,
-                    pressed && styles.targetButtonPressed,
+                    isSelected ? styles.targetButtonSelected : null,
+                    pressed ? styles.pressed : null,
                   ]}
                 >
                   <Text
                     style={[
                       styles.targetButtonText,
-                      isSelected && styles.targetButtonTextSelected,
+                      isSelected ? styles.targetButtonTextSelected : null,
                     ]}
                   >
                     {target}
@@ -392,26 +401,17 @@ export default function AnnouncementsScreen() {
           </View>
 
           <Text style={styles.label}>Ekler</Text>
-
           <View style={styles.attachmentButtonRow}>
             <Pressable
               onPress={pickMediaAttachment}
-              style={({ pressed }) => [
-                styles.attachmentButton,
-                pressed && styles.attachmentButtonPressed,
-              ]}
+              style={({ pressed }) => [styles.attachmentButton, pressed ? styles.pressed : null]}
             >
-              <Text style={styles.attachmentButtonText}>
-                Fotoğraf / Video ekle
-              </Text>
+              <Text style={styles.attachmentButtonText}>Fotoğraf / Video ekle</Text>
             </Pressable>
 
             <Pressable
               onPress={pickFileAttachment}
-              style={({ pressed }) => [
-                styles.attachmentButton,
-                pressed && styles.attachmentButtonPressed,
-              ]}
+              style={({ pressed }) => [styles.attachmentButton, pressed ? styles.pressed : null]}
             >
               <Text style={styles.attachmentButtonText}>Dosya ekle</Text>
             </Pressable>
@@ -425,161 +425,83 @@ export default function AnnouncementsScreen() {
                     <Text style={styles.attachmentType}>
                       {getAttachmentTypeLabel(attachment.type)}
                     </Text>
-                    <Text style={styles.attachmentName}>{attachment.name}</Text>
-                    <Text style={styles.attachmentMeta}>
-                      {formatFileSize(attachment.size)}
+                    <Text style={styles.attachmentName} numberOfLines={1}>
+                      {attachment.name}
                     </Text>
+                    <Text style={styles.attachmentMeta}>{formatFileSize(attachment.size)}</Text>
                   </View>
 
                   <Pressable
                     onPress={() => removeDraftAttachment(attachment.id)}
-                    style={({ pressed }) => [
-                      styles.removeAttachmentButton,
-                      pressed && styles.removeAttachmentButtonPressed,
-                    ]}
+                    style={({ pressed }) => [styles.removeButton, pressed ? styles.pressed : null]}
                   >
-                    <Text style={styles.removeAttachmentButtonText}>Kaldır</Text>
+                    <Text style={styles.removeButtonText}>Kaldır</Text>
                   </Pressable>
                 </View>
               ))}
             </View>
-          ) : (
-            <Text style={styles.emptyAttachmentText}>
-              Henüz ek eklenmedi. İstersen fotoğraf, video veya dosya
-              ekleyebilirsin.
-            </Text>
-          )}
+          ) : null}
 
-          <Pressable
-            disabled={!canPublish}
-            onPress={handlePublishAnnouncement}
-            style={({ pressed }) => [
-              styles.publishButton,
-              pressed && styles.publishButtonPressed,
-              !canPublish && styles.publishButtonDisabled,
-            ]}
-          >
-            <Text style={styles.publishButtonText}>Duyuruyu yayınla</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.listHeader}>
-            <Text style={styles.sectionTitle}>Yayınlanan duyurular</Text>
-            <Text style={styles.countText}>{announcements.length} duyuru</Text>
-          </View>
-
-          <View style={styles.announcementList}>
-            {announcements.map((announcement) => {
-              const announcementAttachments = announcement.attachments ?? [];
-
-              return (
-                <View key={announcement.id} style={styles.announcementCard}>
-                  <View style={styles.cardTopRow}>
-                    <Text style={styles.announcementTarget}>
-                      {announcement.target}
-                    </Text>
-
-                    <Text style={styles.createdAt}>
-                      {announcement.createdAt}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.announcementTitle}>
-                    {announcement.title}
-                  </Text>
-
-                  <Text style={styles.announcementMessage}>
-                    {announcement.message}
-                  </Text>
-
-                  {announcementAttachments.length > 0 ? (
-                    <View style={styles.publishedAttachmentList}>
-                      {announcementAttachments.map((attachment) => (
-                        <View
-                          key={attachment.id}
-                          style={styles.publishedAttachmentCard}
-                        >
-                          {attachment.type === "image" ? (
-                            <Image
-                              source={{ uri: attachment.uri }}
-                              style={styles.attachmentImage}
-                            />
-                          ) : (
-                            <View style={styles.fileIconBox}>
-                              <Text style={styles.fileIconText}>
-                                {attachment.type === "video" ? "▶" : "📎"}
-                              </Text>
-                            </View>
-                          )}
-
-                          <View style={styles.attachmentInfo}>
-                            <Text style={styles.attachmentType}>
-                              {getAttachmentTypeLabel(attachment.type)}
-                            </Text>
-                            <Text style={styles.attachmentName}>
-                              {attachment.name}
-                            </Text>
-                            <Text style={styles.attachmentMeta}>
-                              {formatFileSize(attachment.size)}
-                            </Text>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-
-                  <View style={styles.cardActionRow}>
-                    <Pressable
-                      onPress={() => deleteAnnouncement(announcement.id)}
-                      style={({ pressed }) => [
-                        styles.deleteButton,
-                        pressed && styles.deleteButtonPressed,
-                      ]}
-                    >
-                      <Text style={styles.deleteButtonText}>Duyuruyu sil</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kaydetme durumu</Text>
-
-          <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
-
-          <View style={styles.resetButtonWrapper}>
+          <View style={styles.publishRow}>
             <AppButton
-              title="Demo duyuruları sıfırla"
+              title="Duyuruyu yayınla"
+              onPress={handlePublishAnnouncement}
+              disabled={!canPublish}
+              style={styles.publishButton}
+            />
+
+            <AppButton
+              title="Sıfırla"
               variant="ghost"
-              accessibilityLabel="Demo duyuruları sıfırla"
               onPress={resetAnnouncements}
+              style={styles.resetButton}
             />
           </View>
+
+          <Text style={styles.statusText}>{statusMessage}</Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Demo notu</Text>
+          <Text style={styles.sectionTitle}>Yayınlanan duyurular</Text>
 
-          <Text style={styles.sectionSubtitle}>
-            Bu ekran fotoğraf, video ve dosya bilgisini local storage içine
-            kaydeder. Bu hâlâ Firebase değildir. Gerçek uygulamada bu ekleri
-            Firebase Storage içine yükleyip URL olarak Firestore&apos;da
-            tutacağız.
-          </Text>
+          <View style={styles.announcementList}>
+            {announcements.length > 0 ? (
+              announcements.map((announcement) => (
+                <View key={announcement.id} style={styles.announcementCard}>
+                  <View style={styles.announcementHeaderRow}>
+                    <View style={styles.announcementTextArea}>
+                      <Text style={styles.announcementTarget}>{announcement.target}</Text>
+                      <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                      <Text style={styles.announcementDate}>{announcement.createdAt}</Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() => deleteAnnouncement(announcement.id)}
+                      style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
+                    >
+                      <Text style={styles.deleteButtonText}>Sil</Text>
+                    </Pressable>
+                  </View>
+
+                  <Text style={styles.announcementMessage}>{announcement.message}</Text>
+
+                  {announcement.attachments.length > 0 ? (
+                    <View style={styles.attachmentList}>
+                      {announcement.attachments.map(renderAttachment)}
+                    </View>
+                  ) : null}
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Henüz duyuru yok</Text>
+                <Text style={styles.emptyText}>
+                  İlk duyurunu yukarıdaki formdan oluşturabilirsin.
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-
-        <Link href="/dashboard" asChild>
-          <AppButton
-            title="Dashboard'a dön"
-            variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
-          />
-        </Link>
       </View>
     </ScrollView>
   );
@@ -593,36 +515,35 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
   },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.xl,
   },
   heroCard: {
     backgroundColor: theme.colors.background.surface,
@@ -663,6 +584,16 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
@@ -671,27 +602,37 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     fontSize: theme.fontSizes.md,
-    color: theme.colors.text.secondary,
     fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.lg,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
+  },
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
   label: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.md,
   },
   input: {
+    minHeight: 52,
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.lg,
   },
   textArea: {
     minHeight: 120,
@@ -700,8 +641,7 @@ const styles = StyleSheet.create({
   targetGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
   targetButton: {
@@ -716,14 +656,10 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.brand.primary,
     borderColor: theme.colors.brand.primary,
   },
-  targetButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
   targetButtonText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.secondary,
   },
   targetButtonTextSelected: {
     color: theme.colors.text.inverse,
@@ -732,27 +668,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
   },
   attachmentButton: {
-    backgroundColor: theme.colors.background.subtle,
+    backgroundColor: theme.colors.brand.primarySoft,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: theme.colors.brand.primarySoft,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
   },
-  attachmentButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
   attachmentButtonText: {
-    color: theme.colors.text.secondary,
+    color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
   draftAttachmentList: {
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
   draftAttachmentCard: {
@@ -760,27 +692,19 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-  },
-  emptyAttachmentText: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-    marginBottom: theme.spacing.lg,
+    alignItems: "center",
+    gap: theme.spacing.md,
   },
   attachmentInfo: {
     flex: 1,
-    gap: theme.spacing.xs,
   },
   attachmentType: {
     color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.xs,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    textTransform: "uppercase",
+    marginBottom: theme.spacing.xs,
   },
   attachmentName: {
     color: theme.colors.text.primary,
@@ -788,131 +712,90 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
   },
   attachmentMeta: {
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
   },
-  removeAttachmentButton: {
-    alignSelf: "flex-start",
+  attachmentImage: {
+    width: 54,
+    height: 54,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.subtle,
+  },
+  removeButton: {
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
   },
-  removeAttachmentButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
-  removeAttachmentButtonText: {
+  removeButtonText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  publishButton: {
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radius.lg,
-    paddingVertical: theme.spacing.lg,
-    alignItems: "center",
-    marginTop: theme.spacing.sm,
-  },
-  publishButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
-  publishButtonDisabled: {
-    opacity: 0.48,
-  },
-  publishButtonText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  listHeader: {
+  publishRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
   },
-  countText: {
+  publishButton: {
+    flexGrow: 1,
+  },
+  resetButton: {
+    flexGrow: 1,
+  },
+  statusText: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
   },
   announcementList: {
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
   },
   announcementCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
   },
-  cardTopRow: {
+  announcementHeaderRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  announcementTextArea: {
+    flex: 1,
   },
   announcementTarget: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-  },
-  createdAt: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-  },
-  announcementTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
+  announcementTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  announcementDate: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
   announcementMessage: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-  },
-  publishedAttachmentList: {
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-  },
-  publishedAttachmentCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.md,
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    alignItems: "center",
-  },
-  attachmentImage: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.background.subtle,
-  },
-  fileIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.background.subtle,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fileIconText: {
-    fontSize: theme.fontSizes["2xl"],
-  },
-  cardActionRow: {
-    alignItems: "flex-start",
-    marginTop: theme.spacing.lg,
   },
   deleteButton: {
     backgroundColor: theme.colors.background.surface,
@@ -920,21 +803,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  deleteButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
+    paddingHorizontal: theme.spacing.md,
   },
   deleteButtonText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  resetButtonWrapper: {
+  attachmentList: {
+    gap: theme.spacing.sm,
     marginTop: theme.spacing.lg,
   },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
+  attachmentCard: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+  },
+  emptyCard: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  pressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

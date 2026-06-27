@@ -1,10 +1,5 @@
 import { router } from "expo-router";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 
@@ -21,46 +16,18 @@ type AppDrawerProps = {
 };
 
 const drawerItems: DrawerItem[] = [
-  {
-    label: "Dashboard",
-    subtitle: "Kulüp kontrol merkezi",
-    route: "/dashboard",
-  },
-  {
-    label: "Messages",
-    subtitle: "Takım ve bireysel mesajlar",
-    route: "/messages",
-  },
-  {
-    label: "Announcements",
-    subtitle: "Kulüp duyuruları",
-    route: "/announcements",
-  },
-  {
-    label: "Profile",
-    subtitle: "Profil bilgileri",
-    route: "/profile",
-  },
-  {
-    label: "Schedule",
-    subtitle: "Antrenman ve maç takvimi",
-    isDisabled: true,
-  },
-  {
-    label: "Attendance",
-    subtitle: "Yoklama sistemi",
-    isDisabled: true,
-  },
-  {
-    label: "Payments",
-    subtitle: "Ödeme takibi",
-    isDisabled: true,
-  },
-  {
-    label: "Settings",
-    subtitle: "Uygulama ayarları",
-    isDisabled: true,
-  },
+  { label: "Dashboard", subtitle: "Kulüp kontrol merkezi", route: "/dashboard" },
+  { label: "Messages", subtitle: "Takım ve bireysel mesajlar", route: "/messages" },
+  { label: "Announcements", subtitle: "Kulüp duyuruları", route: "/announcements" },
+  { label: "Schedule", subtitle: "Antrenman ve maç takvimi", route: "/schedule" },
+  { label: "Attendance", subtitle: "Yoklama sistemi", route: "/attendance" },
+  { label: "Availability", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability" },
+  { label: "Teams", subtitle: "Takım yönetimi", route: "/teams" },
+  { label: "Payments", subtitle: "Ödeme takibi", route: "/payments" },
+  { label: "Statistics", subtitle: "Performans ve katılım özeti", route: "/statistics" },
+  { label: "Replays", subtitle: "Video ve drill içerikleri", route: "/replays" },
+  { label: "Profile", subtitle: "Profil bilgileri", route: "/profile" },
+  { label: "Settings", subtitle: "Uygulama ayarları", isDisabled: true },
 ];
 
 export function AppDrawer({ visible, onClose }: AppDrawerProps) {
@@ -69,12 +36,11 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
   }
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
-    if (isDisabled || !route) {
+    if (isDisabled || route === undefined) {
       return;
     }
 
     onClose();
-
     router.push(route as never);
   }
 
@@ -91,10 +57,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
 
           <Pressable
             onPress={onClose}
-            style={({ pressed }) => [
-              styles.closeButton,
-              pressed ? styles.pressed : null,
-            ]}
+            style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}
           >
             <Text style={styles.closeButtonText}>×</Text>
           </Pressable>
@@ -125,31 +88,16 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
                 ]}
               >
                 <View style={styles.itemTextArea}>
-                  <Text
-                    style={[
-                      styles.itemLabel,
-                      item.isDisabled ? styles.disabledText : null,
-                    ]}
-                  >
+                  <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>
                     {item.label}
                   </Text>
 
-                  <Text
-                    style={[
-                      styles.itemSubtitle,
-                      item.isDisabled ? styles.disabledText : null,
-                    ]}
-                  >
+                  <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>
                     {item.subtitle}
                   </Text>
                 </View>
 
-                <Text
-                  style={[
-                    styles.itemArrow,
-                    item.isDisabled ? styles.disabledText : null,
-                  ]}
-                >
+                <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
                   {item.isDisabled ? "Soon" : "›"}
                 </Text>
               </Pressable>
@@ -165,22 +113,22 @@ export default AppDrawer;
 
 const styles = StyleSheet.create({
   overlay: {
-  position: "absolute",
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-  zIndex: 100,
-  flexDirection: "row",
-},
-backdrop: {
-  position: "absolute",
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-  backgroundColor: "rgba(0, 0, 0, 0.44)",
-},
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 1000,
+    flexDirection: "row",
+  },
+  backdrop: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.44)",
+  },
   drawer: {
     width: 310,
     maxWidth: "84%",

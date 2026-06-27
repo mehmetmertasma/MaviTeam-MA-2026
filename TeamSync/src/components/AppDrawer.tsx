@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 
@@ -74,7 +74,11 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
           </View>
         </View>
 
-        <View style={styles.items}>
+        <ScrollView
+          style={styles.itemsScroll}
+          contentContainerStyle={styles.items}
+          showsVerticalScrollIndicator={false}
+        >
           {drawerItems.map((item) => {
             return (
               <Pressable
@@ -103,7 +107,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
               </Pressable>
             );
           })}
-        </View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -132,7 +136,7 @@ const styles = StyleSheet.create({
   drawer: {
     width: 310,
     maxWidth: "84%",
-    minHeight: "100%",
+    height: "100%",
     backgroundColor: theme.colors.background.surface,
     paddingTop: theme.spacing["4xl"],
     paddingHorizontal: theme.spacing.xl,
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.xl,
+    marginBottom: theme.spacing.lg,
   },
   avatar: {
     width: 46,
@@ -211,8 +215,12 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     marginTop: theme.spacing.xs,
   },
+  itemsScroll: {
+    flex: 1,
+  },
   items: {
     gap: theme.spacing.sm,
+    paddingBottom: theme.spacing["2xl"],
   },
   item: {
     backgroundColor: theme.colors.background.subtle,

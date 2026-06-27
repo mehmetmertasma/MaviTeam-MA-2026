@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 
@@ -10,12 +10,24 @@ export const unstable_settings = {
 };
 
 const APP_BACKGROUND_COLOR = "#0f172a";
+const GLOBAL_NAV_TOP_SPACE = 88;
+
+const routesWithoutGlobalNavigation = [
+  "/",
+  "/login",
+  "/create-club",
+  "/join-club",
+  "/join-request-sent",
+];
 
 function AppProviders({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
 export default function RootLayout() {
+  const pathname = usePathname();
+  const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
+
   return (
     <AppProviders>
       <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR }}>
@@ -27,6 +39,7 @@ export default function RootLayout() {
             animation: "fade_from_bottom",
             contentStyle: {
               backgroundColor: APP_BACKGROUND_COLOR,
+              paddingTop: showGlobalNavigation ? GLOBAL_NAV_TOP_SPACE : 0,
             },
           }}
         >

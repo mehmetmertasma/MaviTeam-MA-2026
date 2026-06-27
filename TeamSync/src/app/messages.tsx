@@ -10,8 +10,6 @@ import {
   View,
 } from "react-native";
 
-import { AppDrawer } from "@/components/AppDrawer";
-import { AppHeader } from "@/components/AppHeader";
 import { theme } from "@/constants/theme";
 
 type ChatGroup = {
@@ -78,54 +76,14 @@ const chatGroups: ChatGroup[] = [
 ];
 
 const contacts: Contact[] = [
-  {
-    id: "admin-mert",
-    name: "Admin Mert",
-    role: "Admin",
-    teamName: "Kulüp Yönetimi",
-  },
-  {
-    id: "coach-emre",
-    name: "Coach Emre",
-    role: "Coach",
-    teamName: "U17 Erkek",
-  },
-  {
-    id: "coach-aylin",
-    name: "Coach Aylin",
-    role: "Coach",
-    teamName: "U14 Kız",
-  },
-  {
-    id: "coach-daniel",
-    name: "Coach Daniel",
-    role: "Coach",
-    teamName: "U18 Elite",
-  },
-  {
-    id: "parent-ayse",
-    name: "Ayşe Veli",
-    role: "Parent",
-    teamName: "U17 Erkek",
-  },
-  {
-    id: "parent-mehmet",
-    name: "Mehmet Veli",
-    role: "Parent",
-    teamName: "U14 Kız",
-  },
-  {
-    id: "athlete-efe",
-    name: "Efe Demir",
-    role: "Athlete",
-    teamName: "U17 Erkek",
-  },
-  {
-    id: "athlete-zeynep",
-    name: "Zeynep Kaya",
-    role: "Athlete",
-    teamName: "U14 Kız",
-  },
+  { id: "admin-mert", name: "Admin Mert", role: "Admin", teamName: "Kulüp Yönetimi" },
+  { id: "coach-emre", name: "Coach Emre", role: "Coach", teamName: "U17 Erkek" },
+  { id: "coach-aylin", name: "Coach Aylin", role: "Coach", teamName: "U14 Kız" },
+  { id: "coach-daniel", name: "Coach Daniel", role: "Coach", teamName: "U18 Elite" },
+  { id: "parent-ayse", name: "Ayşe Veli", role: "Parent", teamName: "U17 Erkek" },
+  { id: "parent-mehmet", name: "Mehmet Veli", role: "Parent", teamName: "U14 Kız" },
+  { id: "athlete-efe", name: "Efe Demir", role: "Athlete", teamName: "U17 Erkek" },
+  { id: "athlete-zeynep", name: "Zeynep Kaya", role: "Athlete", teamName: "U14 Kız" },
 ];
 
 function getDirectConversationId(contactId: string) {
@@ -209,14 +167,14 @@ function getContactInitials(name: string) {
     .split(" ")
     .map((part) => part[0])
     .join("")
-    .slice(0, 2);
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export default function MessagesScreen() {
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>(startingMessages);
   const [draftText, setDraftText] = useState("");
-  const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const [newMessageIsOpen, setNewMessageIsOpen] = useState(false);
   const [contactSearchText, setContactSearchText] = useState("");
 
@@ -270,10 +228,7 @@ export default function MessagesScreen() {
   }, [contactSearchText]);
 
   function openGroupChat(group: ChatGroup) {
-    setActiveChat({
-      type: "group",
-      groupId: group.id,
-    });
+    setActiveChat({ type: "group", groupId: group.id });
     setDraftText("");
     setNewMessageIsOpen(false);
     setContactSearchText("");
@@ -334,12 +289,25 @@ export default function MessagesScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View style={styles.chatHeaderWrapper}>
-          <AppHeader
-            title={chatTitle}
-            subtitle={chatSubtitle}
-            mode="back"
-            onBackPress={closeChat}
-          />
+          <Pressable
+            onPress={closeChat}
+            style={({ pressed }) => [
+              styles.backButton,
+              pressed ? styles.pressed : null,
+            ]}
+            accessibilityLabel="Mesaj listesine geri dön"
+          >
+            <Text style={styles.backButtonText}>‹</Text>
+          </Pressable>
+
+          <View style={styles.chatTitleArea}>
+            <Text style={styles.chatTitle} numberOfLines={1}>
+              {chatTitle}
+            </Text>
+            <Text style={styles.chatSubtitle} numberOfLines={1}>
+              {chatSubtitle}
+            </Text>
+          </View>
         </View>
 
         <ScrollView
@@ -355,16 +323,12 @@ export default function MessagesScreen() {
                   key={message.id}
                   style={[
                     styles.messageBubble,
-                    isMyMessage
-                      ? styles.myMessageBubble
-                      : styles.otherMessageBubble,
+                    isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble,
                   ]}
                 >
                   <View style={styles.messageTopRow}>
                     <Text style={styles.messageSender}>{message.senderName}</Text>
-                    <Text style={styles.messageTime}>
-                      {formatMessageTime(message.createdAt)}
-                    </Text>
+                    <Text style={styles.messageTime}>{formatMessageTime(message.createdAt)}</Text>
                   </View>
 
                   <Text style={styles.messageRole}>{message.senderRole}</Text>
@@ -394,10 +358,7 @@ export default function MessagesScreen() {
 
           <Pressable
             onPress={sendMessage}
-            style={({ pressed }) => [
-              styles.sendButton,
-              pressed ? styles.pressed : null,
-            ]}
+            style={({ pressed }) => [styles.sendButton, pressed ? styles.pressed : null]}
           >
             <Text style={styles.sendButtonText}>➤</Text>
           </Pressable>
@@ -407,188 +368,154 @@ export default function MessagesScreen() {
   }
 
   return (
-    <View style={styles.root}>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={styles.screenContent}
-      >
-        <View style={styles.container}>
-          <AppHeader
-            title="Mesajlar"
-            subtitle="Takım grupları ve bireysel mesajlar"
-            mode="menu"
-            onMenuPress={() => setDrawerIsOpen(true)}
-          />
+    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      <View style={styles.container}>
+        <View style={styles.pageHeader}>
+          <Text style={styles.logo}>TeamSync</Text>
+          <Text style={styles.title}>Mesajlar</Text>
+          <Text style={styles.subtitle}>Takım grupları ve bireysel mesajlar.</Text>
+        </View>
 
-          <View style={styles.newMessageButtonRow}>
-            <Pressable
-              onPress={() =>
-                setNewMessageIsOpen((currentValue) => !currentValue)
-              }
-              style={({ pressed }) => [
-                styles.newMessageButton,
-                pressed ? styles.pressed : null,
-              ]}
+        <View style={styles.newMessageButtonRow}>
+          <Pressable
+            onPress={() => setNewMessageIsOpen((currentValue) => !currentValue)}
+            style={({ pressed }) => [styles.newMessageButton, pressed ? styles.pressed : null]}
+          >
+            <Text style={styles.newMessageButtonText}>
+              {newMessageIsOpen ? "Close" : "+ New Message"}
+            </Text>
+          </Pressable>
+        </View>
+
+        {newMessageIsOpen ? (
+          <View style={styles.newMessagePanel}>
+            <View style={styles.newMessageHeader}>
+              <View style={styles.newMessageTextArea}>
+                <Text style={styles.newMessageTitle}>Yeni bireysel mesaj</Text>
+                <Text style={styles.newMessageSubtitle}>
+                  Kişiyi seç, direkt konuşmaya başla.
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => {
+                  setNewMessageIsOpen(false);
+                  setContactSearchText("");
+                }}
+                style={({ pressed }) => [styles.closeSmallButton, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.closeSmallButtonText}>×</Text>
+              </Pressable>
+            </View>
+
+            <TextInput
+              value={contactSearchText}
+              onChangeText={setContactSearchText}
+              placeholder="İsim, rol veya takım ara..."
+              placeholderTextColor={theme.colors.text.muted}
+              style={styles.contactSearchInput}
+            />
+
+            <ScrollView
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+              style={styles.contactPickerScroll}
+              contentContainerStyle={styles.contactPickerContent}
             >
-              <Text style={styles.newMessageButtonText}>
-                {newMessageIsOpen ? "Close" : "+ New Message"}
-              </Text>
-            </Pressable>
-          </View>
+              {filteredContacts.length > 0 ? (
+                filteredContacts.map((contact) => {
+                  const directConversationId = getDirectConversationId(contact.id);
+                  const lastMessage = getLastMessage(directConversationId, messages);
 
-          {newMessageIsOpen ? (
-            <View style={styles.newMessagePanel}>
-              <View style={styles.newMessageHeader}>
-                <View style={styles.newMessageTextArea}>
-                  <Text style={styles.newMessageTitle}>Yeni bireysel mesaj</Text>
-                  <Text style={styles.newMessageSubtitle}>
-                    Kişiyi seç, direkt konuşmaya başla.
+                  return (
+                    <Pressable
+                      key={contact.id}
+                      onPress={() => openDirectChat(contact)}
+                      style={({ pressed }) => [styles.contactRow, pressed ? styles.pressed : null]}
+                    >
+                      <View style={styles.contactAvatar}>
+                        <Text style={styles.contactAvatarText}>
+                          {getContactInitials(contact.name)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.contactInfo}>
+                        <Text style={styles.contactName}>{contact.name}</Text>
+                        <Text style={styles.contactMeta}>
+                          {contact.role} · {contact.teamName}
+                        </Text>
+
+                        {lastMessage ? (
+                          <Text style={styles.contactLastMessage} numberOfLines={1}>
+                            {lastMessage.text}
+                          </Text>
+                        ) : null}
+                      </View>
+
+                      <Text style={styles.contactAction}>Chat</Text>
+                    </Pressable>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyContactsCard}>
+                  <Text style={styles.emptyContactsText}>Kişi bulunamadı.</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        <View style={styles.groupsSection}>
+          <Text style={styles.sectionTitle}>Takım Grupları</Text>
+
+          {chatGroups.map((group) => {
+            const lastMessage = getLastMessage(group.id, messages);
+
+            return (
+              <Pressable
+                key={group.id}
+                onPress={() => openGroupChat(group)}
+                style={({ pressed }) => [styles.groupCard, pressed ? styles.pressed : null]}
+              >
+                <View style={styles.groupAvatar}>
+                  <Text style={styles.groupAvatarText}>
+                    {group.teamName
+                      .split(" ")
+                      .map((part) => part[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
                   </Text>
                 </View>
 
-                <Pressable
-                  onPress={() => {
-                    setNewMessageIsOpen(false);
-                    setContactSearchText("");
-                  }}
-                  style={({ pressed }) => [
-                    styles.closeSmallButton,
-                    pressed ? styles.pressed : null,
-                  ]}
-                >
-                  <Text style={styles.closeSmallButtonText}>×</Text>
-                </Pressable>
-              </View>
-
-              <TextInput
-                value={contactSearchText}
-                onChangeText={setContactSearchText}
-                placeholder="İsim, rol veya takım ara..."
-                placeholderTextColor={theme.colors.text.muted}
-                style={styles.contactSearchInput}
-              />
-
-              <ScrollView
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-                style={styles.contactPickerScroll}
-                contentContainerStyle={styles.contactPickerContent}
-              >
-                {filteredContacts.length > 0 ? (
-                  filteredContacts.map((contact) => {
-                    const directConversationId = getDirectConversationId(contact.id);
-                    const lastMessage = getLastMessage(
-                      directConversationId,
-                      messages
-                    );
-
-                    return (
-                      <Pressable
-                        key={contact.id}
-                        onPress={() => openDirectChat(contact)}
-                        style={({ pressed }) => [
-                          styles.contactRow,
-                          pressed ? styles.pressed : null,
-                        ]}
-                      >
-                        <View style={styles.contactAvatar}>
-                          <Text style={styles.contactAvatarText}>
-                            {getContactInitials(contact.name)}
-                          </Text>
-                        </View>
-
-                        <View style={styles.contactInfo}>
-                          <Text style={styles.contactName}>{contact.name}</Text>
-                          <Text style={styles.contactMeta}>
-                            {contact.role} · {contact.teamName}
-                          </Text>
-
-                          {lastMessage ? (
-                            <Text
-                              style={styles.contactLastMessage}
-                              numberOfLines={1}
-                            >
-                              {lastMessage.text}
-                            </Text>
-                          ) : null}
-                        </View>
-
-                        <Text style={styles.contactAction}>Chat</Text>
-                      </Pressable>
-                    );
-                  })
-                ) : (
-                  <View style={styles.emptyContactsCard}>
-                    <Text style={styles.emptyContactsText}>Kişi bulunamadı.</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          ) : null}
-
-          <View style={styles.groupsSection}>
-            <Text style={styles.sectionTitle}>Takım Grupları</Text>
-
-            {chatGroups.map((group) => {
-              const lastMessage = getLastMessage(group.id, messages);
-
-              return (
-                <Pressable
-                  key={group.id}
-                  onPress={() => openGroupChat(group)}
-                  style={({ pressed }) => [
-                    styles.groupCard,
-                    pressed ? styles.pressed : null,
-                  ]}
-                >
-                  <View style={styles.groupAvatar}>
-                    <Text style={styles.groupAvatarText}>
-                      {group.teamName
-                        .split(" ")
-                        .map((part) => part[0])
-                        .join("")
-                        .slice(0, 2)}
+                <View style={styles.groupInfo}>
+                  <View style={styles.groupTopRow}>
+                    <Text style={styles.groupTitle}>
+                      {group.teamName} {group.name}
                     </Text>
+                    <Text style={styles.groupArrow}>›</Text>
                   </View>
 
-                  <View style={styles.groupInfo}>
-                    <View style={styles.groupTopRow}>
-                      <Text style={styles.groupTitle}>
-                        {group.teamName} {group.name}
-                      </Text>
-                      <Text style={styles.groupArrow}>›</Text>
-                    </View>
+                  <Text style={styles.groupDescription}>{group.description}</Text>
 
-                    <Text style={styles.groupDescription}>{group.description}</Text>
+                  <Text style={styles.lastMessage} numberOfLines={1}>
+                    {lastMessage
+                      ? `${lastMessage.senderName}: ${lastMessage.text}`
+                      : "Henüz mesaj yok."}
+                  </Text>
 
-                    <Text style={styles.lastMessage} numberOfLines={1}>
-                      {lastMessage
-                        ? `${lastMessage.senderName}: ${lastMessage.text}`
-                        : "Henüz mesaj yok."}
-                    </Text>
-
-                    <Text style={styles.groupMeta}>{group.memberCount} üye</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+                  <Text style={styles.groupMeta}>{group.memberCount} üye</Text>
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
-      </ScrollView>
-
-      <AppDrawer
-        visible={drawerIsOpen}
-        onClose={() => setDrawerIsOpen(false)}
-      />
-    </View>
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
   screen: {
     flex: 1,
     backgroundColor: theme.colors.background.app,
@@ -602,6 +529,28 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
+  },
+  pageHeader: {
+    marginBottom: theme.spacing["2xl"],
+  },
+  logo: {
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.md,
+  },
+  title: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes["5xl"],
+    fontWeight: theme.fontWeights.black,
+    lineHeight: theme.lineHeights["5xl"],
+    marginBottom: theme.spacing.sm,
+  },
+  subtitle: {
+    color: theme.colors.text.inverse,
+    opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.semibold,
   },
   newMessageButtonRow: {
     alignItems: "flex-start",
@@ -817,8 +766,44 @@ const styles = StyleSheet.create({
   },
   chatHeaderWrapper: {
     paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.default,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    alignItems: "center",
+    justifyContent: "center",
+    ...theme.shadows.sm,
+  },
+  backButtonText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["3xl"],
+    fontWeight: theme.fontWeights.black,
+    marginTop: -4,
+  },
+  chatTitleArea: {
+    flex: 1,
+  },
+  chatTitle: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+  },
+  chatSubtitle: {
+    color: theme.colors.text.inverse,
+    opacity: 0.72,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
   },
   messagesScroll: {
     flex: 1,

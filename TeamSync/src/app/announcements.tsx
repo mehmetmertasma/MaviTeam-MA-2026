@@ -1,7 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,12 +18,24 @@ import { theme } from "@/constants/theme";
 
 type AnnouncementTarget = "Tüm Kulüp" | "A Takım" | "U16 Erkek" | "U14 Kız";
 
+type AnnouncementAttachmentType = "image" | "video" | "file";
+
+type AnnouncementAttachment = {
+  id: number;
+  type: AnnouncementAttachmentType;
+  name: string;
+  uri: string;
+  mimeType?: string;
+  size?: number;
+};
+
 type Announcement = {
   id: number;
   title: string;
   message: string;
   target: AnnouncementTarget;
   createdAt: string;
+  attachments: AnnouncementAttachment[];
 };
 
 const ANNOUNCEMENTS_STORAGE_KEY = "teamsync_announcements_data";
@@ -40,6 +55,7 @@ const initialAnnouncements: Announcement[] = [
       "U16 Erkek takımı için cuma antrenmanı saat 18:30 olarak güncellendi.",
     target: "U16 Erkek",
     createdAt: "Bugün",
+    attachments: [],
   },
   {
     id: 2,
@@ -47,17 +63,59 @@ const initialAnnouncements: Announcement[] = [
     message: "Bu ayın aidat ödemeleri için son tarih pazar günüdür.",
     target: "Tüm Kulüp",
     createdAt: "Dün",
+    attachments: [],
   },
 ];
 
 function getCreatedAtLabel() {
   const now = new Date();
+
   const time = now.toLocaleTimeString("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
   });
 
   return `Şimdi · ${time}`;
+}
+
+function getAttachmentTypeLabel(type: AnnouncementAttachmentType) {
+  if (type === "image") {
+    return "Fotoğraf";
+  }
+
+  if (type === "video") {
+    return "Video";
+  }
+
+  return "Dosya";
+}
+
+function formatFileSize(size?: number) {
+  if (!size) {
+    return "Boyut bilinmiyor";
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getMediaAttachmentName(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.fileName) {
+    return asset.fileName;
+  }
+
+  if (asset.type === "video") {
+    return "Video eki";
+  }
+
+  return "Fotoğraf eki";
 }
 
 export default function AnnouncementsScreen() {
@@ -68,6 +126,9 @@ export default function AnnouncementsScreen() {
   const [message, setMessage] = useState("");
   const [selectedTarget, setSelectedTarget] =
     useState<AnnouncementTarget>("Tüm Kulüp");
+  const [draftAttachments, setDraftAttachments] = useState<
+    AnnouncementAttachment[]
+  >([]);
   const [statusMessage, setStatusMessage] = useState(
     "Duyurular local storage ile kaydedilecek."
   );
@@ -113,6 +174,98 @@ export default function AnnouncementsScreen() {
     }
   }
 
+  async function pickMediaAttachment() {
+    try {
+      const permissionResult =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (!permissionResult.granted) {
+        setStatusMessage("Fotoğraf/video seçmek için izin gerekli.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images", "videos"],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      const newAttachment: AnnouncementAttachment = {
+        id: Date.now(),
+        type: asset.type === "video" ? "video" : "image",
+        name: getMediaAttachmentName(asset),
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        size: asset.fileSize,
+      };
+
+      setDraftAttachments((currentAttachments) => [
+        ...currentAttachments,
+        newAttachment,
+      ]);
+
+      setStatusMessage("Fotoğraf/video duyuruya eklendi.");
+    } catch {
+      setStatusMessage("Fotoğraf/video eklenirken bir sorun oluştu.");
+    }
+  }
+
+  async function pickFileAttachment() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: true,
+        multiple: false,
+        base64: false,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      const attachmentType: AnnouncementAttachmentType =
+        asset.mimeType?.startsWith("image/")
+          ? "image"
+          : asset.mimeType?.startsWith("video/")
+          ? "video"
+          : "file";
+
+      const newAttachment: AnnouncementAttachment = {
+        id: Date.now(),
+        type: attachmentType,
+        name: asset.name,
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        size: asset.size,
+      };
+
+      setDraftAttachments((currentAttachments) => [
+        ...currentAttachments,
+        newAttachment,
+      ]);
+
+      setStatusMessage("Dosya duyuruya eklendi.");
+    } catch {
+      setStatusMessage("Dosya eklenirken bir sorun oluştu.");
+    }
+  }
+
+  function removeDraftAttachment(attachmentId: number) {
+    setDraftAttachments((currentAttachments) =>
+      currentAttachments.filter((attachment) => attachment.id !== attachmentId)
+    );
+
+    setStatusMessage("Ek kaldırıldı.");
+  }
+
   async function handlePublishAnnouncement() {
     if (!canPublish) {
       setStatusMessage("Başlık ve mesaj alanı boş bırakılamaz.");
@@ -125,6 +278,7 @@ export default function AnnouncementsScreen() {
       message: message.trim(),
       target: selectedTarget,
       createdAt: getCreatedAtLabel(),
+      attachments: draftAttachments,
     };
 
     const updatedAnnouncements = [newAnnouncement, ...announcements];
@@ -132,6 +286,7 @@ export default function AnnouncementsScreen() {
     setTitle("");
     setMessage("");
     setSelectedTarget("Tüm Kulüp");
+    setDraftAttachments([]);
 
     await saveAnnouncements(updatedAnnouncements);
   }
@@ -153,6 +308,7 @@ export default function AnnouncementsScreen() {
       setTitle("");
       setMessage("");
       setSelectedTarget("Tüm Kulüp");
+      setDraftAttachments([]);
       setStatusMessage("Duyurular demo haline sıfırlandı.");
     } catch {
       setStatusMessage("Duyurular sıfırlanırken bir sorun oluştu.");
@@ -180,7 +336,7 @@ export default function AnnouncementsScreen() {
 
           <Text style={styles.heroSubtitle}>
             Admin olarak tüm kulübe veya seçili takıma önemli duyurular
-            gönderebilirsin. Yayınlanan duyurular artık cihazda kayıtlı kalır.
+            gönderebilirsin. Duyuruya fotoğraf, video veya dosya ekleyebilirsin.
           </Text>
         </View>
 
@@ -235,6 +391,65 @@ export default function AnnouncementsScreen() {
             })}
           </View>
 
+          <Text style={styles.label}>Ekler</Text>
+
+          <View style={styles.attachmentButtonRow}>
+            <Pressable
+              onPress={pickMediaAttachment}
+              style={({ pressed }) => [
+                styles.attachmentButton,
+                pressed && styles.attachmentButtonPressed,
+              ]}
+            >
+              <Text style={styles.attachmentButtonText}>
+                Fotoğraf / Video ekle
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={pickFileAttachment}
+              style={({ pressed }) => [
+                styles.attachmentButton,
+                pressed && styles.attachmentButtonPressed,
+              ]}
+            >
+              <Text style={styles.attachmentButtonText}>Dosya ekle</Text>
+            </Pressable>
+          </View>
+
+          {draftAttachments.length > 0 ? (
+            <View style={styles.draftAttachmentList}>
+              {draftAttachments.map((attachment) => (
+                <View key={attachment.id} style={styles.draftAttachmentCard}>
+                  <View style={styles.attachmentInfo}>
+                    <Text style={styles.attachmentType}>
+                      {getAttachmentTypeLabel(attachment.type)}
+                    </Text>
+                    <Text style={styles.attachmentName}>{attachment.name}</Text>
+                    <Text style={styles.attachmentMeta}>
+                      {formatFileSize(attachment.size)}
+                    </Text>
+                  </View>
+
+                  <Pressable
+                    onPress={() => removeDraftAttachment(attachment.id)}
+                    style={({ pressed }) => [
+                      styles.removeAttachmentButton,
+                      pressed && styles.removeAttachmentButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.removeAttachmentButtonText}>Kaldır</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.emptyAttachmentText}>
+              Henüz ek eklenmedi. İstersen fotoğraf, video veya dosya
+              ekleyebilirsin.
+            </Text>
+          )}
+
           <Pressable
             disabled={!canPublish}
             onPress={handlePublishAnnouncement}
@@ -255,35 +470,79 @@ export default function AnnouncementsScreen() {
           </View>
 
           <View style={styles.announcementList}>
-            {announcements.map((announcement) => (
-              <View key={announcement.id} style={styles.announcementCard}>
-                <View style={styles.cardTopRow}>
-                  <Text style={styles.announcementTarget}>
-                    {announcement.target}
+            {announcements.map((announcement) => {
+              const announcementAttachments = announcement.attachments ?? [];
+
+              return (
+                <View key={announcement.id} style={styles.announcementCard}>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.announcementTarget}>
+                      {announcement.target}
+                    </Text>
+
+                    <Text style={styles.createdAt}>
+                      {announcement.createdAt}
+                    </Text>
+                  </View>
+
+                  <Text style={styles.announcementTitle}>
+                    {announcement.title}
                   </Text>
 
-                  <Text style={styles.createdAt}>{announcement.createdAt}</Text>
+                  <Text style={styles.announcementMessage}>
+                    {announcement.message}
+                  </Text>
+
+                  {announcementAttachments.length > 0 ? (
+                    <View style={styles.publishedAttachmentList}>
+                      {announcementAttachments.map((attachment) => (
+                        <View
+                          key={attachment.id}
+                          style={styles.publishedAttachmentCard}
+                        >
+                          {attachment.type === "image" ? (
+                            <Image
+                              source={{ uri: attachment.uri }}
+                              style={styles.attachmentImage}
+                            />
+                          ) : (
+                            <View style={styles.fileIconBox}>
+                              <Text style={styles.fileIconText}>
+                                {attachment.type === "video" ? "▶" : "📎"}
+                              </Text>
+                            </View>
+                          )}
+
+                          <View style={styles.attachmentInfo}>
+                            <Text style={styles.attachmentType}>
+                              {getAttachmentTypeLabel(attachment.type)}
+                            </Text>
+                            <Text style={styles.attachmentName}>
+                              {attachment.name}
+                            </Text>
+                            <Text style={styles.attachmentMeta}>
+                              {formatFileSize(attachment.size)}
+                            </Text>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View style={styles.cardActionRow}>
+                    <Pressable
+                      onPress={() => deleteAnnouncement(announcement.id)}
+                      style={({ pressed }) => [
+                        styles.deleteButton,
+                        pressed && styles.deleteButtonPressed,
+                      ]}
+                    >
+                      <Text style={styles.deleteButtonText}>Duyuruyu sil</Text>
+                    </Pressable>
+                  </View>
                 </View>
-
-                <Text style={styles.announcementTitle}>{announcement.title}</Text>
-
-                <Text style={styles.announcementMessage}>
-                  {announcement.message}
-                </Text>
-
-                <View style={styles.cardActionRow}>
-                  <Pressable
-                    onPress={() => deleteAnnouncement(announcement.id)}
-                    style={({ pressed }) => [
-                      styles.deleteButton,
-                      pressed && styles.deleteButtonPressed,
-                    ]}
-                  >
-                    <Text style={styles.deleteButtonText}>Duyuruyu sil</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
 
@@ -306,9 +565,10 @@ export default function AnnouncementsScreen() {
           <Text style={styles.sectionTitle}>Demo notu</Text>
 
           <Text style={styles.sectionSubtitle}>
-            Bu ekran artık sadece ekranda değişmiyor. Yayınlanan duyurular
-            local storage içine kaydediliyor. Ama bu hâlâ Firebase değildir;
-            başka cihazda veya başka kullanıcıda görünmez.
+            Bu ekran fotoğraf, video ve dosya bilgisini local storage içine
+            kaydeder. Bu hâlâ Firebase değildir. Gerçek uygulamada bu ekleri
+            Firebase Storage içine yükleyip URL olarak Firestore&apos;da
+            tutacağız.
           </Text>
         </View>
 
@@ -468,6 +728,88 @@ const styles = StyleSheet.create({
   targetButtonTextSelected: {
     color: theme.colors.text.inverse,
   },
+  attachmentButtonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  attachmentButton: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  attachmentButtonPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  attachmentButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  draftAttachmentList: {
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  draftAttachmentCard: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: theme.spacing.lg,
+  },
+  emptyAttachmentText: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+    marginBottom: theme.spacing.lg,
+  },
+  attachmentInfo: {
+    flex: 1,
+    gap: theme.spacing.xs,
+  },
+  attachmentType: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.black,
+    textTransform: "uppercase",
+  },
+  attachmentName: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+  },
+  attachmentMeta: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  removeAttachmentButton: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  removeAttachmentButtonPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  removeAttachmentButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
   publishButton: {
     backgroundColor: theme.colors.brand.primary,
     borderRadius: theme.radius.lg,
@@ -536,6 +878,37 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
+  },
+  publishedAttachmentList: {
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.lg,
+  },
+  publishedAttachmentCard: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
+    flexDirection: "row",
+    gap: theme.spacing.md,
+    alignItems: "center",
+  },
+  attachmentImage: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.subtle,
+  },
+  fileIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.background.subtle,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fileIconText: {
+    fontSize: theme.fontSizes["2xl"],
   },
   cardActionRow: {
     alignItems: "flex-start",

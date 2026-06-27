@@ -13,175 +13,267 @@ import {
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 
-type MessageRole = "admin" | "coach" | "parent" | "athlete";
+type UserRole = "admin" | "coach" | "parent" | "athlete";
 
-type MessageRoom = "team-chat" | "coach-chat" | "admin-support";
+type AudienceType =
+  | "team"
+  | "coaches"
+  | "athletes"
+  | "parents"
+  | "admins"
+  | "direct";
 
-type Message = {
+type DemoTeam = {
   id: string;
-  roomId?: MessageRoom;
-  senderName: string;
-  senderRole: MessageRole;
-  text: string;
-  time: string;
-};
-
-type ProfileData = {
   name: string;
-  email: string;
-  club: string;
-  team: string;
-  role: string;
-  season: string;
-  membership: string;
+  clubId: string;
 };
 
-type RoleOption = {
-  id: MessageRole;
+type DemoUser = {
+  id: string;
+  name: string;
+  role: UserRole;
+  clubId: string;
+  teamIds: string[];
+};
+
+type DemoMessage = {
+  id: string;
+  clubId: string;
+  teamId: string;
+  audienceType: AudienceType;
+  senderId: string;
+  senderName: string;
+  senderRole: UserRole;
+  recipientUserId?: string;
+  text: string;
+  createdAt: string;
+};
+
+type AudienceOption = {
+  type: AudienceType;
   title: string;
-  tag: string;
-  description: string;
+  subtitle: string;
 };
 
-type RoomOption = {
-  id: MessageRoom;
-  title: string;
-  description: string;
-  visibleFor: MessageRole[];
+const MESSAGES_STORAGE_KEY = "teamsync_messages_dropdown_v1";
+const CLUB_ID = "club-istanbul-volleyball";
+
+const defaultTeam: DemoTeam = {
+  id: "team-u17-boys",
+  name: "U17 Erkek",
+  clubId: CLUB_ID,
 };
 
-const MESSAGES_STORAGE_KEY = "teamsync_messages_data";
-const PROFILE_STORAGE_KEY = "teamsync_profile_data";
-
-const INITIAL_VISIBLE_MESSAGE_LIMIT = 5;
-const LOAD_MORE_MESSAGE_COUNT = 5;
-
-const startingProfileData: ProfileData = {
-  name: "Mert Asma",
-  email: "mertasma7580@gmail.com",
-  club: "İstanbul Voleybol Kulübü",
-  team: "U16 Erkek",
-  role: "Kulüp yöneticisi",
-  season: "2026 Bahar",
-  membership: "Kulüp öder, veli/sporcu ücretsiz",
-};
-
-const roleOptions: RoleOption[] = [
+const demoTeams: DemoTeam[] = [
+  defaultTeam,
   {
-    id: "admin",
-    title: "Kulüp Yöneticisi",
-    tag: "Admin",
-    description: "Kulüp genelindeki mesajları ve iletişimi takip eder.",
+    id: "team-u14-girls",
+    name: "U14 Kız",
+    clubId: CLUB_ID,
   },
   {
-    id: "coach",
-    title: "Koç",
-    tag: "Coach",
-    description: "Sporcu ve velilerle takım iletişimini yönetir.",
-  },
-  {
-    id: "parent",
-    title: "Veli",
-    tag: "Parent",
-    description: "Koç ve kulüp yönetimiyle iletişim kurar.",
-  },
-  {
-    id: "athlete",
-    title: "Sporcu",
-    tag: "Athlete",
-    description: "Koça soru sorabilir veya durumunu bildirebilir.",
+    id: "team-u18-elite",
+    name: "U18 Elite",
+    clubId: CLUB_ID,
   },
 ];
 
-const roomOptions: RoomOption[] = [
+const defaultUser: DemoUser = {
+  id: "coach-emre",
+  name: "Coach Emre",
+  role: "coach",
+  clubId: CLUB_ID,
+  teamIds: ["team-u17-boys", "team-u18-elite"],
+};
+
+const demoUsers: DemoUser[] = [
+  defaultUser,
   {
-    id: "team-chat",
+    id: "admin-mert",
+    name: "Admin Mert",
+    role: "admin",
+    clubId: CLUB_ID,
+    teamIds: ["team-u17-boys", "team-u14-girls", "team-u18-elite"],
+  },
+  {
+    id: "coach-aylin",
+    name: "Coach Aylin",
+    role: "coach",
+    clubId: CLUB_ID,
+    teamIds: ["team-u14-girls"],
+  },
+  {
+    id: "coach-daniel",
+    name: "Coach Daniel",
+    role: "coach",
+    clubId: CLUB_ID,
+    teamIds: ["team-u18-elite"],
+  },
+  {
+    id: "parent-ayse",
+    name: "Ayşe Veli",
+    role: "parent",
+    clubId: CLUB_ID,
+    teamIds: ["team-u17-boys"],
+  },
+  {
+    id: "parent-mehmet",
+    name: "Mehmet Veli",
+    role: "parent",
+    clubId: CLUB_ID,
+    teamIds: ["team-u14-girls"],
+  },
+  {
+    id: "parent-seda",
+    name: "Seda Veli",
+    role: "parent",
+    clubId: CLUB_ID,
+    teamIds: ["team-u18-elite"],
+  },
+  {
+    id: "athlete-mert",
+    name: "Mert Asma",
+    role: "athlete",
+    clubId: CLUB_ID,
+    teamIds: ["team-u17-boys"],
+  },
+  {
+    id: "athlete-efe",
+    name: "Efe Demir",
+    role: "athlete",
+    clubId: CLUB_ID,
+    teamIds: ["team-u17-boys"],
+  },
+  {
+    id: "athlete-zeynep",
+    name: "Zeynep Kaya",
+    role: "athlete",
+    clubId: CLUB_ID,
+    teamIds: ["team-u14-girls"],
+  },
+  {
+    id: "athlete-arda",
+    name: "Arda Yılmaz",
+    role: "athlete",
+    clubId: CLUB_ID,
+    teamIds: ["team-u18-elite"],
+  },
+];
+
+const audienceOptions: AudienceOption[] = [
+  {
+    type: "team",
     title: "Team Chat",
-    description: "Takım geneli konuşma alanı.",
-    visibleFor: ["admin", "coach", "parent", "athlete"],
+    subtitle: "Seçili takımdaki herkes görür.",
   },
   {
-    id: "coach-chat",
-    title: "Coach Chat",
-    description: "Koç, sporcu ve veli iletişimi.",
-    visibleFor: ["admin", "coach", "parent", "athlete"],
+    type: "coaches",
+    title: "Coaches",
+    subtitle: "Seçili takımın koç grubu.",
   },
   {
-    id: "admin-support",
-    title: "Admin Support",
-    description: "Kulüp yönetimi ile destek konuşması.",
-    visibleFor: ["admin", "coach", "parent"],
+    type: "athletes",
+    title: "Athletes",
+    subtitle: "Seçili takımın sporcuları.",
+  },
+  {
+    type: "parents",
+    title: "Parents",
+    subtitle: "Seçili takımın velileri.",
+  },
+  {
+    type: "admins",
+    title: "Club Admin",
+    subtitle: "Kulüp yöneticileri.",
+  },
+  {
+    type: "direct",
+    title: "Direct Message",
+    subtitle: "Bir kişiye özel mesaj.",
   },
 ];
 
-const startingMessages: Message[] = [
+function sortMessages(messages: DemoMessage[]) {
+  return [...messages].sort(
+    (firstMessage, secondMessage) =>
+      new Date(firstMessage.createdAt).getTime() -
+      new Date(secondMessage.createdAt).getTime()
+  );
+}
+
+const initialMessages: DemoMessage[] = sortMessages([
   {
-    id: "1",
-    roomId: "team-chat",
+    id: "message-1",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "team",
+    senderId: "coach-emre",
     senderName: "Coach Emre",
     senderRole: "coach",
     text: "Bugünkü antrenman 18:30’da başlayacak. Lütfen 15 dakika erken gelin.",
-    time: "09:15",
+    createdAt: "2026-06-26T14:30:00.000Z",
   },
   {
-    id: "2",
-    roomId: "team-chat",
-    senderName: "Mert Asma",
-    senderRole: "athlete",
-    text: "Coach, bugün antrenmana gelebiliyorum.",
-    time: "10:02",
-  },
-  {
-    id: "3",
-    roomId: "team-chat",
+    id: "message-2",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "parents",
+    senderId: "coach-emre",
     senderName: "Coach Emre",
     senderRole: "coach",
-    text: "Maç formasını çantaya koymayı unutmayın.",
-    time: "10:25",
+    text: "Veliler için hatırlatma: hafta sonu maç ulaşım planı yarın paylaşılacak.",
+    createdAt: "2026-06-26T15:10:00.000Z",
   },
   {
-    id: "4",
-    roomId: "team-chat",
+    id: "message-3",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "athletes",
+    senderId: "coach-emre",
+    senderName: "Coach Emre",
+    senderRole: "coach",
+    text: "Sporcular, yarın servis ve savunma drill çalışacağız.",
+    createdAt: "2026-06-26T16:05:00.000Z",
+  },
+  {
+    id: "message-4",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "coaches",
+    senderId: "admin-mert",
     senderName: "Admin Mert",
     senderRole: "admin",
-    text: "Salon girişinde kulüp kartlarınızı göstermeniz gerekiyor.",
-    time: "10:40",
+    text: "U17 koçları, maç kadrosunu cuma gününe kadar sisteme girin.",
+    createdAt: "2026-06-26T17:20:00.000Z",
   },
   {
-    id: "5",
-    roomId: "team-chat",
-    senderName: "Coach Emre",
-    senderRole: "coach",
-    text: "Bugün servis ve savunma drill çalışacağız.",
-    time: "11:00",
-  },
-  {
-    id: "6",
-    roomId: "team-chat",
-    senderName: "Mert Asma",
-    senderRole: "athlete",
-    text: "Tamam coach, görüşürüz.",
-    time: "11:10",
-  },
-  {
-    id: "7",
-    roomId: "coach-chat",
+    id: "message-5",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "direct",
+    senderId: "parent-ayse",
     senderName: "Ayşe Veli",
     senderRole: "parent",
-    text: "Merhaba hocam, hafta sonu maç saati belli oldu mu?",
-    time: "10:18",
+    recipientUserId: "coach-emre",
+    text: "Coach, Mert bugün okul etkinliği yüzünden 10 dakika geç kalabilir.",
+    createdAt: "2026-06-27T13:15:00.000Z",
   },
   {
-    id: "8",
-    roomId: "admin-support",
-    senderName: "Admin Mert",
-    senderRole: "admin",
-    text: "Ödeme veya üyelik soruları için buradan kulüp yönetimine yazabilirsiniz.",
-    time: "11:05",
+    id: "message-6",
+    clubId: CLUB_ID,
+    teamId: "team-u17-boys",
+    audienceType: "direct",
+    senderId: "coach-emre",
+    senderName: "Coach Emre",
+    senderRole: "coach",
+    recipientUserId: "parent-ayse",
+    text: "Tamam, sorun değil. Geldiğinde direkt ısınmaya katılsın.",
+    createdAt: "2026-06-27T13:22:00.000Z",
   },
-];
+]);
 
-function getRoleLabel(role: MessageRole) {
+function getRoleLabel(role: UserRole) {
   if (role === "admin") {
     return "Admin";
   }
@@ -197,200 +289,495 @@ function getRoleLabel(role: MessageRole) {
   return "Athlete";
 }
 
-function getFirstName(name: string) {
-  const trimmedName = name.trim();
+function formatMessageTime(createdAt: string) {
+  const date = new Date(createdAt);
 
-  if (trimmedName.length === 0) {
-    return "Kullanıcı";
+  if (Number.isNaN(date.getTime())) {
+    return "";
   }
 
-  return trimmedName.split(" ")[0];
-}
-
-function getSenderName(role: MessageRole, profileData: ProfileData) {
-  const firstName = getFirstName(profileData.name);
-
-  if (role === "admin") {
-    return `Admin ${firstName}`;
-  }
-
-  if (role === "coach") {
-    return `Coach ${firstName}`;
-  }
-
-  if (role === "parent") {
-    return `Veli ${firstName}`;
-  }
-
-  return profileData.name;
-}
-
-function getCurrentTime() {
-  const now = new Date();
-
-  return now.toLocaleTimeString("tr-TR", {
+  return date.toLocaleString("tr-TR", {
+    month: "short",
+    day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-function getMessageRoom(message: Message) {
-  return message.roomId ?? "team-chat";
+function getUserById(userId: string) {
+  return demoUsers.find((user) => user.id === userId) ?? defaultUser;
+}
+
+function getTeamsForUser(user: DemoUser) {
+  if (user.role === "admin") {
+    return demoTeams.filter((team) => team.clubId === user.clubId);
+  }
+
+  return demoTeams.filter(
+    (team) => team.clubId === user.clubId && user.teamIds.includes(team.id)
+  );
+}
+
+function getTeamNamesForUser(user: DemoUser) {
+  return getTeamsForUser(user)
+    .map((team) => team.name)
+    .join(", ");
+}
+
+function userCanAccessTeam(user: DemoUser, teamId: string) {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  return user.teamIds.includes(teamId);
+}
+
+function canDirectMessageUser(sender: DemoUser, recipient: DemoUser) {
+  if (sender.id === recipient.id) {
+    return false;
+  }
+
+  if (sender.clubId !== recipient.clubId) {
+    return false;
+  }
+
+  if (sender.role === "admin" || sender.role === "coach") {
+    return true;
+  }
+
+  return recipient.role === "admin" || recipient.role === "coach";
+}
+
+function getDirectMessageCandidates(currentUser: DemoUser) {
+  return demoUsers.filter((user) => canDirectMessageUser(currentUser, user));
+}
+
+function canSendAudience(
+  user: DemoUser,
+  audienceType: AudienceType,
+  selectedTeamId: string
+) {
+  if (audienceType === "direct") {
+    return getDirectMessageCandidates(user).length > 0;
+  }
+
+  if (!userCanAccessTeam(user, selectedTeamId)) {
+    return false;
+  }
+
+  if (user.role === "admin" || user.role === "coach") {
+    return true;
+  }
+
+  if (audienceType === "team" || audienceType === "coaches") {
+    return true;
+  }
+
+  if (audienceType === "parents") {
+    return user.role === "parent";
+  }
+
+  if (audienceType === "athletes") {
+    return user.role === "athlete";
+  }
+
+  return false;
+}
+
+function getFirstAllowedAudience(user: DemoUser, selectedTeamId: string) {
+  return (
+    audienceOptions.find((audience) =>
+      canSendAudience(user, audience.type, selectedTeamId)
+    )?.type ?? "team"
+  );
+}
+
+function canUserReadMessage(user: DemoUser, message: DemoMessage) {
+  if (user.clubId !== message.clubId) {
+    return false;
+  }
+
+  if (message.audienceType === "direct") {
+    return message.senderId === user.id || message.recipientUserId === user.id;
+  }
+
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (message.senderId === user.id) {
+    return true;
+  }
+
+  if (!userCanAccessTeam(user, message.teamId)) {
+    return false;
+  }
+
+  if (user.role === "coach") {
+    return true;
+  }
+
+  if (message.audienceType === "team") {
+    return true;
+  }
+
+  if (message.audienceType === "coaches") {
+    return user.role === "coach";
+  }
+
+  if (message.audienceType === "parents") {
+    return user.role === "parent";
+  }
+
+  if (message.audienceType === "athletes") {
+    return user.role === "athlete";
+  }
+
+  if (message.audienceType === "admins") {
+    return user.role === "admin";
+  }
+
+  return false;
+}
+
+function isMessageInSelectedThread(
+  message: DemoMessage,
+  currentUser: DemoUser,
+  selectedTeamId: string,
+  selectedAudienceType: AudienceType,
+  selectedDirectRecipientId?: string
+) {
+  if (selectedAudienceType === "direct") {
+    if (message.audienceType !== "direct" || !selectedDirectRecipientId) {
+      return false;
+    }
+
+    return (
+      (message.senderId === currentUser.id &&
+        message.recipientUserId === selectedDirectRecipientId) ||
+      (message.senderId === selectedDirectRecipientId &&
+        message.recipientUserId === currentUser.id)
+    );
+  }
+
+  return (
+    message.teamId === selectedTeamId &&
+    message.audienceType === selectedAudienceType
+  );
+}
+
+function isAudienceType(value: unknown): value is AudienceType {
+  return (
+    value === "team" ||
+    value === "coaches" ||
+    value === "athletes" ||
+    value === "parents" ||
+    value === "admins" ||
+    value === "direct"
+  );
+}
+
+function isUserRole(value: unknown): value is UserRole {
+  return (
+    value === "admin" ||
+    value === "coach" ||
+    value === "parent" ||
+    value === "athlete"
+  );
+}
+
+function isDemoMessage(value: unknown): value is DemoMessage {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const message = value as Partial<DemoMessage>;
+
+  return (
+    typeof message.id === "string" &&
+    typeof message.clubId === "string" &&
+    typeof message.teamId === "string" &&
+    isAudienceType(message.audienceType) &&
+    typeof message.senderId === "string" &&
+    typeof message.senderName === "string" &&
+    isUserRole(message.senderRole) &&
+    typeof message.text === "string" &&
+    typeof message.createdAt === "string"
+  );
+}
+
+function parseSavedMessages(savedMessages: string | null) {
+  if (savedMessages === null) {
+    return initialMessages;
+  }
+
+  const parsedMessages = JSON.parse(savedMessages) as unknown;
+
+  if (!Array.isArray(parsedMessages)) {
+    return initialMessages;
+  }
+
+  const validMessages = parsedMessages.filter(isDemoMessage);
+
+  if (validMessages.length === 0) {
+    return initialMessages;
+  }
+
+  return sortMessages(validMessages);
+}
+
+function filterUsers(users: DemoUser[], searchText: string) {
+  const normalizedSearchText = searchText.trim().toLowerCase();
+
+  if (normalizedSearchText.length === 0) {
+    return users;
+  }
+
+  return users.filter((user) => {
+    const roleLabel = getRoleLabel(user.role).toLowerCase();
+    const teamNames = getTeamNamesForUser(user).toLowerCase();
+
+    return (
+      user.name.toLowerCase().includes(normalizedSearchText) ||
+      roleLabel.includes(normalizedSearchText) ||
+      teamNames.includes(normalizedSearchText)
+    );
+  });
 }
 
 export default function MessagesScreen() {
-  const [activeRole, setActiveRole] = useState<MessageRole>("coach");
-  const [activeRoom, setActiveRoom] = useState<MessageRoom>("team-chat");
-  const [messages, setMessages] = useState<Message[]>(startingMessages);
-  const [profileData, setProfileData] =
-    useState<ProfileData>(startingProfileData);
-  const [newMessage, setNewMessage] = useState("");
-  const [visibleMessageLimit, setVisibleMessageLimit] = useState(
-    INITIAL_VISIBLE_MESSAGE_LIMIT
-  );
+  const [currentUserId, setCurrentUserId] = useState(defaultUser.id);
+  const [selectedTeamId, setSelectedTeamId] = useState(defaultTeam.id);
+  const [selectedAudienceType, setSelectedAudienceType] =
+    useState<AudienceType>("team");
+  const [selectedDirectRecipientId, setSelectedDirectRecipientId] =
+    useState<string>();
+  const [demoPickerIsOpen, setDemoPickerIsOpen] = useState(false);
+  const [demoSearchText, setDemoSearchText] = useState("");
+  const [recipientPickerIsOpen, setRecipientPickerIsOpen] = useState(false);
+  const [recipientSearchText, setRecipientSearchText] = useState("");
+  const [messages, setMessages] = useState<DemoMessage[]>(initialMessages);
+  const [draftText, setDraftText] = useState("");
   const [statusMessage, setStatusMessage] = useState(
     "Mesajlar local storage ile kaydedilecek."
   );
 
-  const currentRole = roleOptions.find((role) => role.id === activeRole);
+  const currentUser = useMemo(() => {
+    return getUserById(currentUserId);
+  }, [currentUserId]);
 
-  const visibleRooms = useMemo(() => {
-    return roomOptions.filter((room) => room.visibleFor.includes(activeRole));
-  }, [activeRole]);
+  const currentUserTeams = useMemo(() => {
+    return getTeamsForUser(currentUser);
+  }, [currentUser]);
 
-  const currentRoom = roomOptions.find((room) => room.id === activeRoom);
+  const selectedTeam = useMemo(() => {
+    return demoTeams.find((team) => team.id === selectedTeamId) ?? defaultTeam;
+  }, [selectedTeamId]);
 
-  const senderName = getSenderName(activeRole, profileData);
+  const directMessageCandidates = useMemo(() => {
+    return getDirectMessageCandidates(currentUser);
+  }, [currentUser]);
 
-  const filteredMessages = useMemo(() => {
-    const roomMessages = messages.filter(
-      (message) => getMessageRoom(message) === activeRoom
+  const filteredDemoUsers = useMemo(() => {
+    return filterUsers(demoUsers, demoSearchText);
+  }, [demoSearchText]);
+
+  const filteredDirectMessageCandidates = useMemo(() => {
+    return filterUsers(directMessageCandidates, recipientSearchText);
+  }, [directMessageCandidates, recipientSearchText]);
+
+  const selectedDirectRecipient = useMemo(() => {
+    return directMessageCandidates.find(
+      (user) => user.id === selectedDirectRecipientId
     );
+  }, [directMessageCandidates, selectedDirectRecipientId]);
 
-    if (activeRole === "admin" || activeRole === "coach") {
-      return roomMessages;
-    }
+  const selectedAudience = audienceOptions.find(
+    (audience) => audience.type === selectedAudienceType
+  );
 
-    return roomMessages.filter(
-      (message) =>
-        message.senderRole === activeRole ||
-        message.senderRole === "coach" ||
-        message.senderRole === "admin"
-    );
-  }, [activeRole, activeRoom, messages]);
+  const visibleThreadMessages = useMemo(() => {
+    return messages
+      .filter((message) => canUserReadMessage(currentUser, message))
+      .filter((message) =>
+        isMessageInSelectedThread(
+          message,
+          currentUser,
+          selectedTeamId,
+          selectedAudienceType,
+          selectedDirectRecipientId
+        )
+      );
+  }, [
+    currentUser,
+    messages,
+    selectedAudienceType,
+    selectedDirectRecipientId,
+    selectedTeamId,
+  ]);
 
-  const visibleMessages = useMemo(() => {
-    return filteredMessages.slice(-visibleMessageLimit);
-  }, [filteredMessages, visibleMessageLimit]);
-
-  const hasOlderMessages = filteredMessages.length > visibleMessageLimit;
+  const canSendCurrentMessage =
+    draftText.trim().length > 0 &&
+    canSendAudience(currentUser, selectedAudienceType, selectedTeamId) &&
+    (selectedAudienceType !== "direct" || selectedDirectRecipient !== undefined);
 
   useEffect(() => {
-    const activeRoomIsVisible = visibleRooms.some(
-      (room) => room.id === activeRoom
-    );
+    let screenIsActive = true;
 
-    if (!activeRoomIsVisible && visibleRooms.length > 0) {
-      setActiveRoom(visibleRooms[0].id);
-    }
-  }, [activeRole, activeRoom, visibleRooms]);
-
-  useEffect(() => {
-    setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-  }, [activeRole, activeRoom]);
-
-  useEffect(() => {
     async function loadSavedMessages() {
       try {
         const savedMessages = await AsyncStorage.getItem(MESSAGES_STORAGE_KEY);
+        const parsedMessages = parseSavedMessages(savedMessages);
 
-        if (savedMessages === null) {
-          return;
+        if (screenIsActive) {
+          setMessages(parsedMessages);
+          setStatusMessage("Kaydedilmiş mesajlar yüklendi.");
         }
-
-        const parsedMessages = JSON.parse(savedMessages) as Message[];
-
-        setMessages(parsedMessages);
-        setStatusMessage("Kaydedilmiş mesajlar yüklendi.");
       } catch {
-        setStatusMessage("Mesajlar yüklenirken bir sorun oluştu.");
-      }
-    }
-
-    async function loadSavedProfile() {
-      try {
-        const savedProfile = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
-
-        if (savedProfile === null) {
-          return;
+        if (screenIsActive) {
+          setMessages(initialMessages);
+          setStatusMessage("Mesajlar yüklenirken bir sorun oluştu.");
         }
-
-        const parsedProfile = JSON.parse(savedProfile) as ProfileData;
-
-        setProfileData(parsedProfile);
-      } catch {
-        setProfileData(startingProfileData);
       }
     }
 
     loadSavedMessages();
-    loadSavedProfile();
+
+    return () => {
+      screenIsActive = false;
+    };
   }, []);
 
-  async function saveMessages(updatedMessages: Message[]) {
+  function changeDemoUser(nextUserId: string) {
+    const nextUser = getUserById(nextUserId);
+    const nextUserTeams = getTeamsForUser(nextUser);
+    const nextTeamId = nextUserTeams[0]?.id ?? defaultTeam.id;
+    const nextAudienceType = getFirstAllowedAudience(nextUser, nextTeamId);
+
+    setCurrentUserId(nextUser.id);
+    setSelectedTeamId(nextTeamId);
+    setSelectedAudienceType(nextAudienceType);
+    setSelectedDirectRecipientId(undefined);
+    setDemoSearchText("");
+    setDemoPickerIsOpen(false);
+    setRecipientSearchText("");
+    setRecipientPickerIsOpen(false);
+    setDraftText("");
+    setStatusMessage(`${nextUser.name} olarak mesaj ekranı açıldı.`);
+  }
+
+  function changeSelectedTeam(nextTeamId: string) {
+    const nextAudienceType = canSendAudience(
+      currentUser,
+      selectedAudienceType,
+      nextTeamId
+    )
+      ? selectedAudienceType
+      : getFirstAllowedAudience(currentUser, nextTeamId);
+
+    setSelectedTeamId(nextTeamId);
+    setSelectedAudienceType(nextAudienceType);
+    setSelectedDirectRecipientId(undefined);
+    setRecipientSearchText("");
+    setRecipientPickerIsOpen(false);
+    setDraftText("");
+    setStatusMessage("Takım değiştirildi.");
+  }
+
+  function changeAudience(nextAudienceType: AudienceType) {
+    if (!canSendAudience(currentUser, nextAudienceType, selectedTeamId)) {
+      return;
+    }
+
+    setSelectedAudienceType(nextAudienceType);
+    setSelectedDirectRecipientId(undefined);
+    setRecipientSearchText("");
+    setRecipientPickerIsOpen(false);
+    setDraftText("");
+
+    if (nextAudienceType === "direct") {
+      setStatusMessage("Direct Message seçildi. Kişi seçmek için dropdown aç.");
+      return;
+    }
+
+    const audienceTitle =
+      audienceOptions.find((audience) => audience.type === nextAudienceType)
+        ?.title ?? "Mesaj hedefi";
+
+    setStatusMessage(`${audienceTitle} seçildi.`);
+  }
+
+  function changeDirectRecipient(nextRecipientId: string) {
+    const recipient = directMessageCandidates.find(
+      (user) => user.id === nextRecipientId
+    );
+
+    setSelectedDirectRecipientId(nextRecipientId);
+    setRecipientSearchText("");
+    setRecipientPickerIsOpen(false);
+    setDraftText("");
+
+    if (recipient) {
+      setStatusMessage(`${recipient.name} ile özel mesaj açıldı.`);
+    }
+  }
+
+  async function saveMessages(nextMessages: DemoMessage[]) {
     try {
       await AsyncStorage.setItem(
         MESSAGES_STORAGE_KEY,
-        JSON.stringify(updatedMessages)
+        JSON.stringify(nextMessages)
       );
 
-      setMessages(updatedMessages);
-      setStatusMessage("Mesajlar kaydedildi.");
+      setMessages(nextMessages);
+      setStatusMessage("Mesaj kaydedildi.");
     } catch {
       setStatusMessage("Mesaj kaydedilirken bir sorun oluştu.");
     }
   }
 
   async function sendMessage() {
-    const trimmedMessage = newMessage.trim();
+    const trimmedText = draftText.trim();
 
-    if (trimmedMessage.length === 0) {
-      setStatusMessage("Boş mesaj gönderilemez.");
+    if (!canSendCurrentMessage) {
+      setStatusMessage("Mesaj göndermek için hedef ve mesaj gerekli.");
       return;
     }
 
-    const messageToAdd: Message = {
-      id: Date.now().toString(),
-      roomId: activeRoom,
-      senderName,
-      senderRole: activeRole,
-      text: trimmedMessage,
-      time: getCurrentTime(),
+    const newMessage: DemoMessage = {
+      id: `message-${Date.now()}`,
+      clubId: currentUser.clubId,
+      teamId: selectedTeam.id,
+      audienceType: selectedAudienceType,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      senderRole: currentUser.role,
+      recipientUserId:
+        selectedAudienceType === "direct"
+          ? selectedDirectRecipient?.id
+          : undefined,
+      text: trimmedText,
+      createdAt: new Date().toISOString(),
     };
 
-    const updatedMessages = [...messages, messageToAdd];
+    const nextMessages = sortMessages([...messages, newMessage]);
 
-    setNewMessage("");
-    await saveMessages(updatedMessages);
+    setDraftText("");
+    await saveMessages(nextMessages);
   }
 
-  function loadOlderMessages() {
-    setVisibleMessageLimit(
-      (currentLimit) => currentLimit + LOAD_MORE_MESSAGE_COUNT
-    );
-  }
-
-  async function resetMessages() {
+  async function resetDemoMessages() {
     try {
       await AsyncStorage.removeItem(MESSAGES_STORAGE_KEY);
 
-      setMessages(startingMessages);
-      setNewMessage("");
-      setActiveRoom("team-chat");
-      setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-      setStatusMessage("Mesajlar demo haline sıfırlandı.");
+      setMessages(initialMessages);
+      setDraftText("");
+      setSelectedDirectRecipientId(undefined);
+      setRecipientSearchText("");
+      setRecipientPickerIsOpen(false);
+      setStatusMessage("Demo mesajlar sıfırlandı.");
     } catch {
-      setStatusMessage("Mesajlar sıfırlanırken bir sorun oluştu.");
+      setStatusMessage("Demo mesajlar sıfırlanırken bir sorun oluştu.");
     }
   }
 
@@ -403,7 +790,7 @@ export default function MessagesScreen() {
           <View>
             <Text style={styles.welcome}>Mesajlar</Text>
             <Text style={styles.subtitle}>
-              Koç, veli, sporcu ve kulüp yönetimi arasında takım iletişimi.
+              Grup mesajları ve küçük dropdown ile direct message.
             </Text>
           </View>
         </View>
@@ -411,187 +798,372 @@ export default function MessagesScreen() {
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Takım iletişimi</Text>
 
-          <Text style={styles.heroTitle}>Chat Rooms</Text>
+          <Text style={styles.heroTitle}>Messages</Text>
 
           <Text style={styles.heroSubtitle}>
-            Mesajlar konuşma odalarına ayrıldı. Yeni mesaj gönderirken kayıtlı
-            profil adın kullanılır: {senderName}
+            Kullanıcılar açık açık alt alta listelenmez. Direct Message için
+            önce dropdown açılır, sonra isim aranır ve küçük listeden seçim
+            yapılır.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Demo rol seçimi</Text>
+          <Text style={styles.sectionTitle}>Demo kullanıcı</Text>
 
           <Text style={styles.sectionSubtitle}>
-            Şimdilik gerçek giriş sistemi yok. Bu bölümle mesaj ekranını farklı
-            rollerle test ediyoruz.
+            Gerçek login gelene kadar rol testini küçük dropdown ile yapıyoruz.
           </Text>
 
-          <View style={styles.roleGrid}>
-            {roleOptions.map((role) => {
-              const isActive = activeRole === role.id;
+          <Pressable
+            onPress={() => setDemoPickerIsOpen((currentValue) => !currentValue)}
+            style={({ pressed }) => [
+              styles.dropdownButton,
+              demoPickerIsOpen ? styles.dropdownButtonActive : null,
+              pressed ? styles.cardPressed : null,
+            ]}
+          >
+            <View style={styles.dropdownTextArea}>
+              <Text style={styles.dropdownLabel}>Aktif kullanıcı</Text>
+              <Text style={styles.dropdownValue}>{currentUser.name}</Text>
+              <Text style={styles.dropdownMeta}>
+                {getRoleLabel(currentUser.role)} · {getTeamNamesForUser(currentUser)}
+              </Text>
+            </View>
 
-              return (
-                <Pressable
-                  key={role.id}
-                  onPress={() => setActiveRole(role.id)}
-                  style={[
-                    styles.roleCard,
-                    isActive && styles.roleCardActive,
-                  ]}
-                >
-                  <View style={styles.roleHeader}>
-                    <Text
-                      style={[
-                        styles.roleTitle,
-                        isActive && styles.roleTitleActive,
-                      ]}
-                    >
-                      {role.title}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.roleTag,
-                        isActive && styles.roleTagActive,
-                      ]}
-                    >
-                      {role.tag}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.roleDescription,
-                      isActive && styles.roleDescriptionActive,
-                    ]}
-                  >
-                    {role.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Konuşma odaları</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            Şu anki rol: {currentRole?.title}. Bu role uygun odalar aşağıda
-            görünüyor.
-          </Text>
-
-          <View style={styles.roomGrid}>
-            {visibleRooms.map((room) => {
-              const isActive = activeRoom === room.id;
-
-              return (
-                <Pressable
-                  key={room.id}
-                  onPress={() => setActiveRoom(room.id)}
-                  style={[
-                    styles.roomCard,
-                    isActive && styles.roomCardActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.roomTitle,
-                      isActive && styles.roomTitleActive,
-                    ]}
-                  >
-                    {room.title}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.roomDescription,
-                      isActive && styles.roomDescriptionActive,
-                    ]}
-                  >
-                    {room.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{currentRoom?.title}</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            {currentRoom?.description}
-          </Text>
-
-          <View style={styles.messageCountBox}>
-            <Text style={styles.messageCountText}>
-              {filteredMessages.length} mesajdan {visibleMessages.length} tanesi
-              gösteriliyor.
+            <Text style={styles.dropdownArrow}>
+              {demoPickerIsOpen ? "⌃" : "⌄"}
             </Text>
-          </View>
+          </Pressable>
 
-          {hasOlderMessages ? (
-            <AppButton
-              title="Daha eski mesajları yükle"
-              variant="ghost"
-              accessibilityLabel="Daha eski mesajları yükle"
-              style={styles.loadMoreButton}
-              onPress={loadOlderMessages}
-            />
+          {demoPickerIsOpen ? (
+            <View style={styles.dropdownPanel}>
+              <TextInput
+                value={demoSearchText}
+                onChangeText={setDemoSearchText}
+                placeholder="Demo kullanıcı ara..."
+                placeholderTextColor={theme.colors.text.muted}
+                style={styles.compactSearchInput}
+              />
+
+              <ScrollView
+                nestedScrollEnabled
+                style={styles.compactPickerScroll}
+                contentContainerStyle={styles.compactList}
+                keyboardShouldPersistTaps="handled"
+              >
+                {filteredDemoUsers.map((user) => {
+                  const isSelected = user.id === currentUser.id;
+
+                  return (
+                    <Pressable
+                      key={user.id}
+                      onPress={() => changeDemoUser(user.id)}
+                      style={({ pressed }) => [
+                        styles.compactRow,
+                        isSelected ? styles.compactRowActive : null,
+                        pressed ? styles.cardPressed : null,
+                      ]}
+                    >
+                      <View style={styles.compactTextArea}>
+                        <Text
+                          style={[
+                            styles.compactName,
+                            isSelected ? styles.compactNameActive : null,
+                          ]}
+                        >
+                          {user.name}
+                        </Text>
+                        <Text style={styles.compactMeta}>
+                          {getRoleLabel(user.role)} · {getTeamNamesForUser(user)}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.compactAction}>
+                        {isSelected ? "Active" : "Use"}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
           ) : null}
+        </View>
 
-          <View style={styles.messageList}>
-            {visibleMessages.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Henüz mesaj yok</Text>
-                <Text style={styles.emptyText}>
-                  Bu odada görünen ilk mesajı sen gönderebilirsin.
+        {currentUserTeams.length > 1 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Takım seçimi</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Mesajlar seçili takıma göre filtrelenir.
+            </Text>
+
+            <View style={styles.teamGrid}>
+              {currentUserTeams.map((team) => {
+                const isSelected = team.id === selectedTeamId;
+
+                return (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => changeSelectedTeam(team.id)}
+                    style={({ pressed }) => [
+                      styles.teamCard,
+                      isSelected ? styles.teamCardActive : null,
+                      pressed ? styles.cardPressed : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.teamName,
+                        isSelected ? styles.teamNameActive : null,
+                      ]}
+                    >
+                      {team.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kime mesaj atacaksın?</Text>
+
+          <Text style={styles.sectionSubtitle}>
+            Önce grup seçilir. Direct Message seçilirse kişi listesi sadece
+            dropdown içinde görünür.
+          </Text>
+
+          <View style={styles.audienceGrid}>
+            {audienceOptions.map((audience) => {
+              const isSelected = selectedAudienceType === audience.type;
+              const isAllowed = canSendAudience(
+                currentUser,
+                audience.type,
+                selectedTeamId
+              );
+
+              return (
+                <Pressable
+                  key={audience.type}
+                  disabled={!isAllowed}
+                  onPress={() => changeAudience(audience.type)}
+                  style={({ pressed }) => [
+                    styles.audienceCard,
+                    isSelected ? styles.audienceCardActive : null,
+                    !isAllowed ? styles.audienceCardDisabled : null,
+                    pressed && isAllowed ? styles.cardPressed : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.audienceTitle,
+                      isSelected ? styles.audienceTitleActive : null,
+                      !isAllowed ? styles.disabledText : null,
+                    ]}
+                  >
+                    {audience.title}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.audienceSubtitle,
+                      isSelected ? styles.audienceSubtitleActive : null,
+                      !isAllowed ? styles.disabledText : null,
+                    ]}
+                  >
+                    {isAllowed ? audience.subtitle : "Bu rol için kapalı."}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {selectedAudienceType === "direct" ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Direct Message</Text>
+
+            <Text style={styles.sectionSubtitle}>
+              Kişiler büyük liste olarak görünmez. Aşağıdaki dropdown içinde
+              sadece 3 satırlık alan görünür, gerisini scroll edebilirsin.
+            </Text>
+
+            <Pressable
+              onPress={() =>
+                setRecipientPickerIsOpen((currentValue) => !currentValue)
+              }
+              style={({ pressed }) => [
+                styles.dropdownButton,
+                recipientPickerIsOpen ? styles.dropdownButtonActive : null,
+                pressed ? styles.cardPressed : null,
+              ]}
+            >
+              <View style={styles.dropdownTextArea}>
+                <Text style={styles.dropdownLabel}>Kişi seç</Text>
+                <Text style={styles.dropdownValue}>
+                  {selectedDirectRecipient?.name ?? "Henüz kişi seçilmedi"}
+                </Text>
+                <Text style={styles.dropdownMeta}>
+                  {selectedDirectRecipient
+                    ? getRoleLabel(selectedDirectRecipient.role)
+                    : "Aç, isim ara ve seç"}
                 </Text>
               </View>
-            ) : (
-              visibleMessages.map((message) => {
-                const isOwnMessage = message.senderRole === activeRole;
+
+              <Text style={styles.dropdownArrow}>
+                {recipientPickerIsOpen ? "⌃" : "⌄"}
+              </Text>
+            </Pressable>
+
+            {recipientPickerIsOpen ? (
+              <View style={styles.dropdownPanel}>
+                <TextInput
+                  value={recipientSearchText}
+                  onChangeText={setRecipientSearchText}
+                  placeholder="İsim ara..."
+                  placeholderTextColor={theme.colors.text.muted}
+                  style={styles.compactSearchInput}
+                />
+
+                <ScrollView
+                  nestedScrollEnabled
+                  style={styles.compactPickerScroll}
+                  contentContainerStyle={styles.compactList}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {filteredDirectMessageCandidates.length > 0 ? (
+                    filteredDirectMessageCandidates.map((user) => {
+                      const isSelected = user.id === selectedDirectRecipientId;
+
+                      return (
+                        <Pressable
+                          key={user.id}
+                          onPress={() => changeDirectRecipient(user.id)}
+                          style={({ pressed }) => [
+                            styles.compactRow,
+                            isSelected ? styles.compactRowActive : null,
+                            pressed ? styles.cardPressed : null,
+                          ]}
+                        >
+                          <View style={styles.compactTextArea}>
+                            <Text
+                              style={[
+                                styles.compactName,
+                                isSelected ? styles.compactNameActive : null,
+                              ]}
+                            >
+                              {user.name}
+                            </Text>
+                            <Text style={styles.compactMeta}>
+                              {getRoleLabel(user.role)} · {getTeamNamesForUser(user)}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.compactAction}>
+                            {isSelected ? "Selected" : "Choose"}
+                          </Text>
+                        </Pressable>
+                      );
+                    })
+                  ) : (
+                    <View style={styles.compactEmptyBox}>
+                      <Text style={styles.compactEmptyText}>
+                        Kişi bulunamadı. Başka bir isim dene.
+                      </Text>
+                    </View>
+                  )}
+                </ScrollView>
+
+                {filteredDirectMessageCandidates.length > 3 ? (
+                  <Text style={styles.compactResultHint}>
+                    Daha fazla kişi var. Liste içinde scroll yap veya isim yaz.
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <View style={styles.threadHeader}>
+            <View style={styles.threadHeaderText}>
+              <Text style={styles.sectionTitle}>
+                {selectedAudienceType === "direct"
+                  ? selectedDirectRecipient?.name ?? "Direct Message"
+                  : selectedAudience?.title ?? "Messages"}
+              </Text>
+
+              <Text style={styles.sectionSubtitle}>
+                {selectedAudienceType === "direct"
+                  ? "Bu konuşma sadece seçili iki kullanıcı arasında görünür."
+                  : `${selectedTeam.name} · ${selectedAudience?.subtitle ?? ""}`}
+              </Text>
+            </View>
+
+            <View style={styles.countPill}>
+              <Text style={styles.countText}>{visibleThreadMessages.length}</Text>
+            </View>
+          </View>
+
+          <View style={styles.messageList}>
+            {selectedAudienceType === "direct" &&
+            selectedDirectRecipient === undefined ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Kişi seçilmedi</Text>
+                <Text style={styles.emptyText}>
+                  Direct Message için dropdown içinden kişi seçmelisin.
+                </Text>
+              </View>
+            ) : visibleThreadMessages.length > 0 ? (
+              visibleThreadMessages.map((message) => {
+                const isOwnMessage = message.senderId === currentUser.id;
 
                 return (
                   <View
                     key={message.id}
                     style={[
                       styles.messageCard,
-                      isOwnMessage && styles.ownMessageCard,
+                      isOwnMessage ? styles.ownMessageCard : null,
                     ]}
                   >
                     <View style={styles.messageHeader}>
-                      <Text style={styles.senderName}>
-                        {message.senderName}
+                      <Text style={styles.senderName}>{message.senderName}</Text>
+                      <Text style={styles.messageTime}>
+                        {formatMessageTime(message.createdAt)}
                       </Text>
-
-                      <Text style={styles.messageTime}>{message.time}</Text>
                     </View>
 
                     <Text style={styles.senderRole}>
                       {getRoleLabel(message.senderRole)}
                     </Text>
-
                     <Text style={styles.messageText}>{message.text}</Text>
                   </View>
                 );
               })
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Henüz mesaj yok</Text>
+                <Text style={styles.emptyText}>
+                  Bu konuşmada ilk mesajı sen gönderebilirsin.
+                </Text>
+              </View>
             )}
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Yeni mesaj</Text>
-
           <Text style={styles.sectionSubtitle}>
-            Mesaj şu odaya gönderilecek: {currentRoom?.title}
+            Hedef: {" "}
+            {selectedAudienceType === "direct"
+              ? selectedDirectRecipient?.name ?? "Kişi seçilmedi"
+              : selectedAudience?.title}
           </Text>
 
           <TextInput
-            value={newMessage}
-            onChangeText={setNewMessage}
+            value={draftText}
+            onChangeText={setDraftText}
             placeholder="Mesajını yaz..."
             placeholderTextColor={theme.colors.text.muted}
             multiline
@@ -609,7 +1181,6 @@ export default function MessagesScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kaydetme durumu</Text>
-
           <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
 
           <View style={styles.resetButtonWrapper}>
@@ -617,18 +1188,17 @@ export default function MessagesScreen() {
               title="Demo mesajları sıfırla"
               variant="ghost"
               accessibilityLabel="Demo mesajları sıfırla"
-              onPress={resetMessages}
+              onPress={resetDemoMessages}
             />
           </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Gelecek Firebase mantığı</Text>
-
           <Text style={styles.sectionSubtitle}>
-            Daha sonra Firebase’de ilk açılışta sadece son 30-50 mesajı
-            çekeceğiz. Eski mesajlar kullanıcı isterse yüklenecek. Bu, gereksiz
-            Firestore read maliyetini azaltır.
+            Gerçek sistemde bu demo kullanıcı seçici olmayacak. Auth ile giriş
+            yapan kullanıcı kimse, Firestore sadece onun clubId, teamId, role ve
+            direct participant izinlerine göre mesajları gösterecek.
           </Text>
         </View>
 
@@ -682,6 +1252,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text.inverse,
     opacity: 0.76,
     fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.xl,
   },
   heroCard: {
     backgroundColor: theme.colors.background.surface,
@@ -735,106 +1306,218 @@ const styles = StyleSheet.create({
     lineHeight: theme.lineHeights.md,
     marginBottom: theme.spacing.xl,
   },
-  roleGrid: {
-    gap: theme.spacing.md,
-  },
-  roleCard: {
+  dropdownButton: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
   },
-  roleCardActive: {
-    backgroundColor: theme.colors.brand.primary,
+  dropdownButtonActive: {
+    backgroundColor: theme.colors.brand.primarySoft,
     borderColor: theme.colors.brand.primary,
   },
-  roleHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  roleTitle: {
+  dropdownTextArea: {
     flex: 1,
+  },
+  dropdownLabel: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    marginBottom: theme.spacing.xs,
+  },
+  dropdownValue: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
+  },
+  dropdownMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
+  },
+  dropdownArrow: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.black,
+  },
+  dropdownPanel: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  compactSearchInput: {
+    backgroundColor: theme.colors.background.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radius.md,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
   },
-  roleTitleActive: {
-    color: theme.colors.text.inverse,
+  compactPickerScroll: {
+    maxHeight: 186,
   },
-  roleTag: {
+  compactList: {
+    gap: theme.spacing.sm,
+  },
+  compactRow: {
+    minHeight: 54,
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+  },
+  compactRowActive: {
     backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primary,
+  },
+  compactTextArea: {
+    flex: 1,
+  },
+  compactName: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+  },
+  compactNameActive: {
+    color: theme.colors.text.brand,
+  },
+  compactMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
+  },
+  compactAction: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
   },
-  roleTagActive: {
+  compactEmptyBox: {
     backgroundColor: theme.colors.background.surface,
-    color: theme.colors.text.brand,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
   },
-  roleDescription: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+  compactEmptyText: {
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
   },
-  roleDescriptionActive: {
-    color: theme.colors.text.inverse,
+  compactResultHint: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.sm,
   },
-  roomGrid: {
+  teamGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.md,
   },
-  roomCard: {
+  teamCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
-  roomCardActive: {
+  teamCardActive: {
     backgroundColor: theme.colors.brand.primarySoft,
     borderColor: theme.colors.brand.primarySoft,
   },
-  roomTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+  teamName: {
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
   },
-  roomTitleActive: {
+  teamNameActive: {
     color: theme.colors.text.brand,
   },
-  roomDescription: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
+  audienceGrid: {
+    gap: theme.spacing.md,
   },
-  roomDescriptionActive: {
-    color: theme.colors.text.secondary,
-  },
-  messageCountBox: {
+  audienceCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
+    padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    marginBottom: theme.spacing.md,
   },
-  messageCountText: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
+  audienceCardActive: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primarySoft,
+  },
+  audienceCardDisabled: {
+    opacity: 0.42,
+  },
+  audienceTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  audienceTitleActive: {
+    color: theme.colors.text.brand,
+  },
+  audienceSubtitle: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+  },
+  audienceSubtitleActive: {
     color: theme.colors.text.secondary,
   },
-  loadMoreButton: {
+  disabledText: {
+    color: theme.colors.text.muted,
+  },
+  cardPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  threadHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: theme.spacing.lg,
+  },
+  threadHeaderText: {
+    flex: 1,
+  },
+  countPill: {
     alignSelf: "flex-start",
-    marginBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  countText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
   },
   messageList: {
     gap: theme.spacing.md,

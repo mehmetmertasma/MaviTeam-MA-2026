@@ -21,7 +21,7 @@ export function AppGlobalNavigation() {
     return null;
   }
 
-  const showProfileButton = pathname !== "/dashboard";
+  const showProfileButton = pathname !== "/profile";
 
   return (
     <View pointerEvents="box-none" style={styles.root}>

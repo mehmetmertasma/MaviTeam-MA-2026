@@ -14,43 +14,14 @@ import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 
 type UserRole = "admin" | "coach" | "parent" | "athlete";
-
-<<<<<<< Updated upstream
-type AudienceType =
-  | "team"
-  | "coaches"
-  | "athletes"
-  | "parents"
-  | "admins"
-  | "direct";
-=======
-type Contact = {
-  id: string;
-  name: string;
-  role: MessageRole;
-  team: string;
-};
->>>>>>> Stashed changes
+type AudienceType = "team" | "coaches" | "athletes" | "parents" | "admins" | "direct";
 
 type DemoTeam = {
   id: string;
-<<<<<<< Updated upstream
-=======
-  conversationId: string;
-  senderId: string;
-  senderName: string;
-  senderRole: MessageRole;
-  text: string;
-  time: string;
-};
-
-type ProfileData = {
->>>>>>> Stashed changes
   name: string;
   clubId: string;
 };
 
-<<<<<<< Updated upstream
 type DemoUser = {
   id: string;
   name: string;
@@ -78,7 +49,7 @@ type AudienceOption = {
   subtitle: string;
 };
 
-const MESSAGES_STORAGE_KEY = "teamsync_messages_dropdown_v1";
+const MESSAGES_STORAGE_KEY = "teamsync_messages_dropdown_v2";
 const CLUB_ID = "club-istanbul-volleyball";
 
 const defaultTeam: DemoTeam = {
@@ -89,16 +60,8 @@ const defaultTeam: DemoTeam = {
 
 const demoTeams: DemoTeam[] = [
   defaultTeam,
-  {
-    id: "team-u14-girls",
-    name: "U14 Kız",
-    clubId: CLUB_ID,
-  },
-  {
-    id: "team-u18-elite",
-    name: "U18 Elite",
-    clubId: CLUB_ID,
-  },
+  { id: "team-u14-girls", name: "U14 Kız", clubId: CLUB_ID },
+  { id: "team-u18-elite", name: "U18 Elite", clubId: CLUB_ID },
 ];
 
 const defaultUser: DemoUser = {
@@ -131,43 +94,11 @@ const demoUsers: DemoUser[] = [
     role: "coach",
     clubId: CLUB_ID,
     teamIds: ["team-u18-elite"],
-=======
-const MESSAGES_STORAGE_KEY = "teamsync_private_messages_data";
-const PROFILE_STORAGE_KEY = "teamsync_profile_data";
-
-const TEAM_CHAT_ID = "team-chat";
-const INITIAL_VISIBLE_MESSAGE_LIMIT = 6;
-const LOAD_MORE_MESSAGE_COUNT = 6;
-
-const startingProfileData: ProfileData = {
-  name: "Mert Asma",
-  email: "mertasma7580@gmail.com",
-  club: "İstanbul Voleybol Kulübü",
-  team: "U16 Erkek",
-  role: "Kulüp yöneticisi",
-  season: "2026 Bahar",
-  membership: "Kulüp öder, veli/sporcu ücretsiz",
-};
-
-const demoContacts: Contact[] = [
-  {
-    id: "admin-mert",
-    name: "Admin Mert",
-    role: "admin",
-    team: "Kulüp Yönetimi",
-  },
-  {
-    id: "coach-emre",
-    name: "Coach Emre",
-    role: "coach",
-    team: "U16 Erkek",
->>>>>>> Stashed changes
   },
   {
     id: "parent-ayse",
     name: "Ayşe Veli",
     role: "parent",
-<<<<<<< Updated upstream
     clubId: CLUB_ID,
     teamIds: ["team-u17-boys"],
   },
@@ -184,15 +115,11 @@ const demoContacts: Contact[] = [
     role: "parent",
     clubId: CLUB_ID,
     teamIds: ["team-u18-elite"],
-=======
-    team: "U16 Erkek",
->>>>>>> Stashed changes
   },
   {
     id: "athlete-mert",
     name: "Mert Asma",
     role: "athlete",
-<<<<<<< Updated upstream
     clubId: CLUB_ID,
     teamIds: ["team-u17-boys"],
   },
@@ -220,66 +147,27 @@ const demoContacts: Contact[] = [
 ];
 
 const audienceOptions: AudienceOption[] = [
-  {
-    type: "team",
-    title: "Team Chat",
-    subtitle: "Seçili takımdaki herkes görür.",
-  },
-  {
-    type: "coaches",
-    title: "Coaches",
-    subtitle: "Seçili takımın koç grubu.",
-  },
-  {
-    type: "athletes",
-    title: "Athletes",
-    subtitle: "Seçili takımın sporcuları.",
-  },
-  {
-    type: "parents",
-    title: "Parents",
-    subtitle: "Seçili takımın velileri.",
-  },
-  {
-    type: "admins",
-    title: "Club Admin",
-    subtitle: "Kulüp yöneticileri.",
-  },
-  {
-    type: "direct",
-    title: "Direct Message",
-    subtitle: "Bir kişiye özel mesaj.",
-=======
-    team: "U16 Erkek",
-  },
-  {
-    id: "athlete-efe",
-    name: "Efe Asma",
-    role: "athlete",
-    team: "U16 Erkek",
->>>>>>> Stashed changes
-  },
+  { type: "team", title: "Team Chat", subtitle: "Seçili takımdaki herkes görür." },
+  { type: "coaches", title: "Coaches", subtitle: "Seçili takımın koç grubu." },
+  { type: "athletes", title: "Athletes", subtitle: "Seçili takımın sporcuları." },
+  { type: "parents", title: "Parents", subtitle: "Seçili takımın velileri." },
+  { type: "admins", title: "Club Admin", subtitle: "Kulüp yöneticileri." },
+  { type: "direct", title: "Direct Message", subtitle: "Bir kişiye özel mesaj." },
 ];
 
 function sortMessages(messages: DemoMessage[]) {
   return [...messages].sort(
     (firstMessage, secondMessage) =>
-      new Date(firstMessage.createdAt).getTime() -
-      new Date(secondMessage.createdAt).getTime()
+      new Date(firstMessage.createdAt).getTime() - new Date(secondMessage.createdAt).getTime()
   );
 }
 
 const initialMessages: DemoMessage[] = sortMessages([
   {
-<<<<<<< Updated upstream
     id: "message-1",
     clubId: CLUB_ID,
     teamId: "team-u17-boys",
     audienceType: "team",
-=======
-    id: "1",
-    conversationId: TEAM_CHAT_ID,
->>>>>>> Stashed changes
     senderId: "coach-emre",
     senderName: "Coach Emre",
     senderRole: "coach",
@@ -287,7 +175,6 @@ const initialMessages: DemoMessage[] = sortMessages([
     createdAt: "2026-06-26T14:30:00.000Z",
   },
   {
-<<<<<<< Updated upstream
     id: "message-2",
     clubId: CLUB_ID,
     teamId: "team-u17-boys",
@@ -325,19 +212,6 @@ const initialMessages: DemoMessage[] = sortMessages([
     clubId: CLUB_ID,
     teamId: "team-u17-boys",
     audienceType: "direct",
-=======
-    id: "2",
-    conversationId: TEAM_CHAT_ID,
-    senderId: "admin-mert",
-    senderName: "Admin Mert",
-    senderRole: "admin",
-    text: "Salon girişinde kulüp kartlarınızı göstermeniz gerekiyor.",
-    time: "09:40",
-  },
-  {
-    id: "3",
-    conversationId: getDirectConversationId("coach-emre", "parent-ayse"),
->>>>>>> Stashed changes
     senderId: "parent-ayse",
     senderName: "Ayşe Veli",
     senderRole: "parent",
@@ -346,7 +220,6 @@ const initialMessages: DemoMessage[] = sortMessages([
     createdAt: "2026-06-27T13:15:00.000Z",
   },
   {
-<<<<<<< Updated upstream
     id: "message-6",
     clubId: CLUB_ID,
     teamId: "team-u17-boys",
@@ -357,44 +230,16 @@ const initialMessages: DemoMessage[] = sortMessages([
     recipientUserId: "parent-ayse",
     text: "Tamam, sorun değil. Geldiğinde direkt ısınmaya katılsın.",
     createdAt: "2026-06-27T13:22:00.000Z",
-=======
-    id: "4",
-    conversationId: getDirectConversationId("coach-emre", "parent-ayse"),
-    senderId: "coach-emre",
-    senderName: "Coach Emre",
-    senderRole: "coach",
-    text: "Merhaba, maç pazar günü 14:00 gibi görünüyor. Netleşince duyuru atacağım.",
-    time: "10:24",
-  },
-  {
-    id: "5",
-    conversationId: getDirectConversationId("coach-emre", "athlete-mert"),
-    senderId: "athlete-mert",
-    senderName: "Mert Asma",
-    senderRole: "athlete",
-    text: "Coach, bugün antrenmana gelebiliyorum.",
-    time: "10:35",
->>>>>>> Stashed changes
   },
 ]);
 
 function getRoleLabel(role: UserRole) {
-  if (role === "admin") {
-    return "Admin";
-  }
-
-  if (role === "coach") {
-    return "Coach";
-  }
-
-  if (role === "parent") {
-    return "Parent";
-  }
-
+  if (role === "admin") return "Admin";
+  if (role === "coach") return "Coach";
+  if (role === "parent") return "Parent";
   return "Athlete";
 }
 
-<<<<<<< Updated upstream
 function formatMessageTime(createdAt: string) {
   const date = new Date(createdAt);
 
@@ -405,22 +250,11 @@ function formatMessageTime(createdAt: string) {
   return date.toLocaleString("tr-TR", {
     month: "short",
     day: "numeric",
-=======
-function getDirectConversationId(firstUserId: string, secondUserId: string) {
-  return [firstUserId, secondUserId].sort().join("__");
-}
-
-function getCurrentTime() {
-  const now = new Date();
-
-  return now.toLocaleTimeString("tr-TR", {
->>>>>>> Stashed changes
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-<<<<<<< Updated upstream
 function getUserById(userId: string) {
   return demoUsers.find((user) => user.id === userId) ?? defaultUser;
 }
@@ -450,11 +284,7 @@ function userCanAccessTeam(user: DemoUser, teamId: string) {
 }
 
 function canDirectMessageUser(sender: DemoUser, recipient: DemoUser) {
-  if (sender.id === recipient.id) {
-    return false;
-  }
-
-  if (sender.clubId !== recipient.clubId) {
+  if (sender.id === recipient.id || sender.clubId !== recipient.clubId) {
     return false;
   }
 
@@ -469,11 +299,7 @@ function getDirectMessageCandidates(currentUser: DemoUser) {
   return demoUsers.filter((user) => canDirectMessageUser(currentUser, user));
 }
 
-function canSendAudience(
-  user: DemoUser,
-  audienceType: AudienceType,
-  selectedTeamId: string
-) {
+function canSendAudience(user: DemoUser, audienceType: AudienceType, selectedTeamId: string) {
   if (audienceType === "direct") {
     return getDirectMessageCandidates(user).length > 0;
   }
@@ -577,10 +403,7 @@ function isMessageInSelectedThread(
     );
   }
 
-  return (
-    message.teamId === selectedTeamId &&
-    message.audienceType === selectedAudienceType
-  );
+  return message.teamId === selectedTeamId && message.audienceType === selectedAudienceType;
 }
 
 function isAudienceType(value: unknown): value is AudienceType {
@@ -595,12 +418,7 @@ function isAudienceType(value: unknown): value is AudienceType {
 }
 
 function isUserRole(value: unknown): value is UserRole {
-  return (
-    value === "admin" ||
-    value === "coach" ||
-    value === "parent" ||
-    value === "athlete"
-  );
+  return value === "admin" || value === "coach" || value === "parent" || value === "athlete";
 }
 
 function isDemoMessage(value: unknown): value is DemoMessage {
@@ -665,77 +483,20 @@ function filterUsers(users: DemoUser[], searchText: string) {
 export default function MessagesScreen() {
   const [currentUserId, setCurrentUserId] = useState(defaultUser.id);
   const [selectedTeamId, setSelectedTeamId] = useState(defaultTeam.id);
-  const [selectedAudienceType, setSelectedAudienceType] =
-    useState<AudienceType>("team");
-  const [selectedDirectRecipientId, setSelectedDirectRecipientId] =
-    useState<string>();
+  const [selectedAudienceType, setSelectedAudienceType] = useState<AudienceType>("team");
+  const [selectedDirectRecipientId, setSelectedDirectRecipientId] = useState<string>();
   const [demoPickerIsOpen, setDemoPickerIsOpen] = useState(false);
   const [demoSearchText, setDemoSearchText] = useState("");
   const [recipientPickerIsOpen, setRecipientPickerIsOpen] = useState(false);
   const [recipientSearchText, setRecipientSearchText] = useState("");
   const [messages, setMessages] = useState<DemoMessage[]>(initialMessages);
   const [draftText, setDraftText] = useState("");
-=======
-function canMessageContact(activeUser: Contact, contact: Contact) {
-  if (activeUser.id === contact.id) {
-    return false;
-  }
-
-  if (activeUser.role === "admin") {
-    return true;
-  }
-
-  if (activeUser.role === "coach") {
-    return (
-      contact.role === "admin" ||
-      contact.role === "parent" ||
-      contact.role === "athlete"
-    );
-  }
-
-  if (activeUser.role === "parent") {
-    return contact.role === "admin" || contact.role === "coach";
-  }
-
-  return contact.role === "admin" || contact.role === "coach";
-}
-
-function normalizeSavedMessages(savedMessages: Message[]) {
-  return savedMessages.filter(
-    (message) =>
-      typeof message.id === "string" &&
-      typeof message.conversationId === "string" &&
-      typeof message.senderId === "string" &&
-      typeof message.senderName === "string" &&
-      typeof message.text === "string"
-  );
-}
-
-export default function MessagesScreen() {
-  const [activeUser, setActiveUser] = useState<Contact>(demoContacts[1]);
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(
-    null
-  );
-  const [messages, setMessages] = useState<Message[]>(startingMessages);
-  const [profileData, setProfileData] =
-    useState<ProfileData>(startingProfileData);
-  const [newMessage, setNewMessage] = useState("");
-  const [visibleMessageLimit, setVisibleMessageLimit] = useState(
-    INITIAL_VISIBLE_MESSAGE_LIMIT
-  );
->>>>>>> Stashed changes
   const [statusMessage, setStatusMessage] = useState(
     "Mesajlar local storage ile kaydedilecek."
   );
 
-<<<<<<< Updated upstream
-  const currentUser = useMemo(() => {
-    return getUserById(currentUserId);
-  }, [currentUserId]);
-
-  const currentUserTeams = useMemo(() => {
-    return getTeamsForUser(currentUser);
-  }, [currentUser]);
+  const currentUser = useMemo(() => getUserById(currentUserId), [currentUserId]);
+  const currentUserTeams = useMemo(() => getTeamsForUser(currentUser), [currentUser]);
 
   const selectedTeam = useMemo(() => {
     return demoTeams.find((team) => team.id === selectedTeamId) ?? defaultTeam;
@@ -754,9 +515,7 @@ export default function MessagesScreen() {
   }, [directMessageCandidates, recipientSearchText]);
 
   const selectedDirectRecipient = useMemo(() => {
-    return directMessageCandidates.find(
-      (user) => user.id === selectedDirectRecipientId
-    );
+    return directMessageCandidates.find((user) => user.id === selectedDirectRecipientId);
   }, [directMessageCandidates, selectedDirectRecipientId]);
 
   const selectedAudience = audienceOptions.find(
@@ -775,88 +534,16 @@ export default function MessagesScreen() {
           selectedDirectRecipientId
         )
       );
-  }, [
-    currentUser,
-    messages,
-    selectedAudienceType,
-    selectedDirectRecipientId,
-    selectedTeamId,
-  ]);
-=======
-  const messageableContacts = useMemo(() => {
-    return demoContacts.filter((contact) => canMessageContact(activeUser, contact));
-  }, [activeUser]);
-
-  const selectedContact = useMemo(() => {
-    if (selectedContactId === null) {
-      return null;
-    }
-
-    return demoContacts.find((contact) => contact.id === selectedContactId) ?? null;
-  }, [selectedContactId]);
-
-  const activeConversationId =
-    selectedContact === null
-      ? TEAM_CHAT_ID
-      : getDirectConversationId(activeUser.id, selectedContact.id);
-
-  const activeConversationTitle =
-    selectedContact === null
-      ? "Team Chat"
-      : `${activeUser.name} ↔ ${selectedContact.name}`;
-
-  const activeConversationDescription =
-    selectedContact === null
-      ? "Bu alan takım geneli mesajlar içindir. Buradaki mesajları herkes görebilir."
-      : "Bu özel mesajı sadece gönderen kişi ve seçilen kişi görebilir.";
-
-  const filteredMessages = useMemo(() => {
-    return messages.filter((message) => {
-      if (selectedContact === null) {
-        return message.conversationId === TEAM_CHAT_ID;
-      }
-
-      return message.conversationId === activeConversationId;
-    });
-  }, [activeConversationId, messages, selectedContact]);
->>>>>>> Stashed changes
+  }, [currentUser, messages, selectedAudienceType, selectedDirectRecipientId, selectedTeamId]);
 
   const canSendCurrentMessage =
     draftText.trim().length > 0 &&
     canSendAudience(currentUser, selectedAudienceType, selectedTeamId) &&
     (selectedAudienceType !== "direct" || selectedDirectRecipient !== undefined);
 
-<<<<<<< Updated upstream
   useEffect(() => {
     let screenIsActive = true;
 
-=======
-  function changeActiveUser(nextUser: Contact) {
-    setActiveUser(nextUser);
-    setSelectedContactId(null);
-    setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-    setStatusMessage(`${nextUser.name} olarak mesaj ekranı açıldı.`);
-  }
-
-  function openTeamChat() {
-    setSelectedContactId(null);
-    setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-    setStatusMessage("Team Chat açıldı. Buradaki mesajları herkes görebilir.");
-  }
-
-  function openDirectMessage(contactId: string) {
-    const contact = demoContacts.find((demoContact) => demoContact.id === contactId);
-
-    setSelectedContactId(contactId);
-    setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-
-    if (contact) {
-      setStatusMessage(`${contact.name} ile özel mesaj açıldı.`);
-    }
-  }
-
-  useEffect(() => {
->>>>>>> Stashed changes
     async function loadSavedMessages() {
       try {
         const savedMessages = await AsyncStorage.getItem(MESSAGES_STORAGE_KEY);
@@ -866,21 +553,6 @@ export default function MessagesScreen() {
           setMessages(parsedMessages);
           setStatusMessage("Kaydedilmiş mesajlar yüklendi.");
         }
-<<<<<<< Updated upstream
-=======
-
-        const parsedMessages = JSON.parse(savedMessages) as Message[];
-        const normalizedMessages = normalizeSavedMessages(parsedMessages);
-
-        if (normalizedMessages.length === 0) {
-          setMessages(startingMessages);
-          setStatusMessage("Eski mesaj formatı temizlendi. Demo mesajlar yüklendi.");
-          return;
-        }
-
-        setMessages(normalizedMessages);
-        setStatusMessage("Kaydedilmiş mesajlar yüklendi.");
->>>>>>> Stashed changes
       } catch {
         if (screenIsActive) {
           setMessages(initialMessages);
@@ -915,11 +587,7 @@ export default function MessagesScreen() {
   }
 
   function changeSelectedTeam(nextTeamId: string) {
-    const nextAudienceType = canSendAudience(
-      currentUser,
-      selectedAudienceType,
-      nextTeamId
-    )
+    const nextAudienceType = canSendAudience(currentUser, selectedAudienceType, nextTeamId)
       ? selectedAudienceType
       : getFirstAllowedAudience(currentUser, nextTeamId);
 
@@ -949,16 +617,14 @@ export default function MessagesScreen() {
     }
 
     const audienceTitle =
-      audienceOptions.find((audience) => audience.type === nextAudienceType)
-        ?.title ?? "Mesaj hedefi";
+      audienceOptions.find((audience) => audience.type === nextAudienceType)?.title ??
+      "Mesaj hedefi";
 
     setStatusMessage(`${audienceTitle} seçildi.`);
   }
 
   function changeDirectRecipient(nextRecipientId: string) {
-    const recipient = directMessageCandidates.find(
-      (user) => user.id === nextRecipientId
-    );
+    const recipient = directMessageCandidates.find((user) => user.id === nextRecipientId);
 
     setSelectedDirectRecipientId(nextRecipientId);
     setRecipientSearchText("");
@@ -972,10 +638,7 @@ export default function MessagesScreen() {
 
   async function saveMessages(nextMessages: DemoMessage[]) {
     try {
-      await AsyncStorage.setItem(
-        MESSAGES_STORAGE_KEY,
-        JSON.stringify(nextMessages)
-      );
+      await AsyncStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(nextMessages));
 
       setMessages(nextMessages);
       setStatusMessage("Mesaj kaydedildi.");
@@ -992,7 +655,6 @@ export default function MessagesScreen() {
       return;
     }
 
-<<<<<<< Updated upstream
     const newMessage: DemoMessage = {
       id: `message-${Date.now()}`,
       clubId: currentUser.clubId,
@@ -1002,21 +664,9 @@ export default function MessagesScreen() {
       senderName: currentUser.name,
       senderRole: currentUser.role,
       recipientUserId:
-        selectedAudienceType === "direct"
-          ? selectedDirectRecipient?.id
-          : undefined,
+        selectedAudienceType === "direct" ? selectedDirectRecipient?.id : undefined,
       text: trimmedText,
       createdAt: new Date().toISOString(),
-=======
-    const messageToAdd: Message = {
-      id: Date.now().toString(),
-      conversationId: activeConversationId,
-      senderId: activeUser.id,
-      senderName: activeUser.name,
-      senderRole: activeUser.role,
-      text: trimmedMessage,
-      time: getCurrentTime(),
->>>>>>> Stashed changes
     };
 
     const nextMessages = sortMessages([...messages, newMessage]);
@@ -1029,20 +679,12 @@ export default function MessagesScreen() {
     try {
       await AsyncStorage.removeItem(MESSAGES_STORAGE_KEY);
 
-<<<<<<< Updated upstream
       setMessages(initialMessages);
       setDraftText("");
       setSelectedDirectRecipientId(undefined);
       setRecipientSearchText("");
       setRecipientPickerIsOpen(false);
       setStatusMessage("Demo mesajlar sıfırlandı.");
-=======
-      setMessages(startingMessages);
-      setNewMessage("");
-      setSelectedContactId(null);
-      setVisibleMessageLimit(INITIAL_VISIBLE_MESSAGE_LIMIT);
-      setStatusMessage("Mesajlar demo haline sıfırlandı.");
->>>>>>> Stashed changes
     } catch {
       setStatusMessage("Demo mesajlar sıfırlanırken bir sorun oluştu.");
     }
@@ -1057,40 +699,22 @@ export default function MessagesScreen() {
           <View>
             <Text style={styles.welcome}>Mesajlar</Text>
             <Text style={styles.subtitle}>
-<<<<<<< Updated upstream
               Grup mesajları ve küçük dropdown ile direct message.
-=======
-              Team Chat veya seçili kişiye özel mesaj gönder.
->>>>>>> Stashed changes
             </Text>
           </View>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Takım iletişimi</Text>
-
-<<<<<<< Updated upstream
           <Text style={styles.heroTitle}>Messages</Text>
-
           <Text style={styles.heroSubtitle}>
             Kullanıcılar açık açık alt alta listelenmez. Direct Message için
-            önce dropdown açılır, sonra isim aranır ve küçük listeden seçim
-            yapılır.
-=======
-          <Text style={styles.heroTitle}>Private Messages</Text>
-
-          <Text style={styles.heroSubtitle}>
-            Şu an demo kullanıcı: {activeUser.name}. Profil adın kayıtlı:{" "}
-            {profileData.name}. Team Chat herkese açıktır. Direct Message ise
-            sadece seçilen kişiyle görünür.
->>>>>>> Stashed changes
+            önce dropdown açılır, sonra isim aranır ve küçük listeden seçim yapılır.
           </Text>
         </View>
 
         <View style={styles.section}>
-<<<<<<< Updated upstream
           <Text style={styles.sectionTitle}>Demo kullanıcı</Text>
-
           <Text style={styles.sectionSubtitle}>
             Gerçek login gelene kadar rol testini küçük dropdown ile yapıyoruz.
           </Text>
@@ -1111,155 +735,7 @@ export default function MessagesScreen() {
               </Text>
             </View>
 
-            <Text style={styles.dropdownArrow}>
-              {demoPickerIsOpen ? "⌃" : "⌄"}
-=======
-          <Text style={styles.sectionTitle}>Demo kullanıcı seçimi</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            Şimdilik gerçek login sistemi yok. Buradan farklı kullanıcı gibi
-            davranıp mesaj gizliliğini test ediyoruz.
-          </Text>
-
-          <View style={styles.userGrid}>
-            {demoContacts.map((contact) => {
-              const isActive = activeUser.id === contact.id;
-
-              return (
-                <Pressable
-                  key={contact.id}
-                  onPress={() => changeActiveUser(contact)}
-                  style={[
-                    styles.userCard,
-                    isActive && styles.userCardActive,
-                  ]}
-                >
-                  <View style={styles.userTopRow}>
-                    <View style={styles.avatar}>
-                      <Text
-                        style={[
-                          styles.avatarText,
-                          isActive && styles.avatarTextActive,
-                        ]}
-                      >
-                        {contact.name
-                          .split(" ")
-                          .map((namePart) => namePart[0])
-                          .join("")
-                          .slice(0, 2)}
-                      </Text>
-                    </View>
-
-                    <View style={styles.userInfo}>
-                      <Text
-                        style={[
-                          styles.userName,
-                          isActive && styles.userNameActive,
-                        ]}
-                      >
-                        {contact.name}
-                      </Text>
-
-                      <Text
-                        style={[
-                          styles.userMeta,
-                          isActive && styles.userMetaActive,
-                        ]}
-                      >
-                        {getRoleLabel(contact.role)} · {contact.team}
-                      </Text>
-                    </View>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kime mesaj atacaksın?</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            Team Chat herkese gider. Aşağıdan kişi seçersen mesaj sadece sen ve
-            o kişi arasında kalır.
-          </Text>
-
-          <Pressable
-            onPress={openTeamChat}
-            style={[
-              styles.recipientCard,
-              selectedContact === null && styles.recipientCardActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.recipientTitle,
-                selectedContact === null && styles.recipientTitleActive,
-              ]}
-            >
-              Team Chat
-            </Text>
-
-            <Text
-              style={[
-                styles.recipientDescription,
-                selectedContact === null && styles.recipientDescriptionActive,
-              ]}
-            >
-              Takım geneli mesaj. Herkes görebilir.
-            </Text>
-          </Pressable>
-
-          <View style={styles.recipientList}>
-            {messageableContacts.map((contact) => {
-              const isSelected = selectedContactId === contact.id;
-
-              return (
-                <Pressable
-                  key={contact.id}
-                  onPress={() => openDirectMessage(contact.id)}
-                  style={[
-                    styles.recipientCard,
-                    isSelected && styles.recipientCardActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.recipientTitle,
-                      isSelected && styles.recipientTitleActive,
-                    ]}
-                  >
-                    {contact.name}
-                  </Text>
-
-                  <Text
-                    style={[
-                      styles.recipientDescription,
-                      isSelected && styles.recipientDescriptionActive,
-                    ]}
-                  >
-                    {getRoleLabel(contact.role)} · {contact.team} · Private
-                    Message
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{activeConversationTitle}</Text>
-
-          <Text style={styles.sectionSubtitle}>
-            {activeConversationDescription}
-          </Text>
-
-          <View style={styles.messageCountBox}>
-            <Text style={styles.messageCountText}>
-              {filteredMessages.length} mesajdan {visibleMessages.length} tanesi
-              gösteriliyor.
->>>>>>> Stashed changes
-            </Text>
+            <Text style={styles.dropdownArrow}>{demoPickerIsOpen ? "⌃" : "⌄"}</Text>
           </Pressable>
 
           {demoPickerIsOpen ? (
@@ -1305,9 +781,7 @@ export default function MessagesScreen() {
                         </Text>
                       </View>
 
-                      <Text style={styles.compactAction}>
-                        {isSelected ? "Active" : "Use"}
-                      </Text>
+                      <Text style={styles.compactAction}>{isSelected ? "Active" : "Use"}</Text>
                     </Pressable>
                   );
                 })}
@@ -1316,11 +790,9 @@ export default function MessagesScreen() {
           ) : null}
         </View>
 
-<<<<<<< Updated upstream
         {currentUserTeams.length > 1 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Takım seçimi</Text>
-
             <Text style={styles.sectionSubtitle}>
               Mesajlar seçili takıma göre filtrelenir.
             </Text>
@@ -1340,10 +812,7 @@ export default function MessagesScreen() {
                     ]}
                   >
                     <Text
-                      style={[
-                        styles.teamName,
-                        isSelected ? styles.teamNameActive : null,
-                      ]}
+                      style={[styles.teamName, isSelected ? styles.teamNameActive : null]}
                     >
                       {team.name}
                     </Text>
@@ -1356,20 +825,14 @@ export default function MessagesScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kime mesaj atacaksın?</Text>
-
           <Text style={styles.sectionSubtitle}>
-            Önce grup seçilir. Direct Message seçilirse kişi listesi sadece
-            dropdown içinde görünür.
+            Önce grup seçilir. Direct Message seçilirse kişi listesi sadece dropdown içinde görünür.
           </Text>
 
           <View style={styles.audienceGrid}>
             {audienceOptions.map((audience) => {
               const isSelected = selectedAudienceType === audience.type;
-              const isAllowed = canSendAudience(
-                currentUser,
-                audience.type,
-                selectedTeamId
-              );
+              const isAllowed = canSendAudience(currentUser, audience.type, selectedTeamId);
 
               return (
                 <Pressable
@@ -1411,16 +874,13 @@ export default function MessagesScreen() {
         {selectedAudienceType === "direct" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Direct Message</Text>
-
             <Text style={styles.sectionSubtitle}>
               Kişiler büyük liste olarak görünmez. Aşağıdaki dropdown içinde
               sadece 3 satırlık alan görünür, gerisini scroll edebilirsin.
             </Text>
 
             <Pressable
-              onPress={() =>
-                setRecipientPickerIsOpen((currentValue) => !currentValue)
-              }
+              onPress={() => setRecipientPickerIsOpen((currentValue) => !currentValue)}
               style={({ pressed }) => [
                 styles.dropdownButton,
                 recipientPickerIsOpen ? styles.dropdownButtonActive : null,
@@ -1535,8 +995,7 @@ export default function MessagesScreen() {
           </View>
 
           <View style={styles.messageList}>
-            {selectedAudienceType === "direct" &&
-            selectedDirectRecipient === undefined ? (
+            {selectedAudienceType === "direct" && selectedDirectRecipient === undefined ? (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>Kişi seçilmedi</Text>
                 <Text style={styles.emptyText}>
@@ -1546,39 +1005,18 @@ export default function MessagesScreen() {
             ) : visibleThreadMessages.length > 0 ? (
               visibleThreadMessages.map((message) => {
                 const isOwnMessage = message.senderId === currentUser.id;
-=======
-          <View style={styles.messageList}>
-            {visibleMessages.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Henüz mesaj yok</Text>
-
-                <Text style={styles.emptyText}>
-                  Bu konuşmada görünen ilk mesajı sen gönderebilirsin.
-                </Text>
-              </View>
-            ) : (
-              visibleMessages.map((message) => {
-                const isOwnMessage = message.senderId === activeUser.id;
->>>>>>> Stashed changes
 
                 return (
                   <View
                     key={message.id}
-                    style={[
-                      styles.messageCard,
-                      isOwnMessage ? styles.ownMessageCard : null,
-                    ]}
+                    style={[styles.messageCard, isOwnMessage ? styles.ownMessageCard : null]}
                   >
                     <View style={styles.messageHeader}>
                       <Text style={styles.senderName}>{message.senderName}</Text>
-                      <Text style={styles.messageTime}>
-                        {formatMessageTime(message.createdAt)}
-                      </Text>
+                      <Text style={styles.messageTime}>{formatMessageTime(message.createdAt)}</Text>
                     </View>
 
-                    <Text style={styles.senderRole}>
-                      {getRoleLabel(message.senderRole)}
-                    </Text>
+                    <Text style={styles.senderRole}>{getRoleLabel(message.senderRole)}</Text>
                     <Text style={styles.messageText}>{message.text}</Text>
                   </View>
                 );
@@ -1597,14 +1035,10 @@ export default function MessagesScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Yeni mesaj</Text>
           <Text style={styles.sectionSubtitle}>
-<<<<<<< Updated upstream
             Hedef: {" "}
             {selectedAudienceType === "direct"
               ? selectedDirectRecipient?.name ?? "Kişi seçilmedi"
               : selectedAudience?.title}
-=======
-            Mesaj şu konuşmaya gönderilecek: {activeConversationTitle}
->>>>>>> Stashed changes
           </Text>
 
           <TextInput
@@ -1642,16 +1076,9 @@ export default function MessagesScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Gelecek Firebase mantığı</Text>
           <Text style={styles.sectionSubtitle}>
-<<<<<<< Updated upstream
             Gerçek sistemde bu demo kullanıcı seçici olmayacak. Auth ile giriş
             yapan kullanıcı kimse, Firestore sadece onun clubId, teamId, role ve
             direct participant izinlerine göre mesajları gösterecek.
-=======
-            Gerçek sistemde her direct message için özel bir conversationId
-            olacak. Firestore sadece o konuşmanın participant listesinde olan
-            kullanıcıya mesajları gösterecek. Böylece bir veli başka velinin
-            özel mesajını göremeyecek.
->>>>>>> Stashed changes
           </Text>
         </View>
 
@@ -1759,14 +1186,7 @@ const styles = StyleSheet.create({
     lineHeight: theme.lineHeights.md,
     marginBottom: theme.spacing.xl,
   },
-<<<<<<< Updated upstream
   dropdownButton: {
-=======
-  userGrid: {
-    gap: theme.spacing.md,
-  },
-  userCard: {
->>>>>>> Stashed changes
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.md,
@@ -1778,7 +1198,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: theme.spacing.md,
   },
-<<<<<<< Updated upstream
   dropdownButtonActive: {
     backgroundColor: theme.colors.brand.primarySoft,
     borderColor: theme.colors.brand.primary,
@@ -1909,44 +1328,10 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand.primarySoft,
   },
   teamName: {
-=======
-  userCardActive: {
-    backgroundColor: theme.colors.brand.primary,
-    borderColor: theme.colors.brand.primary,
-  },
-  userTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.brand.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  avatarTextActive: {
-    color: theme.colors.text.brand,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
->>>>>>> Stashed changes
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
   },
-<<<<<<< Updated upstream
   teamNameActive: {
     color: theme.colors.text.brand,
   },
@@ -1954,53 +1339,6 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   audienceCard: {
-=======
-  userNameActive: {
-    color: theme.colors.text.inverse,
-  },
-  userMeta: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-  },
-  userMetaActive: {
-    color: theme.colors.text.inverse,
-  },
-  recipientList: {
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  recipientCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  recipientCardActive: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    borderColor: theme.colors.brand.primarySoft,
-  },
-  recipientTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  recipientTitleActive: {
-    color: theme.colors.text.brand,
-  },
-  recipientDescription: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
-  },
-  recipientDescriptionActive: {
-    color: theme.colors.text.secondary,
-  },
-  messageCountBox: {
->>>>>>> Stashed changes
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,

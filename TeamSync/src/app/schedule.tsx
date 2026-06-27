@@ -1,4 +1,3 @@
-import { Link } from "expo-router";
 import { useState } from "react";
 import {
   Pressable,
@@ -27,7 +26,6 @@ type ScheduleItem = {
 };
 
 const scheduleTypes: ScheduleType[] = ["Antrenman", "Maç", "Toplantı"];
-
 const teamOptions: TeamOption[] = ["Tüm Kulüp", "A Takım", "U16 Erkek", "U14 Kız"];
 
 const initialScheduleItems: ScheduleItem[] = [
@@ -64,9 +62,7 @@ const initialScheduleItems: ScheduleItem[] = [
 ];
 
 export default function ScheduleScreen() {
-  const [scheduleItems, setScheduleItems] =
-    useState<ScheduleItem[]>(initialScheduleItems);
-
+  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>(initialScheduleItems);
   const [title, setTitle] = useState("");
   const [selectedType, setSelectedType] = useState<ScheduleType>("Antrenman");
   const [selectedTeam, setSelectedTeam] = useState<TeamOption>("Tüm Kulüp");
@@ -74,6 +70,9 @@ export default function ScheduleScreen() {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
+  const [statusMessage, setStatusMessage] = useState(
+    "Programlar şimdilik bu oturum içinde tutuluyor."
+  );
 
   const canCreate =
     title.trim().length > 0 &&
@@ -83,6 +82,7 @@ export default function ScheduleScreen() {
 
   function handleCreateScheduleItem() {
     if (!canCreate) {
+      setStatusMessage("Başlık, tarih, saat ve konum boş bırakılamaz.");
       return;
     }
 
@@ -97,8 +97,7 @@ export default function ScheduleScreen() {
       note: note.trim() || "Ek not yok.",
     };
 
-    setScheduleItems([newScheduleItem, ...scheduleItems]);
-
+    setScheduleItems((currentItems) => [newScheduleItem, ...currentItems]);
     setTitle("");
     setSelectedType("Antrenman");
     setSelectedTeam("Tüm Kulüp");
@@ -106,35 +105,58 @@ export default function ScheduleScreen() {
     setTime("");
     setLocation("");
     setNote("");
+    setStatusMessage("Yeni program oluşturuldu.");
+  }
+
+  function deleteScheduleItem(itemId: number) {
+    setScheduleItems((currentItems) =>
+      currentItems.filter((item) => item.id !== itemId)
+    );
+    setStatusMessage("Program silindi.");
+  }
+
+  function resetScheduleItems() {
+    setScheduleItems(initialScheduleItems);
+    setTitle("");
+    setSelectedType("Antrenman");
+    setSelectedTeam("Tüm Kulüp");
+    setDate("");
+    setTime("");
+    setLocation("");
+    setNote("");
+    setStatusMessage("Program demo haline sıfırlandı.");
   }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>Program</Text>
-            <Text style={styles.pageSubtitle}>
-              Antrenman, maç ve toplantı programlarını tek yerden yönet.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Program</Text>
+          <Text style={styles.pageSubtitle}>
+            Antrenman, maç ve toplantı programlarını tek yerden yönet.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Takvim yönetimi</Text>
-
           <Text style={styles.heroTitle}>Yeni program oluştur</Text>
-
           <Text style={styles.heroSubtitle}>
-            Admin veya koç olarak takıma özel etkinlik oluşturabilir, veli ve
-            sporcuların programı görmesini sağlayabilirsin.
+            Admin veya koç olarak takıma özel etkinlik oluşturabilir, veli ve sporcuların programı görmesini sağlayabilirsin.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Program bilgileri</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Program bilgileri</Text>
+              <Text style={styles.sectionSubtitle}>
+                Etkinlik türünü, takımı, zamanı ve konumu gir.
+              </Text>
+            </View>
+
+            <Text style={styles.statusPill}>{scheduleItems.length} etkinlik</Text>
+          </View>
 
           <Text style={styles.label}>Başlık</Text>
           <TextInput
@@ -156,14 +178,14 @@ export default function ScheduleScreen() {
                   onPress={() => setSelectedType(type)}
                   style={({ pressed }) => [
                     styles.optionButton,
-                    isSelected && styles.optionButtonSelected,
-                    pressed && styles.optionButtonPressed,
+                    isSelected ? styles.optionButtonSelected : null,
+                    pressed ? styles.pressed : null,
                   ]}
                 >
                   <Text
                     style={[
                       styles.optionButtonText,
-                      isSelected && styles.optionButtonTextSelected,
+                      isSelected ? styles.optionButtonTextSelected : null,
                     ]}
                   >
                     {type}
@@ -184,14 +206,14 @@ export default function ScheduleScreen() {
                   onPress={() => setSelectedTeam(team)}
                   style={({ pressed }) => [
                     styles.optionButton,
-                    isSelected && styles.optionButtonSelected,
-                    pressed && styles.optionButtonPressed,
+                    isSelected ? styles.optionButtonSelected : null,
+                    pressed ? styles.pressed : null,
                   ]}
                 >
                   <Text
                     style={[
                       styles.optionButtonText,
-                      isSelected && styles.optionButtonTextSelected,
+                      isSelected ? styles.optionButtonTextSelected : null,
                     ]}
                   >
                     {team}
@@ -201,23 +223,29 @@ export default function ScheduleScreen() {
             })}
           </View>
 
-          <Text style={styles.label}>Tarih</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Örn: Bugün, Yarın, 12 Temmuz"
-            placeholderTextColor={theme.colors.text.muted}
-            value={date}
-            onChangeText={setDate}
-          />
+          <View style={styles.formGrid}>
+            <View style={styles.formField}>
+              <Text style={styles.label}>Tarih</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Örn: Bugün, Yarın, 12 Temmuz"
+                placeholderTextColor={theme.colors.text.muted}
+                value={date}
+                onChangeText={setDate}
+              />
+            </View>
 
-          <Text style={styles.label}>Saat</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Örn: 18:30"
-            placeholderTextColor={theme.colors.text.muted}
-            value={time}
-            onChangeText={setTime}
-          />
+            <View style={styles.formField}>
+              <Text style={styles.label}>Saat</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Örn: 18:30"
+                placeholderTextColor={theme.colors.text.muted}
+                value={time}
+                onChangeText={setTime}
+              />
+            </View>
+          </View>
 
           <Text style={styles.label}>Konum</Text>
           <TextInput
@@ -238,64 +266,74 @@ export default function ScheduleScreen() {
             multiline
           />
 
-          <Pressable
-            disabled={!canCreate}
-            onPress={handleCreateScheduleItem}
-            style={({ pressed }) => [
-              styles.createButton,
-              pressed && styles.createButtonPressed,
-              !canCreate && styles.createButtonDisabled,
-            ]}
-          >
-            <Text style={styles.createButtonText}>Programı oluştur</Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <AppButton
+              title="Programı oluştur"
+              onPress={handleCreateScheduleItem}
+              disabled={!canCreate}
+              style={styles.actionButton}
+            />
+
+            <AppButton
+              title="Sıfırla"
+              variant="ghost"
+              onPress={resetScheduleItems}
+              style={styles.actionButton}
+            />
+          </View>
+
+          <Text style={styles.statusText}>{statusMessage}</Text>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.listHeader}>
-            <Text style={styles.sectionTitle}>Yaklaşan program</Text>
-            <Text style={styles.countText}>{scheduleItems.length} etkinlik</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Yaklaşan program</Text>
 
           <View style={styles.scheduleList}>
-            {scheduleItems.map((item) => (
-              <View key={item.id} style={styles.scheduleCard}>
-                <View style={styles.cardTopRow}>
-                  <Text style={styles.scheduleType}>{item.type}</Text>
-                  <Text style={styles.scheduleTeam}>{item.team}</Text>
+            {scheduleItems.length > 0 ? (
+              scheduleItems.map((item) => (
+                <View key={item.id} style={styles.scheduleCard}>
+                  <View style={styles.cardTopRow}>
+                    <Text style={styles.scheduleType}>{item.type}</Text>
+                    <Text style={styles.scheduleTeam}>{item.team}</Text>
+                  </View>
+
+                  <Text style={styles.scheduleTitle}>{item.title}</Text>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Tarih</Text>
+                    <Text style={styles.detailValue}>{item.date}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Saat</Text>
+                    <Text style={styles.detailValue}>{item.time}</Text>
+                  </View>
+
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Konum</Text>
+                    <Text style={styles.detailValue}>{item.location}</Text>
+                  </View>
+
+                  <Text style={styles.noteText}>{item.note}</Text>
+
+                  <Pressable
+                    onPress={() => deleteScheduleItem(item.id)}
+                    style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
+                  >
+                    <Text style={styles.deleteButtonText}>Sil</Text>
+                  </Pressable>
                 </View>
-
-                <Text style={styles.scheduleTitle}>{item.title}</Text>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Tarih</Text>
-                  <Text style={styles.detailValue}>{item.date}</Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Saat</Text>
-                  <Text style={styles.detailValue}>{item.time}</Text>
-                </View>
-
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Konum</Text>
-                  <Text style={styles.detailValue}>{item.location}</Text>
-                </View>
-
-                <Text style={styles.noteText}>{item.note}</Text>
+              ))
+            ) : (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Henüz program yok</Text>
+                <Text style={styles.emptyText}>
+                  İlk etkinliği yukarıdaki formdan oluşturabilirsin.
+                </Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
-
-        <Link href="/dashboard" asChild>
-          <AppButton
-            title="Dashboard'a dön"
-            variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
-          />
-        </Link>
       </View>
     </ScrollView>
   );
@@ -309,34 +347,34 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
   },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
@@ -379,39 +417,64 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
+  sectionSubtitle: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
+  },
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+  },
   label: {
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing.sm,
-    marginTop: theme.spacing.md,
   },
   input: {
+    minHeight: 52,
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
+    marginBottom: theme.spacing.lg,
   },
   textArea: {
-    minHeight: 100,
+    minHeight: 112,
     textAlignVertical: "top",
   },
   optionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.sm,
+    gap: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
   optionButton: {
@@ -426,107 +489,138 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.brand.primary,
     borderColor: theme.colors.brand.primary,
   },
-  optionButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
   optionButtonText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.secondary,
   },
   optionButtonTextSelected: {
     color: theme.colors.text.inverse,
   },
-  createButton: {
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radius.lg,
-    paddingVertical: theme.spacing.lg,
-    alignItems: "center",
-    marginTop: theme.spacing.sm,
-  },
-  createButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
-  createButtonDisabled: {
-    opacity: 0.48,
-  },
-  createButtonText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  listHeader: {
+  formGrid: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexWrap: "wrap",
     gap: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
   },
-  countText: {
+  formField: {
+    flexGrow: 1,
+    flexBasis: 220,
+  },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  actionButton: {
+    flexGrow: 1,
+  },
+  statusText: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
   },
   scheduleList: {
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
   },
   scheduleCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
   },
   cardTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
   scheduleType: {
+    backgroundColor: theme.colors.brand.primarySoft,
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
   scheduleTeam: {
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.black,
   },
   scheduleTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.lg,
   },
   detailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.default,
   },
   detailLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    flex: 1,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
   },
   detailValue: {
     flex: 1,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
     textAlign: "right",
   },
   noteText: {
-    marginTop: theme.spacing.md,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
+    marginTop: theme.spacing.lg,
   },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
+  deleteButton: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+  },
+  deleteButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  emptyCard: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  pressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

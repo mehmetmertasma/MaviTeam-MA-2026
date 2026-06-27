@@ -1,5 +1,6 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -21,6 +22,8 @@ type Announcement = {
   target: AnnouncementTarget;
   createdAt: string;
 };
+
+const ANNOUNCEMENTS_STORAGE_KEY = "teamsync_announcements_data";
 
 const targetOptions: AnnouncementTarget[] = [
   "Tüm Kulüp",
@@ -47,6 +50,16 @@ const initialAnnouncements: Announcement[] = [
   },
 ];
 
+function getCreatedAtLabel() {
+  const now = new Date();
+  const time = now.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `Şimdi · ${time}`;
+}
+
 export default function AnnouncementsScreen() {
   const [announcements, setAnnouncements] =
     useState<Announcement[]>(initialAnnouncements);
@@ -55,11 +68,54 @@ export default function AnnouncementsScreen() {
   const [message, setMessage] = useState("");
   const [selectedTarget, setSelectedTarget] =
     useState<AnnouncementTarget>("Tüm Kulüp");
+  const [statusMessage, setStatusMessage] = useState(
+    "Duyurular local storage ile kaydedilecek."
+  );
 
   const canPublish = title.trim().length > 0 && message.trim().length > 0;
 
-  function handlePublishAnnouncement() {
+  useEffect(() => {
+    async function loadSavedAnnouncements() {
+      try {
+        const savedAnnouncements = await AsyncStorage.getItem(
+          ANNOUNCEMENTS_STORAGE_KEY
+        );
+
+        if (savedAnnouncements === null) {
+          return;
+        }
+
+        const parsedAnnouncements = JSON.parse(
+          savedAnnouncements
+        ) as Announcement[];
+
+        setAnnouncements(parsedAnnouncements);
+        setStatusMessage("Kaydedilmiş duyurular yüklendi.");
+      } catch {
+        setStatusMessage("Duyurular yüklenirken bir sorun oluştu.");
+      }
+    }
+
+    loadSavedAnnouncements();
+  }, []);
+
+  async function saveAnnouncements(updatedAnnouncements: Announcement[]) {
+    try {
+      await AsyncStorage.setItem(
+        ANNOUNCEMENTS_STORAGE_KEY,
+        JSON.stringify(updatedAnnouncements)
+      );
+
+      setAnnouncements(updatedAnnouncements);
+      setStatusMessage("Duyurular kaydedildi.");
+    } catch {
+      setStatusMessage("Duyurular kaydedilirken bir sorun oluştu.");
+    }
+  }
+
+  async function handlePublishAnnouncement() {
     if (!canPublish) {
+      setStatusMessage("Başlık ve mesaj alanı boş bırakılamaz.");
       return;
     }
 
@@ -68,14 +124,39 @@ export default function AnnouncementsScreen() {
       title: title.trim(),
       message: message.trim(),
       target: selectedTarget,
-      createdAt: "Şimdi",
+      createdAt: getCreatedAtLabel(),
     };
 
-    setAnnouncements([newAnnouncement, ...announcements]);
+    const updatedAnnouncements = [newAnnouncement, ...announcements];
 
     setTitle("");
     setMessage("");
     setSelectedTarget("Tüm Kulüp");
+
+    await saveAnnouncements(updatedAnnouncements);
+  }
+
+  async function deleteAnnouncement(announcementId: number) {
+    const updatedAnnouncements = announcements.filter(
+      (announcement) => announcement.id !== announcementId
+    );
+
+    await saveAnnouncements(updatedAnnouncements);
+    setStatusMessage("Duyuru silindi.");
+  }
+
+  async function resetAnnouncements() {
+    try {
+      await AsyncStorage.removeItem(ANNOUNCEMENTS_STORAGE_KEY);
+
+      setAnnouncements(initialAnnouncements);
+      setTitle("");
+      setMessage("");
+      setSelectedTarget("Tüm Kulüp");
+      setStatusMessage("Duyurular demo haline sıfırlandı.");
+    } catch {
+      setStatusMessage("Duyurular sıfırlanırken bir sorun oluştu.");
+    }
   }
 
   return (
@@ -99,7 +180,7 @@ export default function AnnouncementsScreen() {
 
           <Text style={styles.heroSubtitle}>
             Admin olarak tüm kulübe veya seçili takıma önemli duyurular
-            gönderebilirsin.
+            gönderebilirsin. Yayınlanan duyurular artık cihazda kayıtlı kalır.
           </Text>
         </View>
 
@@ -184,16 +265,51 @@ export default function AnnouncementsScreen() {
                   <Text style={styles.createdAt}>{announcement.createdAt}</Text>
                 </View>
 
-                <Text style={styles.announcementTitle}>
-                  {announcement.title}
-                </Text>
+                <Text style={styles.announcementTitle}>{announcement.title}</Text>
 
                 <Text style={styles.announcementMessage}>
                   {announcement.message}
                 </Text>
+
+                <View style={styles.cardActionRow}>
+                  <Pressable
+                    onPress={() => deleteAnnouncement(announcement.id)}
+                    style={({ pressed }) => [
+                      styles.deleteButton,
+                      pressed && styles.deleteButtonPressed,
+                    ]}
+                  >
+                    <Text style={styles.deleteButtonText}>Duyuruyu sil</Text>
+                  </Pressable>
+                </View>
               </View>
             ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Kaydetme durumu</Text>
+
+          <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+
+          <View style={styles.resetButtonWrapper}>
+            <AppButton
+              title="Demo duyuruları sıfırla"
+              variant="ghost"
+              accessibilityLabel="Demo duyuruları sıfırla"
+              onPress={resetAnnouncements}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Demo notu</Text>
+
+          <Text style={styles.sectionSubtitle}>
+            Bu ekran artık sadece ekranda değişmiyor. Yayınlanan duyurular
+            local storage içine kaydediliyor. Ama bu hâlâ Firebase değildir;
+            başka cihazda veya başka kullanıcıda görünmez.
+          </Text>
         </View>
 
         <Link href="/dashboard" asChild>
@@ -292,6 +408,12 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
+  },
+  sectionSubtitle: {
+    fontSize: theme.fontSizes.md,
+    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.lg,
   },
   label: {
     fontSize: theme.fontSizes.md,
@@ -414,6 +536,30 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
+  },
+  cardActionRow: {
+    alignItems: "flex-start",
+    marginTop: theme.spacing.lg,
+  },
+  deleteButton: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  deleteButtonPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  deleteButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  resetButtonWrapper: {
+    marginTop: theme.spacing.lg,
   },
   backButton: {
     marginBottom: theme.spacing["2xl"],

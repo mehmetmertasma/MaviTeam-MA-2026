@@ -186,6 +186,94 @@ export const teamSyncService = {
     });
   },
 
+  async approveJoinRequest(joinRequestId: string) {
+    const data = await loadAppData();
+    const reviewedAt = nowIso();
+    let approvedUserId = "";
+
+    const joinRequests = data.joinRequests.map((request) => {
+      if (request.id !== joinRequestId) {
+        return request;
+      }
+
+      approvedUserId = request.userId;
+
+      return {
+        ...request,
+        status: "approved" as const,
+        reviewedByUserId: data.currentUser.id,
+        reviewedAt,
+      };
+    });
+
+    const users = data.users.map((user) => {
+      if (user.id !== approvedUserId) {
+        return user;
+      }
+
+      return {
+        ...user,
+        status: "active" as const,
+        updatedAt: reviewedAt,
+      };
+    });
+
+    const currentUser = data.currentUser.id === approvedUserId
+      ? users.find((user) => user.id === approvedUserId) ?? data.currentUser
+      : data.currentUser;
+
+    return saveAppData({
+      ...data,
+      currentUser,
+      users,
+      joinRequests,
+    });
+  },
+
+  async rejectJoinRequest(joinRequestId: string) {
+    const data = await loadAppData();
+    const reviewedAt = nowIso();
+    let rejectedUserId = "";
+
+    const joinRequests = data.joinRequests.map((request) => {
+      if (request.id !== joinRequestId) {
+        return request;
+      }
+
+      rejectedUserId = request.userId;
+
+      return {
+        ...request,
+        status: "rejected" as const,
+        reviewedByUserId: data.currentUser.id,
+        reviewedAt,
+      };
+    });
+
+    const users = data.users.map((user) => {
+      if (user.id !== rejectedUserId) {
+        return user;
+      }
+
+      return {
+        ...user,
+        status: "removed" as const,
+        updatedAt: reviewedAt,
+      };
+    });
+
+    const currentUser = data.currentUser.id === rejectedUserId
+      ? users.find((user) => user.id === rejectedUserId) ?? data.currentUser
+      : data.currentUser;
+
+    return saveAppData({
+      ...data,
+      currentUser,
+      users,
+      joinRequests,
+    });
+  },
+
   async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
     const data = await loadAppData();
     const updatedAt = nowIso();

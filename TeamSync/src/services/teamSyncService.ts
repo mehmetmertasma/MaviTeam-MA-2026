@@ -379,6 +379,15 @@ export const teamSyncService = {
     });
   },
 
+  async removeAnnouncement(announcementId: string) {
+    const data = await loadAppData();
+
+    return saveAppData({
+      ...data,
+      announcements: data.announcements.filter((announcement) => announcement.id !== announcementId),
+    });
+  },
+
   async createScheduleEvent(input: Omit<ScheduleEvent, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
     const newEvent: ScheduleEvent = {

@@ -12,8 +12,26 @@ import type {
 
 const TEAMSYNC_APP_DATA_KEY = "teamsync_app_data_v1";
 
+type CreateClubWorkspaceInput = {
+  ownerFullName: string;
+  ownerEmail: string;
+  clubName: string;
+  sport: string;
+  city: string;
+};
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function generateClubCode(clubName: string) {
+  const prefix = clubName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "")
+    .slice(0, 3);
+
+  return `${prefix || "TS"}${new Date().getFullYear()}`;
 }
 
 async function loadAppData(): Promise<TeamSyncAppData> {
@@ -50,6 +68,64 @@ export const teamSyncService = {
   async getCurrentClub() {
     const data = await loadAppData();
     return data.club;
+  },
+
+  async createClubWorkspace(input: CreateClubWorkspaceInput) {
+    const createdAt = nowIso();
+    const ownerId = `user-owner-${Date.now()}`;
+    const clubId = `club-${Date.now()}`;
+    const teamId = `team-${Date.now()}`;
+    const cleanSport = input.sport.trim() || "Voleybol";
+
+    const nextClub: Club = {
+      id: clubId,
+      name: input.clubName.trim() || "TeamSync Kulübü",
+      sport: cleanSport,
+      city: input.city.trim() || "Şehir yok",
+      code: generateClubCode(input.clubName),
+      ownerId,
+      primaryColor: "#2563eb",
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const nextCurrentUser: UserProfile = {
+      id: ownerId,
+      fullName: input.ownerFullName.trim() || "Kulüp Yöneticisi",
+      email: input.ownerEmail.trim().toLowerCase() || "demo@teamsync.app",
+      role: "clubAdmin",
+      status: "active",
+      clubId,
+      teamIds: [teamId],
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const firstTeam: Team = {
+      id: teamId,
+      clubId,
+      name: `${cleanSport} Takımı`,
+      ageGroup: "Genel",
+      coachIds: [],
+      memberIds: [ownerId],
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const nextAppData: TeamSyncAppData = {
+      club: nextClub,
+      currentUser: nextCurrentUser,
+      users: [nextCurrentUser],
+      teams: [firstTeam],
+      announcements: [],
+      scheduleEvents: [],
+      chatGroups: [],
+      chatMessages: [],
+      payments: [],
+      joinRequests: [],
+    };
+
+    return saveAppData(nextAppData);
   },
 
   async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {

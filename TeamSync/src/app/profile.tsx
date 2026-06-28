@@ -1,30 +1,36 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
 
-type ProfileData = {
-  name: string;
+type ProfileFormData = {
+  fullName: string;
   email: string;
-  club: string;
-  team: string;
-  role: string;
-  season: string;
-  membership: string;
+  clubName: string;
+  clubSport: string;
+  clubCity: string;
+  clubCode: string;
 };
 
-const PROFILE_STORAGE_KEY = "teamsync_profile_data";
+const emptyFormData: ProfileFormData = {
+  fullName: "",
+  email: "",
+  clubName: "",
+  clubSport: "",
+  clubCity: "",
+  clubCode: "",
+};
 
-const startingProfileData: ProfileData = {
-  name: "Mert Asma",
-  email: "mertasma7580@gmail.com",
-  club: "İstanbul Voleybol Kulübü",
-  team: "U16 Erkek",
-  role: "Kulüp yöneticisi",
-  season: "2026 Bahar",
-  membership: "Kulüp öder, veli/sporcu ücretsiz",
+const roleDisplayNames: Record<UserRole, string> = {
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
 };
 
 function getInitials(name: string) {
@@ -40,55 +46,89 @@ function getInitials(name: string) {
   return initials || "TS";
 }
 
+function getFormDataFromAppData(appData: TeamSyncAppData): ProfileFormData {
+  return {
+    fullName: appData.currentUser.fullName,
+    email: appData.currentUser.email,
+    clubName: appData.club.name,
+    clubSport: appData.club.sport,
+    clubCity: appData.club.city,
+    clubCode: appData.club.code,
+  };
+}
+
 export default function ProfileScreen() {
-  const [profileData, setProfileData] = useState<ProfileData>(startingProfileData);
-  const [draftProfileData, setDraftProfileData] = useState<ProfileData>(startingProfileData);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    "Profil bilgileri local storage ile kaydedilecek."
+  const [statusMessage, setStatusMessage] = useState("Profil merkezi TeamSync datasından yüklenecek.");
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadProfileData() {
+        try {
+          const loadedAppData = await teamSyncService.getAppData();
+
+          if (isActive) {
+            setAppData(loadedAppData);
+            setDraftProfileData(getFormDataFromAppData(loadedAppData));
+            setStatusMessage("Profil merkezi TeamSync datasından yüklendi.");
+          }
+        } catch {
+          if (isActive) {
+            setStatusMessage("Profil bilgileri yüklenirken bir sorun oluştu.");
+          }
+        }
+      }
+
+      loadProfileData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
   );
 
-  useEffect(() => {
-    async function loadSavedProfile() {
-      try {
-        const savedProfile = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
-
-        if (savedProfile === null) {
-          return;
-        }
-
-        const parsedProfile = JSON.parse(savedProfile) as ProfileData;
-        setProfileData(parsedProfile);
-        setDraftProfileData(parsedProfile);
-        setStatusMessage("Kaydedilmiş profil bilgileri yüklendi.");
-      } catch {
-        setStatusMessage("Profil bilgileri yüklenirken bir sorun oluştu.");
-      }
+  function startEditing() {
+    if (appData !== null) {
+      setDraftProfileData(getFormDataFromAppData(appData));
     }
 
-    loadSavedProfile();
-  }, []);
-
-  function startEditing() {
-    setDraftProfileData(profileData);
     setIsEditing(true);
     setStatusMessage("Düzenleme modu açık.");
   }
 
   function cancelEditing() {
-    setDraftProfileData(profileData);
+    if (appData !== null) {
+      setDraftProfileData(getFormDataFromAppData(appData));
+    }
+
     setIsEditing(false);
     setStatusMessage("Değişiklikler iptal edildi.");
   }
 
   async function saveProfile() {
     try {
-      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(draftProfileData));
-      setProfileData(draftProfileData);
+      await teamSyncService.updateCurrentUser({
+        fullName: draftProfileData.fullName.trim() || "TeamSync Kullanıcı",
+        email: draftProfileData.email.trim().toLowerCase() || "demo@teamsync.app",
+      });
+
+      const nextAppData = await teamSyncService.updateCurrentClub({
+        name: draftProfileData.clubName.trim() || "TeamSync Kulübü",
+        sport: draftProfileData.clubSport.trim() || "Voleybol",
+        city: draftProfileData.clubCity.trim() || "Şehir yok",
+        code: draftProfileData.clubCode.trim().toUpperCase() || "TS2026",
+      });
+
+      setAppData(nextAppData);
+      setDraftProfileData(getFormDataFromAppData(nextAppData));
       setIsEditing(false);
-      setStatusMessage("Profil bilgileri kaydedildi.");
+      setStatusMessage("Profil ve kulüp bilgileri merkezi data service içine kaydedildi.");
     } catch {
       setStatusMessage("Profil kaydedilirken bir sorun oluştu.");
     }
@@ -96,24 +136,43 @@ export default function ProfileScreen() {
 
   async function resetProfile() {
     try {
-      await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
-      setProfileData(startingProfileData);
-      setDraftProfileData(startingProfileData);
+      const resetData = await teamSyncService.resetDemoData();
+
+      setAppData(resetData);
+      setDraftProfileData(getFormDataFromAppData(resetData));
       setIsEditing(false);
-      setStatusMessage("Profil demo bilgilere sıfırlandı.");
+      setStatusMessage("Merkezi demo data sıfırlandı.");
     } catch {
       setStatusMessage("Profil sıfırlanırken bir sorun oluştu.");
     }
   }
 
-  function updateDraftProfile(field: keyof ProfileData, value: string) {
+  function updateDraftProfile(field: keyof ProfileFormData, value: string) {
     setDraftProfileData((currentData) => ({
       ...currentData,
       [field]: value,
     }));
   }
 
-  const displayData = isEditing ? draftProfileData : profileData;
+  if (appData === null) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+        <View style={styles.container}>
+          <View style={styles.pageHeader}>
+            <Text style={styles.logo}>TeamSync</Text>
+            <Text style={styles.pageTitle}>Profil</Text>
+            <Text style={styles.pageSubtitle}>{statusMessage}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  const currentUser = appData.currentUser;
+  const currentClub = appData.club;
+  const primaryTeam = appData.teams.find((team) => currentUser.teamIds.includes(team.id));
+  const displayData = isEditing ? draftProfileData : getFormDataFromAppData(appData);
+  const displayRole = roleDisplayNames[currentUser.role];
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
@@ -122,21 +181,21 @@ export default function ProfileScreen() {
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.pageTitle}>Profil</Text>
           <Text style={styles.pageSubtitle}>
-            Hesap bilgilerini, kulüp rolünü ve bildirim tercihlerini yönet.
+            Hesap ve kulüp bilgilerini merkezi data service üzerinden yönet.
           </Text>
         </View>
 
         <View style={styles.heroCard}>
           <View style={styles.profileHeroRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(displayData.name)}</Text>
+              <Text style={styles.avatarText}>{getInitials(displayData.fullName)}</Text>
             </View>
 
             <View style={styles.profileHeroText}>
               <Text style={styles.heroLabel}>Hesap merkezi</Text>
-              <Text style={styles.heroTitle}>{displayData.name}</Text>
+              <Text style={styles.heroTitle}>{displayData.fullName}</Text>
               <Text style={styles.heroSubtitle}>
-                {displayData.email} · {displayData.club}
+                {displayData.email} · {displayData.clubName}
               </Text>
             </View>
           </View>
@@ -177,13 +236,13 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>1</Text>
-            <Text style={styles.statLabel}>Takım</Text>
+            <Text style={styles.statValue}>{currentUser.teamIds.length}</Text>
+            <Text style={styles.statLabel}>Takım erişimi</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>5</Text>
-            <Text style={styles.statLabel}>Rol sistemi</Text>
+            <Text style={styles.statValue}>{appData.users.filter((user) => user.status === "active").length}</Text>
+            <Text style={styles.statLabel}>Aktif üye</Text>
           </View>
         </View>
 
@@ -191,12 +250,12 @@ export default function ProfileScreen() {
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>
-                {isEditing ? "Profil bilgilerini düzenle" : "Kulüp özeti"}
+                {isEditing ? "Profil ve kulüp bilgilerini düzenle" : "Merkezi profil özeti"}
               </Text>
               <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
             </View>
 
-            <Text style={styles.statusPill}>{displayData.role}</Text>
+            <Text style={styles.statusPill}>{displayRole}</Text>
           </View>
 
           {isEditing ? (
@@ -205,8 +264,8 @@ export default function ProfileScreen() {
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>Ad Soyad</Text>
                   <TextInput
-                    value={draftProfileData.name}
-                    onChangeText={(value) => updateDraftProfile("name", value)}
+                    value={draftProfileData.fullName}
+                    onChangeText={(value) => updateDraftProfile("fullName", value)}
                     placeholder="Ad Soyad"
                     placeholderTextColor={theme.colors.text.muted}
                     style={styles.input}
@@ -229,10 +288,10 @@ export default function ProfileScreen() {
 
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Kulüp</Text>
+                  <Text style={styles.inputLabel}>Kulüp adı</Text>
                   <TextInput
-                    value={draftProfileData.club}
-                    onChangeText={(value) => updateDraftProfile("club", value)}
+                    value={draftProfileData.clubName}
+                    onChangeText={(value) => updateDraftProfile("clubName", value)}
                     placeholder="Kulüp adı"
                     placeholderTextColor={theme.colors.text.muted}
                     style={styles.input}
@@ -240,11 +299,11 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Takım</Text>
+                  <Text style={styles.inputLabel}>Branş</Text>
                   <TextInput
-                    value={draftProfileData.team}
-                    onChangeText={(value) => updateDraftProfile("team", value)}
-                    placeholder="Takım adı"
+                    value={draftProfileData.clubSport}
+                    onChangeText={(value) => updateDraftProfile("clubSport", value)}
+                    placeholder="Branş"
                     placeholderTextColor={theme.colors.text.muted}
                     style={styles.input}
                   />
@@ -253,62 +312,64 @@ export default function ProfileScreen() {
 
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Rol</Text>
+                  <Text style={styles.inputLabel}>Şehir</Text>
                   <TextInput
-                    value={draftProfileData.role}
-                    onChangeText={(value) => updateDraftProfile("role", value)}
-                    placeholder="Rol"
+                    value={draftProfileData.clubCity}
+                    onChangeText={(value) => updateDraftProfile("clubCity", value)}
+                    placeholder="Şehir"
                     placeholderTextColor={theme.colors.text.muted}
                     style={styles.input}
                   />
                 </View>
 
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Aktif sezon</Text>
+                  <Text style={styles.inputLabel}>Kulüp kodu</Text>
                   <TextInput
-                    value={draftProfileData.season}
-                    onChangeText={(value) => updateDraftProfile("season", value)}
-                    placeholder="Aktif sezon"
+                    value={draftProfileData.clubCode}
+                    onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())}
+                    placeholder="Kulüp kodu"
                     placeholderTextColor={theme.colors.text.muted}
+                    autoCapitalize="characters"
                     style={styles.input}
                   />
                 </View>
               </View>
-
-              <Text style={styles.inputLabel}>Üyelik modeli</Text>
-              <TextInput
-                value={draftProfileData.membership}
-                onChangeText={(value) => updateDraftProfile("membership", value)}
-                placeholder="Üyelik modeli"
-                placeholderTextColor={theme.colors.text.muted}
-                style={styles.input}
-              />
             </View>
           ) : (
             <View style={styles.infoList}>
               <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Kullanıcı</Text>
+                <Text style={styles.infoValue}>{currentUser.fullName}</Text>
+              </View>
+
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>E-posta</Text>
+                <Text style={styles.infoValue}>{currentUser.email}</Text>
+              </View>
+
+              <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Kulüp</Text>
-                <Text style={styles.infoValue}>{profileData.club}</Text>
+                <Text style={styles.infoValue}>{currentClub.name}</Text>
               </View>
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Takım</Text>
-                <Text style={styles.infoValue}>{profileData.team}</Text>
+                <Text style={styles.infoValue}>{primaryTeam?.name ?? "Takım seçilmedi"}</Text>
               </View>
 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Rol</Text>
-                <Text style={styles.infoValue}>{profileData.role}</Text>
+                <Text style={styles.infoValue}>{displayRole}</Text>
               </View>
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Aktif sezon</Text>
-                <Text style={styles.infoValue}>{profileData.season}</Text>
+                <Text style={styles.infoLabel}>Kulüp kodu</Text>
+                <Text style={styles.infoValue}>{currentClub.code}</Text>
               </View>
 
               <View style={styles.infoRowLast}>
-                <Text style={styles.infoLabel}>Üyelik</Text>
-                <Text style={styles.infoValue}>{profileData.membership}</Text>
+                <Text style={styles.infoLabel}>Data modu</Text>
+                <Text style={styles.infoValue}>TeamSync service layer</Text>
               </View>
             </View>
           )}
@@ -317,7 +378,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Bildirimler</Text>
           <Text style={styles.sectionSubtitle}>
-            Gerçek push notification sistemi Firebase/Expo notifications ile bağlanacak.
+            Şimdilik local state. Gerçek push notification sistemi Firebase/Expo notifications ile bağlanacak.
           </Text>
 
           <View style={styles.preferenceRow}>
@@ -339,17 +400,13 @@ export default function ProfileScreen() {
 
         <View style={styles.actionRowBottom}>
           {!isEditing ? (
-            <AppButton
-              title="Profili düzenle"
-              onPress={startEditing}
-              style={styles.actionButton}
-            />
+            <AppButton title="Profili düzenle" onPress={startEditing} style={styles.actionButton} />
           ) : null}
 
           <AppButton
-            title="Demo profili sıfırla"
+            title="Merkezi demo datayı sıfırla"
             variant="secondary"
-            accessibilityLabel="Profil bilgilerini sıfırla"
+            accessibilityLabel="Merkezi demo datayı sıfırla"
             style={styles.actionButton}
             onPress={resetProfile}
           />
@@ -398,12 +455,12 @@ const styles = StyleSheet.create({
   },
   profileHeroRow: {
     flexDirection: "row",
-    gap: theme.spacing.lg,
     alignItems: "center",
+    gap: theme.spacing.lg,
   },
   avatar: {
-    width: 72,
-    height: 72,
+    width: 74,
+    height: 74,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.brand.primary,
     alignItems: "center",
@@ -411,7 +468,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.xl,
+    fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
   },
   profileHeroText: { flex: 1 },
@@ -424,21 +481,29 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.full,
-    marginBottom: theme.spacing.lg,
-  },
-  heroTitle: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
+  heroTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    lineHeight: theme.lineHeights["4xl"],
+    marginBottom: theme.spacing.sm,
+  },
   heroSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
   heroButton: { marginTop: theme.spacing["2xl"], alignSelf: "flex-start" },
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing["2xl"],
+  },
+  actionButton: { minWidth: 160 },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -447,7 +512,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 145,
+    flexBasis: 160,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.xl,
@@ -487,7 +552,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.md,
   },
   sectionSubtitle: {
     color: theme.colors.text.secondary,
@@ -501,92 +566,76 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.full,
   },
-  form: { gap: theme.spacing.md },
+  form: { gap: theme.spacing.lg },
   formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
-  formField: { flexGrow: 1, flexBasis: 220 },
+  formField: { flex: 1, minWidth: 240 },
   inputLabel: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.extrabold,
     marginBottom: theme.spacing.sm,
   },
   input: {
     minHeight: 52,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.background.surface,
     paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    marginBottom: theme.spacing.lg,
+    fontSize: theme.fontSizes.lg,
   },
-  infoList: { gap: 0 },
+  infoList: { width: "100%" },
   infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
-  infoRowLast: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    paddingTop: theme.spacing.lg,
-  },
+  infoRowLast: { paddingTop: theme.spacing.lg, gap: theme.spacing.sm },
   infoLabel: {
-    flex: 1,
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    textTransform: "uppercase",
   },
   infoValue: {
-    flex: 1,
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
-    textAlign: "right",
   },
   preferenceRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.lg,
   },
   preferenceRowLast: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
   },
   preferenceTextArea: { flex: 1 },
   preferenceTitle: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.xs,
   },
   preferenceSubtitle: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
+    lineHeight: theme.lineHeights.md,
   },
   actionRowBottom: {
     flexDirection: "row",
@@ -594,5 +643,4 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginBottom: theme.spacing["2xl"],
   },
-  actionButton: { flexGrow: 1 },
 });

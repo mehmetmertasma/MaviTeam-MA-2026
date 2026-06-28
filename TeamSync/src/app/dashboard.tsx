@@ -71,6 +71,13 @@ const startingProfileData: ProfileData = {
   membership: "Kulüp öder, veli/sporcu ücretsiz",
 };
 
+const roleDisplayNames: Record<UserRole, string> = {
+  admin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
+};
+
 const roleOptions: RoleOption[] = [
   {
     id: "admin",
@@ -239,6 +246,14 @@ function getFirstName(name: string) {
   return trimmedName.split(" ")[0];
 }
 
+function getDashboardSubtitle(role: UserRole, profileData: ProfileData) {
+  if (role === "admin") {
+    return profileData.club;
+  }
+
+  return `${profileData.team} · ${profileData.club}`;
+}
+
 export default function DashboardScreen() {
   const [activeRole, setActiveRole] = useState<UserRole>("admin");
   const [savedProfileData, setSavedProfileData] =
@@ -278,21 +293,16 @@ export default function DashboardScreen() {
     }, [])
   );
 
-  const dashboardWelcome =
-    activeRole === "admin" || activeRole === "athlete"
-      ? `Hoş geldin, ${getFirstName(savedProfileData.name)}`
-      : currentDashboard.welcomeTitle;
-
-  const dashboardSubtitle =
-    activeRole === "admin" ? savedProfileData.club : currentDashboard.clubSubtitle;
+  const dashboardWelcome = `Hoş geldin, ${getFirstName(savedProfileData.name)}`;
+  const dashboardSubtitle = getDashboardSubtitle(activeRole, savedProfileData);
 
   const overviewItems = currentDashboard.overview.map((item) => {
     if (item.label === "Aktif sezon") {
       return { ...item, value: savedProfileData.season };
     }
 
-    if (item.label === "Rolün" && activeRole === "admin") {
-      return { ...item, value: savedProfileData.role };
+    if (item.label === "Rolün") {
+      return { ...item, value: roleDisplayNames[activeRole] };
     }
 
     if (item.label === "Takım") {
@@ -303,7 +313,7 @@ export default function DashboardScreen() {
       return { ...item, value: savedProfileData.membership };
     }
 
-    if (item.label === "Sporcu" && activeRole === "athlete") {
+    if (item.label === "Sporcu") {
       return { ...item, value: savedProfileData.name };
     }
 

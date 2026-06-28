@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { demoTeamSyncData } from "@/data/demoTeamSyncData";
+import { initialTeamSyncData } from "@/data/initialTeamSyncData";
 import type {
   Announcement,
+  AttendanceRecord,
+  AttendanceStatus,
   Club,
   JoinRequest,
   ScheduleEvent,
@@ -29,6 +31,15 @@ type CreateJoinRequestInput = {
   requestedRole?: UserRole;
 };
 
+type SaveAttendanceInput = {
+  teamId?: string;
+  sessionDate: string;
+  records: Array<{
+    userId: string;
+    status: AttendanceStatus;
+  }>;
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -46,15 +57,26 @@ function generateClubCode(clubName: string) {
   return `${prefix || "TS"}${new Date().getFullYear()}`;
 }
 
+function ensureAppDataShape(data: TeamSyncAppData & { attendanceRecords?: AttendanceRecord[] }) {
+  return {
+    ...data,
+    attendanceRecords: Array.isArray(data.attendanceRecords) ? data.attendanceRecords : [],
+  } satisfies TeamSyncAppData;
+}
+
 async function loadAppData(): Promise<TeamSyncAppData> {
   const savedData = await AsyncStorage.getItem(TEAMSYNC_APP_DATA_KEY);
 
   if (savedData === null) {
-    await AsyncStorage.setItem(TEAMSYNC_APP_DATA_KEY, JSON.stringify(demoTeamSyncData));
-    return demoTeamSyncData;
+    await AsyncStorage.setItem(TEAMSYNC_APP_DATA_KEY, JSON.stringify(initialTeamSyncData));
+    return initialTeamSyncData;
   }
 
-  return JSON.parse(savedData) as TeamSyncAppData;
+  const parsedData = JSON.parse(savedData) as TeamSyncAppData & {
+    attendanceRecords?: AttendanceRecord[];
+  };
+
+  return ensureAppDataShape(parsedData);
 }
 
 async function saveAppData(data: TeamSyncAppData) {
@@ -67,9 +89,9 @@ export const teamSyncService = {
     return loadAppData();
   },
 
-  async resetDemoData() {
-    await AsyncStorage.setItem(TEAMSYNC_APP_DATA_KEY, JSON.stringify(demoTeamSyncData));
-    return demoTeamSyncData;
+  async resetAppData() {
+    await AsyncStorage.setItem(TEAMSYNC_APP_DATA_KEY, JSON.stringify(initialTeamSyncData));
+    return initialTeamSyncData;
   },
 
   async getCurrentUser() {
@@ -104,7 +126,7 @@ export const teamSyncService = {
     const nextCurrentUser: UserProfile = {
       id: ownerId,
       fullName: input.ownerFullName.trim() || "Kulüp Yöneticisi",
-      email: input.ownerEmail.trim().toLowerCase() || "demo@teamsync.app",
+      email: input.ownerEmail.trim().toLowerCase() || "owner@teamsync.app",
       role: "clubAdmin",
       status: "active",
       clubId,
@@ -131,6 +153,7 @@ export const teamSyncService = {
       teams: [firstTeam],
       announcements: [],
       scheduleEvents: [],
+      attendanceRecords: [],
       chatGroups: [],
       chatMessages: [],
       payments: [],
@@ -418,6 +441,32 @@ export const teamSyncService = {
           updatedAt: nowIso(),
         };
       }),
+    });
+  },
+
+  async saveAttendance(input: SaveAttendanceInput) {
+    const data = await loadAppData();
+    const recordedAt = nowIso();
+    const nextRecords: AttendanceRecord[] = input.records.map((record) => ({
+      id: `attendance-${input.teamId ?? "club"}-${record.userId}-${input.sessionDate}`,
+      clubId: data.club.id,
+      teamId: input.teamId,
+      userId: record.userId,
+      status: record.status,
+      sessionDate: input.sessionDate,
+      recordedByUserId: data.currentUser.id,
+      recordedAt,
+      updatedAt: recordedAt,
+    }));
+
+    return saveAppData({
+      ...data,
+      attendanceRecords: [
+        ...nextRecords,
+        ...data.attendanceRecords.filter((record) => {
+          return !(record.teamId === input.teamId && record.sessionDate === input.sessionDate);
+        }),
+      ],
     });
   },
 

@@ -34,6 +34,7 @@ export default function RegisterScreen() {
   function handleContinue() {
     const trimmedName = fullName.trim();
     const trimmedEmail = contactInfo.trim().toLowerCase();
+    const nextRoute = getNextRoute(next);
 
     if (trimmedName === "") {
       setStatusMessage("Lütfen ad soyad bilgisini giriniz.");
@@ -51,7 +52,14 @@ export default function RegisterScreen() {
     }
 
     setStatusMessage("Bilgiler alındı. Sonraki adıma geçiliyor.");
-    router.replace(getNextRoute(next) as never);
+
+    router.replace({
+      pathname: nextRoute,
+      params: {
+        fullName: trimmedName,
+        email: trimmedEmail,
+      },
+    } as never);
   }
 
   return (
@@ -95,7 +103,7 @@ export default function RegisterScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Sonraki adım</Text>
           <Text style={styles.infoText}>
-            Gerçek giriş sistemi bağlanınca bu ekrana parola alanı ve Firebase kayıt işlemi eklenecek.
+            Bu bilgiler şimdilik create/join ekranına taşınır. Firebase Auth bağlanınca aynı akış gerçek hesap oluşturacak.
           </Text>
         </View>
 

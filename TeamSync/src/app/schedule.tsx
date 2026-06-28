@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -10,65 +11,35 @@ import {
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { ScheduleEvent, ScheduleEventType, TeamSyncAppData } from "@/types/teamSync";
 
-type ScheduleType = "Antrenman" | "Maç" | "Toplantı";
-type TeamOption = "Tüm Kulüp" | "A Takım" | "U16 Erkek" | "U14 Kız";
-
-type ScheduleItem = {
-  id: number;
-  title: string;
-  type: ScheduleType;
-  team: TeamOption;
-  dayNumber: number;
-  dateLabel: string;
-  time: string;
-  location: string;
-  note: string;
+type ScheduleTypeOption = {
+  label: string;
+  value: ScheduleEventType;
 };
 
-const scheduleTypes: ScheduleType[] = ["Antrenman", "Maç", "Toplantı"];
-const teamOptions: TeamOption[] = ["Tüm Kulüp", "A Takım", "U16 Erkek", "U14 Kız"];
+type TeamOption = {
+  id: string;
+  label: string;
+  teamId?: string;
+};
+
+const scheduleTypeOptions: ScheduleTypeOption[] = [
+  { label: "Antrenman", value: "practice" },
+  { label: "Maç", value: "match" },
+  { label: "Toplantı", value: "meeting" },
+];
+
 const weekDays = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 const calendarDays = Array.from({ length: 35 }, (_, index) => index + 1);
 
-const initialScheduleItems: ScheduleItem[] = [
-  {
-    id: 1,
-    title: "A Takım antrenmanı",
-    type: "Antrenman",
-    team: "A Takım",
-    dayNumber: 5,
-    dateLabel: "5 Temmuz",
-    time: "18:30",
-    location: "Burhan Felek Spor Salonu",
-    note: "Oyuncular 15 dakika erken gelmeli.",
-  },
-  {
-    id: 2,
-    title: "Hazırlık maçı",
-    type: "Maç",
-    team: "U16 Erkek",
-    dayNumber: 8,
-    dateLabel: "8 Temmuz",
-    time: "20:00",
-    location: "Kadıköy Spor Kompleksi",
-    note: "Forma ve lisanslar unutulmamalı.",
-  },
-  {
-    id: 3,
-    title: "Veli bilgilendirme toplantısı",
-    type: "Toplantı",
-    team: "Tüm Kulüp",
-    dayNumber: 12,
-    dateLabel: "12 Temmuz",
-    time: "19:00",
-    location: "Kulüp Toplantı Salonu",
-    note: "Sezon planı ve ödeme süreci konuşulacak.",
-  },
-];
+function getTypeLabel(type: ScheduleEventType) {
+  return scheduleTypeOptions.find((option) => option.value === type)?.label ?? "Etkinlik";
+}
 
-function getTypeStyles(type: ScheduleType) {
-  if (type === "Maç") {
+function getTypeStyles(type: ScheduleEventType) {
+  if (type === "match") {
     return {
       backgroundColor: "#fee2e2",
       borderColor: "#ef4444",
@@ -76,7 +47,7 @@ function getTypeStyles(type: ScheduleType) {
     };
   }
 
-  if (type === "Toplantı") {
+  if (type === "meeting") {
     return {
       backgroundColor: "#fef3c7",
       borderColor: "#f59e0b",
@@ -91,23 +62,128 @@ function getTypeStyles(type: ScheduleType) {
   };
 }
 
-function getDateLabel(dayNumber: number) {
-  return `${dayNumber} Temmuz`;
+function getDateFromValue(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date;
+}
+
+function getDayNumber(value: string) {
+  return getDateFromValue(value)?.getDate() ?? 0;
+}
+
+function formatEventDate(value: string) {
+  const date = getDateFromValue(value);
+
+  if (date === null) {
+    return "Tarih yok";
+  }
+
+  return date.toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "long",
+  });
+}
+
+function formatEventTime(value: string) {
+  const date = getDateFromValue(value);
+
+  if (date === null) {
+    return "Saat yok";
+  }
+
+  return date.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getCurrentMonthName() {
+  return new Date().toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+}
+
+function buildStartsAt(dayNumber: number, timeValue: string) {
+  const [hourText, minuteText] = timeValue.trim().split(":");
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  const now = new Date();
+  const startsAt = new Date(now.getFullYear(), now.getMonth(), dayNumber, hour, minute, 0);
+
+  return startsAt.toISOString();
+}
+
+function getTeamLabel(event: ScheduleEvent, appData: TeamSyncAppData) {
+  if (event.teamId === undefined) {
+    return "Tüm Kulüp";
+  }
+
+  return appData.teams.find((team) => team.id === event.teamId)?.name ?? "Takım bulunamadı";
 }
 
 export default function ScheduleScreen() {
-  const [scheduleItems, setScheduleItems] = useState<ScheduleItem[]>(initialScheduleItems);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [showEventForm, setShowEventForm] = useState(false);
   const [title, setTitle] = useState("");
-  const [selectedType, setSelectedType] = useState<ScheduleType>("Antrenman");
-  const [selectedTeam, setSelectedTeam] = useState<TeamOption>("Tüm Kulüp");
+  const [selectedType, setSelectedType] = useState<ScheduleEventType>("practice");
+  const [selectedTeamId, setSelectedTeamId] = useState("all-club");
   const [dayNumber, setDayNumber] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
   const [statusMessage, setStatusMessage] = useState(
-    "Takvimde etkinlikleri renklerine göre takip edebilirsin."
+    "Program merkezi TeamSync datasından yüklenecek."
   );
+
+  const loadScheduleData = useCallback(async () => {
+    try {
+      const loadedAppData = await teamSyncService.getAppData();
+      setAppData(loadedAppData);
+      setStatusMessage("Program merkezi TeamSync datasından yüklendi.");
+    } catch {
+      setStatusMessage("Program yüklenirken bir sorun oluştu.");
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadScheduleData();
+    }, [loadScheduleData])
+  );
+
+  const teamOptions = useMemo<TeamOption[]>(() => {
+    const allClubOption: TeamOption = {
+      id: "all-club",
+      label: "Tüm Kulüp",
+    };
+
+    if (appData === null) {
+      return [allClubOption];
+    }
+
+    return [
+      allClubOption,
+      ...appData.teams.map((team) => ({
+        id: team.id,
+        label: team.name,
+        teamId: team.id,
+      })),
+    ];
+  }, [appData]);
+
+  const scheduleEvents = useMemo(() => {
+    return [...(appData?.scheduleEvents ?? [])].sort((firstEvent, secondEvent) => {
+      return new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime();
+    });
+  }, [appData]);
 
   const canCreate =
     title.trim().length > 0 &&
@@ -116,26 +192,33 @@ export default function ScheduleScreen() {
     location.trim().length > 0;
 
   const eventsByDay = useMemo(() => {
-    return scheduleItems.reduce<Record<number, ScheduleItem[]>>((groups, item) => {
-      const currentEvents = groups[item.dayNumber] ?? [];
+    return scheduleEvents.reduce<Record<number, ScheduleEvent[]>>((groups, item) => {
+      const itemDayNumber = getDayNumber(item.startsAt);
+      const currentEvents = groups[itemDayNumber] ?? [];
+
       return {
         ...groups,
-        [item.dayNumber]: [...currentEvents, item],
+        [itemDayNumber]: [...currentEvents, item],
       };
     }, {});
-  }, [scheduleItems]);
+  }, [scheduleEvents]);
 
   function clearForm() {
     setTitle("");
-    setSelectedType("Antrenman");
-    setSelectedTeam("Tüm Kulüp");
+    setSelectedType("practice");
+    setSelectedTeamId("all-club");
     setDayNumber("");
     setTime("");
     setLocation("");
     setNote("");
   }
 
-  function handleCreateScheduleItem() {
+  async function handleCreateScheduleItem() {
+    if (appData === null) {
+      setStatusMessage("Önce merkezi data yüklenmeli.");
+      return;
+    }
+
     const parsedDayNumber = Number(dayNumber.trim());
 
     if (!canCreate) {
@@ -148,41 +231,39 @@ export default function ScheduleScreen() {
       return;
     }
 
-    const newScheduleItem: ScheduleItem = {
-      id: Date.now(),
-      title: title.trim(),
-      type: selectedType,
-      team: selectedTeam,
-      dayNumber: parsedDayNumber,
-      dateLabel: getDateLabel(parsedDayNumber),
-      time: time.trim(),
-      location: location.trim(),
-      note: note.trim() || "Ek not yok.",
-    };
+    const startsAt = buildStartsAt(parsedDayNumber, time);
 
-    setScheduleItems((currentItems) => [newScheduleItem, ...currentItems]);
-    clearForm();
-    setShowEventForm(false);
-    setStatusMessage("Yeni etkinlik takvime eklendi.");
-  }
+    if (startsAt === null) {
+      setStatusMessage("Saat formatı HH:mm şeklinde olmalı. Örn. 18:30");
+      return;
+    }
 
-  function deleteScheduleItem(itemId: number) {
-    setScheduleItems((currentItems) =>
-      currentItems.filter((item) => item.id !== itemId)
-    );
-    setStatusMessage("Etkinlik silindi.");
-  }
+    const selectedTeam = teamOptions.find((team) => team.id === selectedTeamId) ?? teamOptions[0];
 
-  function resetScheduleItems() {
-    setScheduleItems(initialScheduleItems);
-    clearForm();
-    setShowEventForm(false);
-    setStatusMessage("Program demo haline sıfırlandı.");
+    try {
+      const nextAppData = await teamSyncService.createScheduleEvent({
+        clubId: appData.club.id,
+        teamId: selectedTeam.teamId,
+        title: title.trim(),
+        type: selectedType,
+        startsAt,
+        location: location.trim(),
+        note: note.trim() || "Ek not yok.",
+        createdByUserId: appData.currentUser.id,
+      });
+
+      setAppData(nextAppData);
+      clearForm();
+      setShowEventForm(false);
+      setStatusMessage("Yeni etkinlik merkezi program datasına eklendi.");
+    } catch {
+      setStatusMessage("Etkinlik oluşturulurken bir sorun oluştu.");
+    }
   }
 
   function openEventForm() {
     setShowEventForm(true);
-    setStatusMessage("Etkinlik bilgilerini doldurup takvime ekleyebilirsin.");
+    setStatusMessage("Etkinlik bilgilerini doldurup merkezi takvime ekleyebilirsin.");
   }
 
   function closeEventForm() {
@@ -198,7 +279,7 @@ export default function ScheduleScreen() {
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.pageTitle}>Program</Text>
           <Text style={styles.pageSubtitle}>
-            Antrenman, maç ve toplantıları takvim görünümünde yönet.
+            Antrenman, maç ve toplantıları merkezi data üzerinden yönet.
           </Text>
         </View>
 
@@ -206,35 +287,35 @@ export default function ScheduleScreen() {
           <Text style={styles.heroLabel}>Takvim yönetimi</Text>
           <Text style={styles.heroTitle}>Haftalık / aylık program görünümü</Text>
           <Text style={styles.heroSubtitle}>
-            Etkinlikler takvimde türüne göre farklı renklerle görünür. Form sadece “Etkinlik ekle” butonuna basınca açılır.
+            Bu sayfa artık demo array kullanmıyor. Etkinlikler TeamSync service layer içindeki appData.scheduleEvents üzerinden geliyor.
           </Text>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Takvim</Text>
+              <Text style={styles.sectionTitle}>Takvim · {getCurrentMonthName()}</Text>
               <Text style={styles.sectionSubtitle}>
                 Maç, antrenman ve toplantıları Canvas tarzı renkli kartlar gibi takip et.
               </Text>
             </View>
 
-            <Text style={styles.statusPill}>{scheduleItems.length} etkinlik</Text>
+            <Text style={styles.statusPill}>{scheduleEvents.length} etkinlik</Text>
           </View>
 
           <View style={styles.legendRow}>
-            {scheduleTypes.map((type) => {
-              const typeStyles = getTypeStyles(type);
+            {scheduleTypeOptions.map((type) => {
+              const typeStyles = getTypeStyles(type.value);
 
               return (
-                <View key={type} style={styles.legendItem}>
+                <View key={type.value} style={styles.legendItem}>
                   <View
                     style={[
                       styles.legendDot,
                       { backgroundColor: typeStyles.borderColor },
                     ]}
                   />
-                  <Text style={styles.legendText}>{type}</Text>
+                  <Text style={styles.legendText}>{type.label}</Text>
                 </View>
               );
             })}
@@ -273,7 +354,7 @@ export default function ScheduleScreen() {
                             numberOfLines={1}
                             style={[styles.calendarEventText, { color: typeStyles.textColor }]}
                           >
-                            {event.time} {event.title}
+                            {formatEventTime(event.startsAt)} {event.title}
                           </Text>
                         </View>
                       );
@@ -297,9 +378,9 @@ export default function ScheduleScreen() {
             />
 
             <AppButton
-              title="Programı sıfırla"
+              title="Merkezi datayı yenile"
               variant="ghost"
-              onPress={resetScheduleItems}
+              onPress={loadScheduleData}
               style={styles.actionButton}
             />
           </View>
@@ -313,7 +394,7 @@ export default function ScheduleScreen() {
               <View style={styles.sectionHeaderText}>
                 <Text style={styles.sectionTitle}>Etkinlik ekle</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Etkinlik bilgilerini doldurunca takvimde renkli şekilde görünecek.
+                  Etkinlik bilgilerini doldurunca merkezi program datasına kaydedilecek.
                 </Text>
               </View>
 
@@ -331,14 +412,14 @@ export default function ScheduleScreen() {
 
             <Text style={styles.label}>Etkinlik türü</Text>
             <View style={styles.optionGrid}>
-              {scheduleTypes.map((type) => {
-                const isSelected = selectedType === type;
-                const typeStyles = getTypeStyles(type);
+              {scheduleTypeOptions.map((type) => {
+                const isSelected = selectedType === type.value;
+                const typeStyles = getTypeStyles(type.value);
 
                 return (
                   <Pressable
-                    key={type}
-                    onPress={() => setSelectedType(type)}
+                    key={type.value}
+                    onPress={() => setSelectedType(type.value)}
                     style={({ pressed }) => [
                       styles.optionButton,
                       isSelected
@@ -356,7 +437,7 @@ export default function ScheduleScreen() {
                         isSelected ? { color: typeStyles.textColor } : null,
                       ]}
                     >
-                      {type}
+                      {type.label}
                     </Text>
                   </Pressable>
                 );
@@ -366,12 +447,12 @@ export default function ScheduleScreen() {
             <Text style={styles.label}>Takım</Text>
             <View style={styles.optionGrid}>
               {teamOptions.map((team) => {
-                const isSelected = selectedTeam === team;
+                const isSelected = selectedTeamId === team.id;
 
                 return (
                   <Pressable
-                    key={team}
-                    onPress={() => setSelectedTeam(team)}
+                    key={team.id}
+                    onPress={() => setSelectedTeamId(team.id)}
                     style={({ pressed }) => [
                       styles.optionButton,
                       isSelected ? styles.optionButtonSelected : null,
@@ -384,7 +465,7 @@ export default function ScheduleScreen() {
                         isSelected ? styles.optionButtonTextSelected : null,
                       ]}
                     >
-                      {team}
+                      {team.label}
                     </Text>
                   </Pressable>
                 );
@@ -393,14 +474,14 @@ export default function ScheduleScreen() {
 
             <View style={styles.formGrid}>
               <View style={styles.formField}>
-                <Text style={styles.label}>Takvim günü</Text>
+                <Text style={styles.label}>Gün</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Örn: 12"
                   placeholderTextColor={theme.colors.text.muted}
+                  keyboardType="number-pad"
                   value={dayNumber}
                   onChangeText={setDayNumber}
-                  keyboardType="number-pad"
                 />
               </View>
 
@@ -419,7 +500,7 @@ export default function ScheduleScreen() {
             <Text style={styles.label}>Konum</Text>
             <TextInput
               style={styles.input}
-              placeholder="Örn: Kulüp spor salonu"
+              placeholder="Örn: Ana Spor Salonu"
               placeholderTextColor={theme.colors.text.muted}
               value={location}
               onChangeText={setLocation}
@@ -428,7 +509,7 @@ export default function ScheduleScreen() {
             <Text style={styles.label}>Not</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Ek bilgi yaz..."
+              placeholder="Ek not yaz..."
               placeholderTextColor={theme.colors.text.muted}
               value={note}
               onChangeText={setNote}
@@ -437,12 +518,11 @@ export default function ScheduleScreen() {
 
             <View style={styles.actionRow}>
               <AppButton
-                title="Etkinliği takvime ekle"
+                title="Etkinliği kaydet"
                 onPress={handleCreateScheduleItem}
                 disabled={!canCreate}
                 style={styles.actionButton}
               />
-
               <AppButton
                 title="Vazgeç"
                 variant="ghost"
@@ -454,68 +534,38 @@ export default function ScheduleScreen() {
         ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Yaklaşan etkinlikler</Text>
-          <Text style={styles.sectionSubtitle}>
-            Takvimde görünen etkinliklerin detay listesi.
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Yaklaşan etkinlikler</Text>
+              <Text style={styles.sectionSubtitle}>Programdaki kayıtlar merkezi data’dan listeleniyor.</Text>
+            </View>
+            <Text style={styles.statusPill}>{scheduleEvents.length} kayıt</Text>
+          </View>
 
-          <View style={styles.scheduleList}>
-            {scheduleItems.length > 0 ? (
-              scheduleItems.map((item) => {
-                const typeStyles = getTypeStyles(item.type);
+          <View style={styles.eventList}>
+            {appData !== null && scheduleEvents.length > 0 ? (
+              scheduleEvents.map((event) => {
+                const typeStyles = getTypeStyles(event.type);
 
                 return (
-                  <View key={item.id} style={styles.scheduleCard}>
-                    <View style={styles.cardTopRow}>
-                      <Text
-                        style={[
-                          styles.scheduleType,
-                          {
-                            backgroundColor: typeStyles.backgroundColor,
-                            color: typeStyles.textColor,
-                            borderColor: typeStyles.borderColor,
-                          },
-                        ]}
-                      >
-                        {item.type}
+                  <View key={event.id} style={styles.eventCard}>
+                    <View style={[styles.eventTypeBar, { backgroundColor: typeStyles.borderColor }]} />
+
+                    <View style={styles.eventContent}>
+                      <Text style={styles.eventType}>{getTypeLabel(event.type)} · {getTeamLabel(event, appData)}</Text>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <Text style={styles.eventMeta}>
+                        {formatEventDate(event.startsAt)} · {formatEventTime(event.startsAt)} · {event.location}
                       </Text>
-                      <Text style={styles.scheduleTeam}>{item.team}</Text>
+                      <Text style={styles.eventNote}>{event.note ?? "Ek not yok."}</Text>
                     </View>
-
-                    <Text style={styles.scheduleTitle}>{item.title}</Text>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Tarih</Text>
-                      <Text style={styles.detailValue}>{item.dateLabel}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Saat</Text>
-                      <Text style={styles.detailValue}>{item.time}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Konum</Text>
-                      <Text style={styles.detailValue}>{item.location}</Text>
-                    </View>
-
-                    <Text style={styles.noteText}>{item.note}</Text>
-
-                    <Pressable
-                      onPress={() => deleteScheduleItem(item.id)}
-                      style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
-                    >
-                      <Text style={styles.deleteButtonText}>Sil</Text>
-                    </Pressable>
                   </View>
                 );
               })
             ) : (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>Henüz etkinlik yok</Text>
-                <Text style={styles.emptyText}>
-                  Etkinlik ekle butonuna basarak ilk programı oluşturabilirsin.
-                </Text>
+                <Text style={styles.emptyText}>Etkinlik ekle butonu ile ilk program kaydını oluşturabilirsin.</Text>
               </View>
             )}
           </View>
@@ -526,24 +576,15 @@ export default function ScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
     paddingHorizontal: theme.spacing["2xl"],
     paddingBottom: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 1100,
-    alignSelf: "center",
-  },
-  pageHeader: {
-    marginBottom: theme.spacing["2xl"],
-  },
+  container: { width: "100%", maxWidth: 1100, alignSelf: "center" },
+  pageHeader: { marginBottom: theme.spacing["2xl"] },
   logo: {
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
@@ -610,19 +651,17 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
-  sectionHeaderText: {
-    flex: 1,
-  },
+  sectionHeaderText: { flex: 1 },
   sectionTitle: {
-    color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
   sectionSubtitle: {
-    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
   statusPill: {
@@ -638,7 +677,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
   },
   legendItem: {
     flexDirection: "row",
@@ -648,12 +687,12 @@ const styles = StyleSheet.create({
   legendDot: {
     width: 12,
     height: 12,
-    borderRadius: 999,
+    borderRadius: theme.radius.full,
   },
   legendText: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
   },
   calendarGrid: {
     flexDirection: "row",
@@ -665,14 +704,14 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.subtle,
   },
   weekDayCell: {
-    width: "14.2857%",
-    minHeight: 40,
-    justifyContent: "center",
+    width: `${100 / 7}%`,
+    minHeight: 38,
     alignItems: "center",
-    backgroundColor: theme.colors.background.surface,
+    justifyContent: "center",
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.surface,
   },
   weekDayText: {
     color: theme.colors.text.secondary,
@@ -680,8 +719,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
   },
   dayCell: {
-    width: "14.2857%",
-    minHeight: 118,
+    width: `${100 / 7}%`,
+    minHeight: 104,
     padding: theme.spacing.sm,
     borderRightWidth: 1,
     borderBottomWidth: 1,
@@ -692,40 +731,37 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
-  dayEventList: {
-    gap: theme.spacing.xs,
-  },
+  dayEventList: { gap: 4 },
   calendarEventPill: {
     borderWidth: 1,
     borderRadius: theme.radius.md,
-    paddingVertical: 3,
-    paddingHorizontal: theme.spacing.xs,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
   },
   calendarEventText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: theme.fontWeights.black,
   },
   moreEventsText: {
-    color: theme.colors.text.muted,
-    fontSize: 10,
+    color: theme.colors.text.secondary,
+    fontSize: 11,
     fontWeight: theme.fontWeights.black,
   },
   actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing["2xl"],
   },
-  actionButton: {
-    flexGrow: 1,
-  },
+  actionButton: { flexGrow: 1, minWidth: 170 },
   statusText: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     marginTop: theme.spacing.lg,
+    lineHeight: theme.lineHeights.md,
   },
   label: {
     color: theme.colors.text.primary,
@@ -739,30 +775,27 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.lg,
   },
-  textArea: {
-    minHeight: 120,
-    textAlignVertical: "top",
-  },
+  textArea: { minHeight: 110, textAlignVertical: "top" },
   optionGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
   },
   optionButton: {
-    backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background.subtle,
   },
   optionButtonSelected: {
     backgroundColor: theme.colors.brand.primary,
@@ -773,118 +806,69 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  optionButtonTextSelected: {
-    color: theme.colors.text.inverse,
-  },
+  optionButtonTextSelected: { color: theme.colors.text.inverse },
   formGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.lg,
   },
-  formField: {
-    flexGrow: 1,
-    flexBasis: 220,
-  },
-  scheduleList: {
-    gap: theme.spacing.lg,
-    marginTop: theme.spacing.lg,
-  },
-  scheduleCard: {
+  formField: { flex: 1, minWidth: 180 },
+  eventList: { gap: theme.spacing.md },
+  eventCard: {
+    flexDirection: "row",
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    padding: theme.spacing.xl,
-  },
-  cardTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  scheduleType: {
     overflow: "hidden",
-    borderWidth: 1,
-    borderRadius: theme.radius.full,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
+  },
+  eventTypeBar: { width: 8 },
+  eventContent: {
+    flex: 1,
+    padding: theme.spacing.lg,
+  },
+  eventType: {
+    color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
   },
-  scheduleTeam: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  scheduleTitle: {
+  eventTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xs,
   },
-  detailRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.default,
-  },
-  detailLabel: {
+  eventMeta: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  detailValue: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    textAlign: "right",
-    flex: 1,
+    marginBottom: theme.spacing.sm,
   },
-  noteText: {
+  eventNote: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
-    marginTop: theme.spacing.lg,
-  },
-  deleteButton: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.lg,
-  },
-  deleteButtonText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
   },
   emptyCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    padding: theme.spacing.xl,
   },
   emptyTitle: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.lg,
+    fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.sm,
   },
   emptyText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
   },
-  pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
+  pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

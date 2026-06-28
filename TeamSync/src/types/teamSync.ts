@@ -8,6 +8,8 @@ export type AnnouncementTarget = "allClub" | "team";
 
 export type ScheduleEventType = "practice" | "match" | "meeting";
 
+export type AttendanceStatus = "present" | "absent" | "late" | "excused";
+
 export type PaymentStatus = "paid" | "unpaid" | "late";
 
 export type JoinRequestStatus = "pending" | "approved" | "rejected";
@@ -77,6 +79,18 @@ export type ScheduleEvent = {
   updatedAt?: TimestampString;
 };
 
+export type AttendanceRecord = {
+  id: string;
+  clubId: string;
+  teamId?: string;
+  userId: string;
+  status: AttendanceStatus;
+  sessionDate: TimestampString;
+  recordedByUserId: string;
+  recordedAt: TimestampString;
+  updatedAt?: TimestampString;
+};
+
 export type ChatGroup = {
   id: string;
   clubId: string;
@@ -127,6 +141,7 @@ export type TeamSyncAppData = {
   teams: Team[];
   announcements: Announcement[];
   scheduleEvents: ScheduleEvent[];
+  attendanceRecords: AttendanceRecord[];
   chatGroups: ChatGroup[];
   chatMessages: ChatMessage[];
   payments: Payment[];

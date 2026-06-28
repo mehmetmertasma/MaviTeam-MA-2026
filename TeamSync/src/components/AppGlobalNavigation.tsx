@@ -8,6 +8,7 @@ import { theme } from "@/constants/theme";
 const routesWithoutTopControls = [
   "/",
   "/login",
+  "/register",
   "/create-club",
   "/join-club",
   "/join-request-sent",

@@ -1,131 +1,137 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { Announcement, TeamSyncAppData } from "@/types/teamSync";
 
-type AnnouncementTarget = "Tüm Kulüp" | "A Takım" | "U16 Erkek" | "U14 Kız";
-
-type Announcement = {
-  id: number;
-  title: string;
-  message: string;
-  target: AnnouncementTarget;
-  createdAt: string;
+type TargetOption = {
+  id: string;
+  label: string;
+  targetType: "allClub" | "team";
+  targetTeamId?: string;
 };
 
-const ANNOUNCEMENTS_STORAGE_KEY = "teamsync_announcements_data";
-const targetOptions: AnnouncementTarget[] = ["Tüm Kulüp", "A Takım", "U16 Erkek", "U14 Kız"];
+function formatDate(value: string) {
+  const date = new Date(value);
 
-const initialAnnouncements: Announcement[] = [
-  {
-    id: 1,
-    title: "Antrenman saati güncellendi",
-    message: "U16 Erkek takımı için cuma antrenmanı saat 18:30 olarak güncellendi.",
-    target: "U16 Erkek",
-    createdAt: "Bugün · 18.30",
-  },
-  {
-    id: 2,
-    title: "Aidat hatırlatması",
-    message: "Bu ayın aidat ödemeleri için son tarih pazar günüdür.",
-    target: "Tüm Kulüp",
-    createdAt: "Dün · 19.45",
-  },
-];
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok";
+  }
 
-function getCreatedAtLabel() {
-  const now = new Date();
-  const time = now
-    .toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
-    .replace(":", ".");
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-  return `Bugün · ${time}`;
+function getAnnouncementTargetLabel(announcement: Announcement, appData: TeamSyncAppData) {
+  if (announcement.targetType === "allClub") {
+    return "Tüm Kulüp";
+  }
+
+  return appData.teams.find((team) => team.id === announcement.targetTeamId)?.name ?? "Takım bulunamadı";
 }
 
 export default function AnnouncementsScreen() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [selectedTarget, setSelectedTarget] = useState<AnnouncementTarget>("Tüm Kulüp");
-  const [statusMessage, setStatusMessage] = useState("Duyurular local storage ile kaydedilecek.");
+  const [selectedTargetId, setSelectedTargetId] = useState("all-club");
+  const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklenecek.");
 
-  const canPublish = title.trim().length > 0 && message.trim().length > 0;
-
-  useEffect(() => {
-    async function loadSavedAnnouncements() {
-      try {
-        const savedAnnouncements = await AsyncStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY);
-
-        if (savedAnnouncements === null) {
-          return;
-        }
-
-        const parsedAnnouncements = JSON.parse(savedAnnouncements) as Announcement[];
-        setAnnouncements(parsedAnnouncements);
-        setStatusMessage("Kaydedilmiş duyurular yüklendi.");
-      } catch {
-        setStatusMessage("Duyurular yüklenirken bir sorun oluştu.");
-      }
+  const loadAnnouncementsData = useCallback(async () => {
+    try {
+      const loadedAppData = await teamSyncService.getAppData();
+      setAppData(loadedAppData);
+      setStatusMessage("Duyurular merkezi TeamSync datasından yüklendi.");
+    } catch {
+      setStatusMessage("Duyurular yüklenirken bir sorun oluştu.");
     }
-
-    loadSavedAnnouncements();
   }, []);
 
-  async function saveAnnouncements(updatedAnnouncements: Announcement[]) {
-    try {
-      await AsyncStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(updatedAnnouncements));
-      setAnnouncements(updatedAnnouncements);
-      setStatusMessage("Duyurular kaydedildi.");
-    } catch {
-      setStatusMessage("Duyurular kaydedilirken bir sorun oluştu.");
+  useFocusEffect(
+    useCallback(() => {
+      loadAnnouncementsData();
+    }, [loadAnnouncementsData])
+  );
+
+  const targetOptions = useMemo<TargetOption[]>(() => {
+    const allClubOption: TargetOption = {
+      id: "all-club",
+      label: "Tüm Kulüp",
+      targetType: "allClub",
+    };
+
+    if (appData === null) {
+      return [allClubOption];
     }
-  }
+
+    return [
+      allClubOption,
+      ...appData.teams.map((team) => ({
+        id: team.id,
+        label: team.name,
+        targetType: "team" as const,
+        targetTeamId: team.id,
+      })),
+    ];
+  }, [appData]);
+
+  const announcements = appData?.announcements ?? [];
+  const canPublish = title.trim().length > 0 && message.trim().length > 0;
 
   function clearForm() {
     setTitle("");
     setMessage("");
-    setSelectedTarget("Tüm Kulüp");
+    setSelectedTargetId("all-club");
   }
 
   async function publishAnnouncement() {
+    if (appData === null) {
+      setStatusMessage("Önce merkezi data yüklenmeli.");
+      return;
+    }
+
     if (!canPublish) {
       setStatusMessage("Başlık ve mesaj alanı boş bırakılamaz.");
       return;
     }
 
-    const newAnnouncement: Announcement = {
-      id: Date.now(),
-      title: title.trim(),
-      message: message.trim(),
-      target: selectedTarget,
-      createdAt: getCreatedAtLabel(),
-    };
+    const selectedTarget =
+      targetOptions.find((target) => target.id === selectedTargetId) ?? targetOptions[0];
 
-    const updatedAnnouncements = [newAnnouncement, ...announcements];
-    clearForm();
-    setShowCreateForm(false);
-    await saveAnnouncements(updatedAnnouncements);
-    setStatusMessage("Duyuru yayınlandı.");
-  }
-
-  async function deleteAnnouncement(announcementId: number) {
-    const updatedAnnouncements = announcements.filter((announcement) => announcement.id !== announcementId);
-    await saveAnnouncements(updatedAnnouncements);
-    setStatusMessage("Duyuru silindi.");
-  }
-
-  async function resetAnnouncements() {
     try {
-      await AsyncStorage.removeItem(ANNOUNCEMENTS_STORAGE_KEY);
-      setAnnouncements(initialAnnouncements);
+      const nextAppData = await teamSyncService.createAnnouncement({
+        clubId: appData.club.id,
+        title: title.trim(),
+        message: message.trim(),
+        targetType: selectedTarget.targetType,
+        targetTeamId: selectedTarget.targetTeamId,
+        createdByUserId: appData.currentUser.id,
+      });
+
+      setAppData(nextAppData);
       clearForm();
       setShowCreateForm(false);
-      setStatusMessage("Duyurular demo haline sıfırlandı.");
+      setStatusMessage("Duyuru merkezi data service içine yayınlandı.");
     } catch {
-      setStatusMessage("Duyurular sıfırlanırken bir sorun oluştu.");
+      setStatusMessage("Duyuru yayınlanırken bir sorun oluştu.");
+    }
+  }
+
+  async function deleteAnnouncement(announcementId: string) {
+    try {
+      const nextAppData = await teamSyncService.removeAnnouncement(announcementId);
+      setAppData(nextAppData);
+      setStatusMessage("Duyuru merkezi datadan silindi.");
+    } catch {
+      setStatusMessage("Duyuru silinirken bir sorun oluştu.");
     }
   }
 
@@ -135,14 +141,14 @@ export default function AnnouncementsScreen() {
         <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.pageTitle}>Duyurular</Text>
-          <Text style={styles.pageSubtitle}>Kulüp veya takım üyelerine duyuru yayınla.</Text>
+          <Text style={styles.pageSubtitle}>Kulüp veya takım üyelerine merkezi data üzerinden duyuru yayınla.</Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Kulüp iletişim merkezi</Text>
           <Text style={styles.heroTitle}>Duyuru yönetimi</Text>
           <Text style={styles.heroSubtitle}>
-            Yayınlanan duyurular önce görünür. Yeni duyuru yazmak için butona basınca form açılır.
+            Bu sayfa artık ayrı local storage kullanmıyor. Duyurular `appData.announcements` içinden gelir ve service layer üzerinden kaydedilir.
           </Text>
         </View>
 
@@ -158,9 +164,9 @@ export default function AnnouncementsScreen() {
           />
 
           <AppButton
-            title="Duyuruları sıfırla"
+            title="Merkezi datayı yenile"
             variant="ghost"
-            onPress={resetAnnouncements}
+            onPress={loadAnnouncementsData}
             style={styles.actionButton}
           />
         </View>
@@ -197,12 +203,12 @@ export default function AnnouncementsScreen() {
             <Text style={styles.label}>Kimlere gönderilecek?</Text>
             <View style={styles.targetGrid}>
               {targetOptions.map((target) => {
-                const isSelected = selectedTarget === target;
+                const isSelected = selectedTargetId === target.id;
 
                 return (
                   <Pressable
-                    key={target}
-                    onPress={() => setSelectedTarget(target)}
+                    key={target.id}
+                    onPress={() => setSelectedTargetId(target.id)}
                     style={({ pressed }) => [
                       styles.targetButton,
                       isSelected ? styles.targetButtonSelected : null,
@@ -210,7 +216,7 @@ export default function AnnouncementsScreen() {
                     ]}
                   >
                     <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>
-                      {target}
+                      {target.label}
                     </Text>
                   </Pressable>
                 );
@@ -248,14 +254,16 @@ export default function AnnouncementsScreen() {
           </View>
 
           <View style={styles.announcementList}>
-            {announcements.length > 0 ? (
+            {appData !== null && announcements.length > 0 ? (
               announcements.map((announcement) => (
                 <View key={announcement.id} style={styles.announcementCard}>
                   <View style={styles.announcementHeaderRow}>
                     <View style={styles.announcementTextArea}>
-                      <Text style={styles.announcementTarget}>{announcement.target}</Text>
+                      <Text style={styles.announcementTarget}>
+                        {getAnnouncementTargetLabel(announcement, appData)}
+                      </Text>
                       <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                      <Text style={styles.announcementDate}>Paylaşıldı: {announcement.createdAt}</Text>
+                      <Text style={styles.announcementDate}>Paylaşıldı: {formatDate(announcement.createdAt)}</Text>
                     </View>
 
                     <Pressable
@@ -286,46 +294,230 @@ export default function AnnouncementsScreen() {
 
 const styles = StyleSheet.create({
   scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: { flexGrow: 1, backgroundColor: theme.colors.background.app, paddingHorizontal: theme.spacing["2xl"], paddingBottom: theme.spacing["2xl"] },
+  screen: {
+    flexGrow: 1,
+    backgroundColor: theme.colors.background.app,
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
+  },
   container: { width: "100%", maxWidth: 980, alignSelf: "center" },
   pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
-  pageTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"], marginBottom: theme.spacing.sm },
-  pageSubtitle: { color: theme.colors.text.inverse, opacity: 0.76, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
-  heroCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["3xl"], marginBottom: theme.spacing["2xl"], ...theme.shadows.md },
-  heroLabel: { alignSelf: "flex-start", backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full, marginBottom: theme.spacing.lg },
-  heroTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, color: theme.colors.text.primary, lineHeight: theme.lineHeights["4xl"], marginBottom: theme.spacing.md },
-  heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl },
-  actionRowTop: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
+  logo: {
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.md,
+  },
+  pageTitle: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes["5xl"],
+    fontWeight: theme.fontWeights.black,
+    lineHeight: theme.lineHeights["5xl"],
+    marginBottom: theme.spacing.sm,
+  },
+  pageSubtitle: {
+    color: theme.colors.text.inverse,
+    opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  heroCard: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    padding: theme.spacing["3xl"],
+    marginBottom: theme.spacing["2xl"],
+    ...theme.shadows.md,
+  },
+  heroLabel: {
+    alignSelf: "flex-start",
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    marginBottom: theme.spacing.lg,
+  },
+  heroTitle: {
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    lineHeight: theme.lineHeights["4xl"],
+    marginBottom: theme.spacing.md,
+  },
+  heroSubtitle: {
+    fontSize: theme.fontSizes.lg,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.xl,
+  },
+  actionRowTop: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing["2xl"],
+  },
   actionButton: { flexGrow: 1 },
-  section: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
-  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  section: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    padding: theme.spacing["2xl"],
+    marginBottom: theme.spacing["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    ...theme.shadows.sm,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
   sectionHeaderText: { flex: 1 },
-  sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, color: theme.colors.text.primary, marginBottom: theme.spacing.md },
-  sectionSubtitle: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.md },
-  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full },
-  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
-  input: { minHeight: 52, backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.lg },
+  sectionTitle: {
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.md,
+  },
+  sectionSubtitle: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
+  },
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+  },
+  label: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
+  },
+  input: {
+    minHeight: 52,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    marginBottom: theme.spacing.lg,
+  },
   textArea: { minHeight: 120, textAlignVertical: "top" },
-  targetGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.lg },
-  targetButton: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  targetButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
-  targetButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  targetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.xl,
+  },
+  targetButton: {
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background.subtle,
+  },
+  targetButtonSelected: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  targetButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
-  publishRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.md },
-  announcementList: { gap: theme.spacing.lg },
-  announcementCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl },
-  announcementHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.md },
+  publishRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
+  announcementList: { gap: theme.spacing.md },
+  announcementCard: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  announcementHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: theme.spacing.lg,
+    alignItems: "flex-start",
+    marginBottom: theme.spacing.md,
+  },
   announcementTextArea: { flex: 1 },
-  announcementTarget: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  announcementTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  announcementDate: { color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
-  announcementMessage: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  deleteButton: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md },
-  deleteButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
-  emptyCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl },
-  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
-  statusText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.lg },
+  announcementTarget: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  announcementTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  announcementDate: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  announcementMessage: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.lg,
+  },
+  deleteButton: {
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    backgroundColor: theme.colors.background.surface,
+  },
+  deleteButtonText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  emptyCard: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+  },
+  statusText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xl,
+    lineHeight: theme.lineHeights.md,
+  },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

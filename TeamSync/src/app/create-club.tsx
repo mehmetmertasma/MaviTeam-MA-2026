@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -8,6 +9,26 @@ import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
 
 const t = translations[defaultLanguage];
+
+const CLUB_STORAGE_KEY = "teamsync_created_club_data";
+const PROFILE_STORAGE_KEY = "teamsync_profile_data";
+
+type CreatedClubData = {
+  name: string;
+  sport: string;
+  city: string;
+  code: string;
+};
+
+type ProfileData = {
+  name: string;
+  email: string;
+  club: string;
+  team: string;
+  role: string;
+  season: string;
+  membership: string;
+};
 
 export default function CreateClubScreen() {
   const router = useRouter();
@@ -22,24 +43,54 @@ export default function CreateClubScreen() {
       ? "TS-2026"
       : `${clubName.trim().slice(0, 2).toUpperCase()}-2026`;
 
-  function handleCreateClub() {
-    if (clubName.trim() === "") {
+  async function handleCreateClub() {
+    const trimmedClubName = clubName.trim();
+    const trimmedSport = sport.trim();
+    const trimmedCity = city.trim();
+
+    if (trimmedClubName === "") {
       setError("Lütfen kulüp adını giriniz.");
       return;
     }
 
-    if (sport.trim() === "") {
+    if (trimmedSport === "") {
       setError("Lütfen branş bilgisini giriniz.");
       return;
     }
 
-    if (city.trim() === "") {
+    if (trimmedCity === "") {
       setError("Lütfen şehir bilgisini giriniz.");
       return;
     }
 
-    setError("");
-    router.push("/dashboard");
+    const createdClubData: CreatedClubData = {
+      name: trimmedClubName,
+      sport: trimmedSport,
+      city: trimmedCity,
+      code: previewCode,
+    };
+
+    const demoProfileData: ProfileData = {
+      name: "Yönetici",
+      email: "demo@teamsync.app",
+      club: trimmedClubName,
+      team: `${trimmedSport} Takımı`,
+      role: "Kulüp yöneticisi",
+      season: "2026 Bahar",
+      membership: "Kulüp öder, veli/sporcu ücretsiz",
+    };
+
+    try {
+      await AsyncStorage.multiSet([
+        [CLUB_STORAGE_KEY, JSON.stringify(createdClubData)],
+        [PROFILE_STORAGE_KEY, JSON.stringify(demoProfileData)],
+      ]);
+
+      setError("");
+      router.replace("/dashboard");
+    } catch {
+      setError("Kulüp bilgileri kaydedilirken bir sorun oluştu.");
+    }
   }
 
   return (

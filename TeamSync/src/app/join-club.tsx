@@ -1,4 +1,4 @@
-import { Link, useRouter } from "expo-router";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -6,13 +6,28 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { UserRole } from "@/types/teamSync";
 
 const t = translations[defaultLanguage];
 
+function getParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
 export default function JoinClubScreen() {
   const router = useRouter();
+  const { fullName, email } = useLocalSearchParams();
+
+  const requestFullName = getParamValue(fullName);
+  const requestEmail = getParamValue(email);
 
   const [inviteCode, setInviteCode] = useState("");
+  const [requestedRole, setRequestedRole] = useState<UserRole>("athlete");
   const [error, setError] = useState("");
 
   function handleInviteCodeChange(text: string) {
@@ -25,7 +40,7 @@ export default function JoinClubScreen() {
     }
   }
 
-  function handleJoinClub() {
+  async function handleJoinClub() {
     const cleanedCode = inviteCode.trim();
 
     if (cleanedCode === "") {
@@ -38,12 +53,19 @@ export default function JoinClubScreen() {
       return;
     }
 
-    setError("");
+    try {
+      await teamSyncService.createJoinRequest({
+        fullName: requestFullName || "Yeni Kullanıcı",
+        email: requestEmail || "pending@teamsync.app",
+        inviteCode: cleanedCode,
+        requestedRole,
+      });
 
-    // Önemli değişiklik:
-    // Eskiden dashboard'a gidiyordu.
-    // Artık admin onayı bekleme ekranına gidiyor.
-    router.push("/join-request-sent");
+      setError("");
+      router.replace("/join-request-sent");
+    } catch {
+      setError("Bu kulüp kodu bulunamadı. Lütfen kodu kontrol edip tekrar deneyiniz.");
+    }
   }
 
   return (
@@ -61,8 +83,14 @@ export default function JoinClubScreen() {
         </Text>
 
         <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Kayıt bilgileri</Text>
+          <Text style={styles.infoText}>{requestFullName || "İsim register ekranından gelecek"}</Text>
+          <Text style={styles.infoText}>{requestEmail || "E-posta register ekranından gelecek"}</Text>
+        </View>
+
+        <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Kod örneği</Text>
-          <Text style={styles.infoText}>TS-2026 veya IVK-2026</Text>
+          <Text style={styles.infoText}>TS2026 veya kulübün oluşturduğu kod</Text>
         </View>
 
         <View style={styles.form}>
@@ -71,13 +99,37 @@ export default function JoinClubScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Örn. TS-2026"
+              placeholder="Örn. TS2026"
               placeholderTextColor={theme.colors.text.muted}
               value={inviteCode}
               onChangeText={handleInviteCodeChange}
               autoCapitalize="characters"
               accessibilityLabel="Takım veya kulüp kodu"
             />
+          </View>
+
+          <View style={styles.roleBox}>
+            <Text style={styles.label}>Katılmak istediğin rol</Text>
+            <View style={styles.roleGrid}>
+              <AppButton
+                title="Sporcu"
+                variant={requestedRole === "athlete" ? "primary" : "secondary"}
+                onPress={() => setRequestedRole("athlete")}
+                style={styles.roleButton}
+              />
+              <AppButton
+                title="Veli"
+                variant={requestedRole === "parent" ? "primary" : "secondary"}
+                onPress={() => setRequestedRole("parent")}
+                style={styles.roleButton}
+              />
+              <AppButton
+                title="Koç"
+                variant={requestedRole === "coach" ? "primary" : "secondary"}
+                onPress={() => setRequestedRole("coach")}
+                style={styles.roleButton}
+              />
+            </View>
           </View>
         </View>
 
@@ -159,7 +211,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
@@ -177,6 +229,7 @@ const styles = StyleSheet.create({
   },
   form: {
     width: "100%",
+    gap: theme.spacing.lg,
   },
   inputGroup: {
     width: "100%",
@@ -198,6 +251,18 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     fontSize: theme.fontSizes.lg,
     color: theme.colors.text.primary,
+  },
+  roleBox: {
+    width: "100%",
+  },
+  roleGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+  },
+  roleButton: {
+    flexGrow: 1,
+    minWidth: 120,
   },
   errorText: {
     marginTop: theme.spacing.lg,

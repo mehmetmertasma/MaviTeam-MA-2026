@@ -4,10 +4,12 @@ import { demoTeamSyncData } from "@/data/demoTeamSyncData";
 import type {
   Announcement,
   Club,
+  JoinRequest,
   ScheduleEvent,
   Team,
   TeamSyncAppData,
   UserProfile,
+  UserRole,
 } from "@/types/teamSync";
 
 const TEAMSYNC_APP_DATA_KEY = "teamsync_app_data_v1";
@@ -20,16 +22,26 @@ type CreateClubWorkspaceInput = {
   city: string;
 };
 
+type CreateJoinRequestInput = {
+  fullName: string;
+  email: string;
+  inviteCode: string;
+  requestedRole?: UserRole;
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
 
-function generateClubCode(clubName: string) {
-  const prefix = clubName
+function normalizeClubCode(value: string) {
+  return value
     .trim()
     .toUpperCase()
-    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "")
-    .slice(0, 3);
+    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
+}
+
+function generateClubCode(clubName: string) {
+  const prefix = normalizeClubCode(clubName).slice(0, 3);
 
   return `${prefix || "TS"}${new Date().getFullYear()}`;
 }
@@ -126,6 +138,52 @@ export const teamSyncService = {
     };
 
     return saveAppData(nextAppData);
+  },
+
+  async createJoinRequest(input: CreateJoinRequestInput) {
+    const data = await loadAppData();
+    const normalizedInputCode = normalizeClubCode(input.inviteCode);
+    const normalizedClubCode = normalizeClubCode(data.club.code);
+
+    if (normalizedInputCode !== normalizedClubCode) {
+      throw new Error("INVALID_CLUB_CODE");
+    }
+
+    const createdAt = nowIso();
+    const pendingUserId = `user-pending-${Date.now()}`;
+    const requestedRole = input.requestedRole ?? "athlete";
+    const normalizedEmail = input.email.trim().toLowerCase() || "pending@teamsync.app";
+
+    const pendingUser: UserProfile = {
+      id: pendingUserId,
+      fullName: input.fullName.trim() || "Yeni Kullanıcı",
+      email: normalizedEmail,
+      role: requestedRole,
+      status: "pending",
+      clubId: data.club.id,
+      teamIds: [],
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    const joinRequest: JoinRequest = {
+      id: `join-request-${Date.now()}`,
+      clubId: data.club.id,
+      userId: pendingUserId,
+      requestedRole,
+      status: "pending",
+      createdAt,
+    };
+
+    return saveAppData({
+      ...data,
+      currentUser: pendingUser,
+      users: [pendingUser, ...data.users.filter((user) => user.email !== normalizedEmail)],
+      joinRequests: [
+        joinRequest,
+        ...data.joinRequests.filter((request) => request.userId !== pendingUserId),
+      ],
+    });
   },
 
   async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {

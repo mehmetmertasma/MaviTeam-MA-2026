@@ -38,27 +38,26 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.buttonGroup}>
-          <Link href="/create-club" asChild>
+          <Link href={{ pathname: "/register", params: { next: "create-club" } }} asChild>
             <AppButton
               title="Kulüp oluştur"
-              accessibilityLabel="Yeni kulüp oluşturma sayfasına git"
+              accessibilityLabel="Kayıt ekranından sonra yeni kulüp oluşturma sayfasına git"
               style={styles.button}
             />
           </Link>
 
-          <Link href="/join-club" asChild>
+          <Link href={{ pathname: "/register", params: { next: "join-club" } }} asChild>
             <AppButton
               title="Takım kodu ile katıl"
               variant="secondary"
-              accessibilityLabel="Takım kodu ile kulübe katılma sayfasına git"
+              accessibilityLabel="Kayıt ekranından sonra takım kodu ile kulübe katılma sayfasına git"
               style={styles.button}
             />
           </Link>
         </View>
 
         <Text style={styles.footerText}>
-          E-mail veya şifre sistemi daha sonra Firebase ile eklenecek. Şimdilik
-          ana giriş sistemi takım kodudur.
+          Önce kullanıcı bilgileri alınır. Sonra kulüp oluşturma veya takım kodu ile katılma adımına geçilir.
         </Text>
       </ScreenCard>
     </ScrollView>

@@ -1,5 +1,4 @@
-import { Link } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -56,22 +55,10 @@ const initialPayments: PaymentRecord[] = [
   },
 ];
 
-const paymentStatusOptions: {
-  label: string;
-  status: PaymentStatus;
-}[] = [
-  {
-    label: "Ödendi",
-    status: "paid",
-  },
-  {
-    label: "Ödenmedi",
-    status: "pending",
-  },
-  {
-    label: "Gecikti",
-    status: "overdue",
-  },
+const paymentStatusOptions: { label: string; status: PaymentStatus }[] = [
+  { label: "Ödendi", status: "paid" },
+  { label: "Ödenmedi", status: "pending" },
+  { label: "Gecikti", status: "overdue" },
 ];
 
 function getStatusLabel(status: PaymentStatus) {
@@ -97,27 +84,30 @@ function getPaymentMethodForStatus(status: PaymentStatus) {
 export default function PaymentsScreen() {
   const [payments, setPayments] = useState<PaymentRecord[]>(initialPayments);
   const [activeView, setActiveView] = useState<PaymentView>("admin");
+  const [statusMessage, setStatusMessage] = useState(
+    "Ödeme kayıtları şimdilik bu oturum içinde tutuluyor."
+  );
 
-  const totalPaid = payments.filter((payment) => payment.status === "paid").length;
+  const summary = useMemo(() => {
+    const paidCount = payments.filter((payment) => payment.status === "paid").length;
+    const pendingCount = payments.filter((payment) => payment.status === "pending").length;
+    const overdueCount = payments.filter((payment) => payment.status === "overdue").length;
 
-  const totalPending = payments.filter(
-    (payment) => payment.status === "pending",
-  ).length;
-
-  const totalOverdue = payments.filter(
-    (payment) => payment.status === "overdue",
-  ).length;
+    return {
+      paidCount,
+      pendingCount,
+      overdueCount,
+      totalCount: payments.length,
+    };
+  }, [payments]);
 
   const parentPayments = payments.filter(
-    (payment) => payment.athleteName === "Efe Asma",
+    (payment) => payment.athleteName === "Efe Asma"
   );
 
   const visiblePayments = activeView === "admin" ? payments : parentPayments;
 
-  function handleChangePaymentStatus(
-    paymentId: number,
-    newStatus: PaymentStatus,
-  ) {
+  function handleChangePaymentStatus(paymentId: number, newStatus: PaymentStatus) {
     setPayments((currentPayments) =>
       currentPayments.map((payment) => {
         if (payment.id !== paymentId) {
@@ -129,49 +119,49 @@ export default function PaymentsScreen() {
           method: getPaymentMethodForStatus(newStatus),
           status: newStatus,
         };
-      }),
+      })
     );
+
+    setStatusMessage("Ödeme durumu güncellendi.");
+  }
+
+  function resetPayments() {
+    setPayments(initialPayments);
+    setStatusMessage("Ödemeler demo haline sıfırlandı.");
   }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>Ödemeler</Text>
-
-            <Text style={styles.pageSubtitle}>
-              Kulüp aidatlarını takip et, ödeme durumlarını düzenle ve velilere
-              güncel ödeme bilgisini göster.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Ödemeler</Text>
+          <Text style={styles.pageSubtitle}>
+            Kulüp aidatlarını takip et, ödeme durumlarını düzenle ve velilere güncel ödeme bilgisini göster.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Kulüp finans merkezi</Text>
-
           <Text style={styles.heroTitle}>Aidat ve ödeme takibi</Text>
-
           <Text style={styles.heroSubtitle}>
-            Admin yanlışlıkla bir ödemeyi ödendi olarak işaretlerse tekrar
-            ödenmedi veya gecikti durumuna çevirebilir.
+            Admin ödeme durumlarını günceller. Veli ise sadece kendi sporcusunun ödeme durumunu görür.
           </Text>
         </View>
 
         <View style={styles.viewSwitcher}>
           <Pressable
             onPress={() => setActiveView("admin")}
-            style={[
+            style={({ pressed }) => [
               styles.viewButton,
-              activeView === "admin" && styles.viewButtonActive,
+              activeView === "admin" ? styles.viewButtonActive : null,
+              pressed ? styles.pressed : null,
             ]}
           >
             <Text
               style={[
                 styles.viewButtonText,
-                activeView === "admin" && styles.viewButtonTextActive,
+                activeView === "admin" ? styles.viewButtonTextActive : null,
               ]}
             >
               Admin görünümü
@@ -180,15 +170,16 @@ export default function PaymentsScreen() {
 
           <Pressable
             onPress={() => setActiveView("parent")}
-            style={[
+            style={({ pressed }) => [
               styles.viewButton,
-              activeView === "parent" && styles.viewButtonActive,
+              activeView === "parent" ? styles.viewButtonActive : null,
+              pressed ? styles.pressed : null,
             ]}
           >
             <Text
               style={[
                 styles.viewButtonText,
-                activeView === "parent" && styles.viewButtonTextActive,
+                activeView === "parent" ? styles.viewButtonTextActive : null,
               ]}
             >
               Veli görünümü
@@ -198,30 +189,27 @@ export default function PaymentsScreen() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{totalPaid}</Text>
+            <Text style={styles.statValue}>{summary.paidCount}</Text>
             <Text style={styles.statLabel}>Ödenen</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{totalPending}</Text>
+            <Text style={styles.statValue}>{summary.pendingCount}</Text>
             <Text style={styles.statLabel}>Ödenmeyen</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{totalOverdue}</Text>
+            <Text style={styles.statValue}>{summary.overdueCount}</Text>
             <Text style={styles.statLabel}>Geciken</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>
-                {activeView === "admin"
-                  ? "Kulüp ödeme listesi"
-                  : "Benim ödeme durumum"}
+                {activeView === "admin" ? "Kulüp ödeme listesi" : "Benim ödeme durumum"}
               </Text>
-
               <Text style={styles.sectionSubtitle}>
                 {activeView === "admin"
                   ? "Admin her ödeme için ödendi, ödenmedi veya gecikti durumunu seçebilir."
@@ -229,7 +217,7 @@ export default function PaymentsScreen() {
               </Text>
             </View>
 
-            <Text style={styles.countText}>{visiblePayments.length} kayıt</Text>
+            <Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text>
           </View>
 
           <View style={styles.paymentList}>
@@ -241,32 +229,19 @@ export default function PaymentsScreen() {
                 <View key={payment.id} style={styles.paymentCard}>
                   <View style={styles.cardTopRow}>
                     <View style={styles.cardTitleGroup}>
-                      <Text style={styles.athleteName}>
-                        {payment.athleteName}
-                      </Text>
-
-                      <Text style={styles.parentName}>
-                        {payment.parentName}
-                      </Text>
+                      <Text style={styles.athleteName}>{payment.athleteName}</Text>
+                      <Text style={styles.parentName}>{payment.parentName}</Text>
                     </View>
 
-                    <View
+                    <Text
                       style={[
                         styles.statusBadge,
-                        isPaid && styles.statusBadgePaid,
-                        isOverdue && styles.statusBadgeOverdue,
+                        isPaid ? styles.statusBadgePaid : null,
+                        isOverdue ? styles.statusBadgeOverdue : null,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.statusText,
-                          isPaid && styles.statusTextPaid,
-                          isOverdue && styles.statusTextOverdue,
-                        ]}
-                      >
-                        {getStatusLabel(payment.status)}
-                      </Text>
-                    </View>
+                      {getStatusLabel(payment.status)}
+                    </Text>
                   </View>
 
                   <View style={styles.infoGrid}>
@@ -286,16 +261,14 @@ export default function PaymentsScreen() {
                     </View>
 
                     <View style={styles.infoBox}>
-                      <Text style={styles.infoLabel}>Son gün</Text>
+                      <Text style={styles.infoLabel}>Son tarih</Text>
                       <Text style={styles.infoValue}>{payment.dueDate}</Text>
                     </View>
                   </View>
 
-                  <View style={styles.bottomRow}>
-                    <Text style={styles.methodText}>Yöntem: {payment.method}</Text>
-                  </View>
+                  <Text style={styles.methodText}>Yöntem: {payment.method}</Text>
 
-                  {activeView === "admin" && (
+                  {activeView === "admin" ? (
                     <View style={styles.statusActions}>
                       {paymentStatusOptions.map((option) => {
                         const isSelected = payment.status === option.status;
@@ -303,23 +276,17 @@ export default function PaymentsScreen() {
                         return (
                           <Pressable
                             key={option.status}
-                            onPress={() =>
-                              handleChangePaymentStatus(
-                                payment.id,
-                                option.status,
-                              )
-                            }
+                            onPress={() => handleChangePaymentStatus(payment.id, option.status)}
                             style={({ pressed }) => [
-                              styles.statusActionButton,
-                              isSelected && styles.statusActionButtonActive,
-                              pressed && styles.statusActionButtonPressed,
+                              styles.statusButton,
+                              isSelected ? styles.statusButtonSelected : null,
+                              pressed ? styles.pressed : null,
                             ]}
                           >
                             <Text
                               style={[
-                                styles.statusActionButtonText,
-                                isSelected &&
-                                  styles.statusActionButtonTextActive,
+                                styles.statusButtonText,
+                                isSelected ? styles.statusButtonTextSelected : null,
                               ]}
                             >
                               {option.label}
@@ -328,31 +295,21 @@ export default function PaymentsScreen() {
                         );
                       })}
                     </View>
-                  )}
+                  ) : null}
                 </View>
               );
             })}
           </View>
-        </View>
 
-        <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>Gerçek sistemde nasıl olacak?</Text>
+          <Text style={styles.statusText}>{statusMessage}</Text>
 
-          <Text style={styles.noteText}>
-            Firebase eklendiğinde adminin yaptığı her ödeme durumu değişikliği
-            database’e kaydedilecek. Böylece yanlışlıkla işaretlenen ödeme
-            tekrar düzeltilebilecek.
-          </Text>
-        </View>
-
-        <Link href="/dashboard" asChild>
           <AppButton
-            title="Dashboard'a dön"
+            title="Demo veriyi sıfırla"
             variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
+            onPress={resetPayments}
+            style={styles.resetButton}
           />
-        </Link>
+        </View>
       </View>
     </ScrollView>
   );
@@ -366,34 +323,34 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
   },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
@@ -435,10 +392,11 @@ const styles = StyleSheet.create({
   viewButton: {
     flex: 1,
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     alignItems: "center",
   },
   viewButtonActive: {
@@ -446,9 +404,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand.primary,
   },
   viewButtonText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
   },
   viewButtonTextActive: {
     color: theme.colors.text.inverse,
@@ -461,7 +419,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 180,
+    flexBasis: 145,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.xl,
@@ -470,15 +428,15 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   statValue: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
     marginBottom: theme.spacing.xs,
   },
   statLabel: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
   },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -489,9 +447,10 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
@@ -499,28 +458,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   sectionSubtitle: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
-  countText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
   paymentList: {
     gap: theme.spacing.md,
   },
   paymentCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
@@ -536,131 +499,103 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   athleteName: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.xs,
   },
   parentName: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
   },
   statusBadge: {
-    backgroundColor: theme.colors.state.warningSoft,
-    borderRadius: theme.radius.full,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-  },
-  statusBadgePaid: {
-    backgroundColor: theme.colors.state.successSoft,
-  },
-  statusBadgeOverdue: {
-    backgroundColor: theme.colors.state.dangerSoft,
-  },
-  statusText: {
+    backgroundColor: theme.colors.background.surface,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.warning,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
   },
-  statusTextPaid: {
-    color: theme.colors.text.success,
+  statusBadgePaid: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    borderColor: theme.colors.brand.primarySoft,
   },
-  statusTextOverdue: {
-    color: theme.colors.text.danger,
+  statusBadgeOverdue: {
+    color: theme.colors.text.primary,
   },
   infoGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
   },
   infoBox: {
     flexGrow: 1,
-    flexBasis: 140,
+    flexBasis: 130,
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.md,
-    padding: theme.spacing.md,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
   },
   infoLabel: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.muted,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   infoValue: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-  },
-  bottomRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.md,
   },
   methodText: {
-    flex: 1,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
   },
   statusActions: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
     marginTop: theme.spacing.lg,
   },
-  statusActionButton: {
-    flexGrow: 1,
-    flexBasis: 120,
+  statusButton: {
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    alignItems: "center",
+    paddingHorizontal: theme.spacing.md,
   },
-  statusActionButtonActive: {
+  statusButtonSelected: {
     backgroundColor: theme.colors.brand.primary,
     borderColor: theme.colors.brand.primary,
   },
-  statusActionButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
-  statusActionButtonText: {
+  statusButtonText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  statusActionButtonTextActive: {
+  statusButtonTextSelected: {
     color: theme.colors.text.inverse,
   },
-  noteCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  noteTitle: {
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  noteText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+  statusText: {
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
   },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
+  resetButton: {
+    marginTop: theme.spacing.lg,
+  },
+  pressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

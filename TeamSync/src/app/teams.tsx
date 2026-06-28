@@ -1,15 +1,23 @@
+import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+
+type TeamMember = {
+  id: string;
+  name: string;
+  role: "Koç" | "Sporcu" | "Veli";
+  status: "Aktif" | "Onay bekliyor";
+};
 
 type Team = {
   id: string;
   name: string;
   ageGroup: string;
   coachName: string;
-  athleteCount: number;
+  members: TeamMember[];
 };
 
 const initialTeams: Team[] = [
@@ -18,35 +26,77 @@ const initialTeams: Team[] = [
     name: "A Takım",
     ageGroup: "Senior",
     coachName: "Can Demir",
-    athleteCount: 18,
+    members: [
+      { id: "1-coach", name: "Can Demir", role: "Koç", status: "Aktif" },
+      { id: "1-athlete-1", name: "Emir Yılmaz", role: "Sporcu", status: "Aktif" },
+      { id: "1-athlete-2", name: "Kerem Aksoy", role: "Sporcu", status: "Aktif" },
+      { id: "1-parent-1", name: "Selin Yılmaz", role: "Veli", status: "Aktif" },
+    ],
   },
   {
     id: "2",
     name: "U16 Erkek",
     ageGroup: "U16",
     coachName: "Mehmet Kaya",
-    athleteCount: 14,
+    members: [
+      { id: "2-coach", name: "Mehmet Kaya", role: "Koç", status: "Aktif" },
+      { id: "2-athlete-1", name: "Mert Asma", role: "Sporcu", status: "Aktif" },
+      { id: "2-athlete-2", name: "Efe Demir", role: "Sporcu", status: "Aktif" },
+      { id: "2-athlete-3", name: "Arda Çelik", role: "Sporcu", status: "Onay bekliyor" },
+      { id: "2-parent-1", name: "Ayhan Demir", role: "Veli", status: "Aktif" },
+    ],
   },
   {
     id: "3",
     name: "U14 Kız",
     ageGroup: "U14",
     coachName: "Ayşe Yıldız",
-    athleteCount: 16,
+    members: [
+      { id: "3-coach", name: "Ayşe Yıldız", role: "Koç", status: "Aktif" },
+      { id: "3-athlete-1", name: "Zeynep Acar", role: "Sporcu", status: "Aktif" },
+      { id: "3-athlete-2", name: "Elif Şahin", role: "Sporcu", status: "Aktif" },
+      { id: "3-parent-1", name: "Deniz Acar", role: "Veli", status: "Aktif" },
+    ],
   },
 ];
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TS";
+}
+
+function getAthleteCount(team: Team) {
+  return team.members.filter((member) => member.role === "Sporcu").length;
+}
+
 export default function TeamsScreen() {
   const [teams, setTeams] = useState<Team[]>(initialTeams);
+  const [selectedTeamId, setSelectedTeamId] = useState(initialTeams[0].id);
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [coachName, setCoachName] = useState("");
   const [statusMessage, setStatusMessage] = useState(
-    "Takımlar şimdilik bu oturum içinde tutuluyor."
+    "Bir takıma tıklayarak içindeki üyeleri görebilirsin."
   );
 
+  const selectedTeam = useMemo(() => {
+    return teams.find((team) => team.id === selectedTeamId) ?? teams[0];
+  }, [selectedTeamId, teams]);
+
   const totalAthletes = useMemo(() => {
-    return teams.reduce((total, team) => total + team.athleteCount, 0);
+    return teams.reduce((total, team) => total + getAthleteCount(team), 0);
+  }, [teams]);
+
+  const totalMembers = useMemo(() => {
+    return teams.reduce((total, team) => total + team.members.length, 0);
   }, [teams]);
 
   function handleCreateTeam() {
@@ -70,22 +120,41 @@ export default function TeamsScreen() {
       name: teamName.trim(),
       ageGroup: ageGroup.trim(),
       coachName: coachName.trim(),
-      athleteCount: 0,
+      members: [
+        {
+          id: `${Date.now()}-coach`,
+          name: coachName.trim(),
+          role: "Koç",
+          status: "Aktif",
+        },
+      ],
     };
 
     setTeams((currentTeams) => [newTeam, ...currentTeams]);
+    setSelectedTeamId(newTeam.id);
     setTeamName("");
     setAgeGroup("");
     setCoachName("");
-    setStatusMessage("Yeni takım oluşturuldu.");
+    setStatusMessage("Yeni takım oluşturuldu ve seçildi.");
   }
 
   function resetTeams() {
     setTeams(initialTeams);
+    setSelectedTeamId(initialTeams[0].id);
     setTeamName("");
     setAgeGroup("");
     setCoachName("");
     setStatusMessage("Takımlar demo haline sıfırlandı.");
+  }
+
+  function handleSelectTeam(team: Team) {
+    setSelectedTeamId(team.id);
+    setStatusMessage(`${team.name} seçildi. Aşağıda takım üyelerini görebilirsin.`);
+  }
+
+  function handleSendMessage(memberName: string) {
+    setStatusMessage(`${memberName} için mesaj ekranı açılıyor.`);
+    router.push("/messages" as never);
   }
 
   return (
@@ -103,7 +172,7 @@ export default function TeamsScreen() {
           <Text style={styles.heroLabel}>Kulüp organizasyonu</Text>
           <Text style={styles.heroTitle}>Takım yönetim merkezi</Text>
           <Text style={styles.heroSubtitle}>
-            Her takım ileride kendi programına, yoklamasına, mesajlarına ve ödeme kayıtlarına bağlanacak.
+            Takıma tıklayınca o takımın içindeki koç, sporcu ve veli profilleri burada listelenir.
           </Text>
         </View>
 
@@ -119,8 +188,8 @@ export default function TeamsScreen() {
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{teams.length}</Text>
-            <Text style={styles.statLabel}>Koç</Text>
+            <Text style={styles.statValue}>{totalMembers}</Text>
+            <Text style={styles.statLabel}>Üye</Text>
           </View>
         </View>
 
@@ -194,28 +263,86 @@ export default function TeamsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kulüp takımları</Text>
+          <Text style={styles.sectionSubtitle}>
+            Bir takıma tıkla; seçilen takımın profilleri aşağıda açılacak.
+          </Text>
 
           <View style={styles.teamList}>
-            {teams.map((team) => (
-              <View key={team.id} style={styles.teamCard}>
-                <View style={styles.teamTopRow}>
-                  <View style={styles.teamInfo}>
-                    <Text style={styles.teamName}>{team.name}</Text>
-                    <Text style={styles.teamMeta}>
-                      {team.ageGroup} · Koç: {team.coachName}
+            {teams.map((team) => {
+              const isSelected = selectedTeam?.id === team.id;
+
+              return (
+                <Pressable
+                  key={team.id}
+                  onPress={() => handleSelectTeam(team)}
+                  style={({ pressed }) => [
+                    styles.teamCard,
+                    isSelected ? styles.teamCardSelected : null,
+                    pressed ? styles.cardPressed : null,
+                  ]}
+                >
+                  <View style={styles.teamTopRow}>
+                    <View style={styles.teamInfo}>
+                      <Text style={styles.teamName}>{team.name}</Text>
+                      <Text style={styles.teamMeta}>
+                        {team.ageGroup} · Koç: {team.coachName}
+                      </Text>
+                    </View>
+
+                    <View style={styles.badgeColumn}>
+                      {isSelected ? <Text style={styles.selectedBadge}>Seçili</Text> : null}
+                      <Text style={styles.athleteBadge}>{getAthleteCount(team)} sporcu</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.teamHint}>
+                    {team.members.length} profil bağlı · Takım detaylarını açmak için tıkla.
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {selectedTeam ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>{selectedTeam.name} profilleri</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Bu takımın içindeki kişiler ve hızlı mesaj işlemleri.
+                </Text>
+              </View>
+
+              <Text style={styles.statusPill}>{selectedTeam.members.length} kişi</Text>
+            </View>
+
+            <View style={styles.memberList}>
+              {selectedTeam.members.map((member) => (
+                <View key={member.id} style={styles.memberCard}>
+                  <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{getInitials(member.name)}</Text>
+                  </View>
+
+                  <View style={styles.memberInfo}>
+                    <Text style={styles.memberName}>{member.name}</Text>
+                    <Text style={styles.memberMeta}>
+                      {member.role} · {member.status}
                     </Text>
                   </View>
 
-                  <Text style={styles.athleteBadge}>{team.athleteCount} sporcu</Text>
+                  <AppButton
+                    title="Mesaj yolla"
+                    variant="secondary"
+                    accessibilityLabel={`${member.name} kişisine mesaj yolla`}
+                    onPress={() => handleSendMessage(member.name)}
+                    style={styles.memberButton}
+                  />
                 </View>
-
-                <Text style={styles.teamHint}>
-                  Sporcu ekleme, program oluşturma ve yoklama özellikleri ileride bu takım üzerinden çalışacak.
-                </Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -410,6 +537,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
+  teamCardSelected: {
+    borderColor: theme.colors.brand.primary,
+    backgroundColor: theme.colors.brand.primarySoft,
+  },
   teamTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -431,8 +562,21 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
   },
+  badgeColumn: {
+    alignItems: "flex-end",
+    gap: theme.spacing.sm,
+  },
+  selectedBadge: {
+    backgroundColor: theme.colors.brand.primary,
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
+  },
   athleteBadge: {
-    backgroundColor: theme.colors.brand.primarySoft,
+    backgroundColor: theme.colors.background.surface,
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
@@ -445,5 +589,52 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
+  },
+  memberList: {
+    gap: theme.spacing.md,
+  },
+  memberCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  memberMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  memberButton: {
+    minWidth: 128,
+  },
+  cardPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

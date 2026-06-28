@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { demoTeamSyncData } from "@/data/demoTeamSyncData";
 import type {
   Announcement,
+  Club,
   ScheduleEvent,
   Team,
   TeamSyncAppData,
@@ -49,6 +50,42 @@ export const teamSyncService = {
   async getCurrentClub() {
     const data = await loadAppData();
     return data.club;
+  },
+
+  async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
+    const data = await loadAppData();
+    const updatedAt = nowIso();
+    const nextCurrentUser: UserProfile = {
+      ...data.currentUser,
+      ...updates,
+      updatedAt,
+    };
+
+    return saveAppData({
+      ...data,
+      currentUser: nextCurrentUser,
+      users: data.users.map((user) => {
+        if (user.id !== nextCurrentUser.id) {
+          return user;
+        }
+
+        return nextCurrentUser;
+      }),
+    });
+  },
+
+  async updateCurrentClub(updates: Partial<Pick<Club, "name" | "sport" | "city" | "code" | "logoUrl" | "primaryColor">>) {
+    const data = await loadAppData();
+    const nextClub: Club = {
+      ...data.club,
+      ...updates,
+      updatedAt: nowIso(),
+    };
+
+    return saveAppData({
+      ...data,
+      club: nextClub,
+    });
   },
 
   async listUsersByClub(clubId: string) {

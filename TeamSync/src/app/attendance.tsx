@@ -1,5 +1,4 @@
-import { Link } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -60,28 +59,54 @@ const initialAttendanceList: AthleteAttendance[] = [
   },
 ];
 
+function getCurrentSaveLabel() {
+  const time = new Date().toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `Şimdi · ${time}`;
+}
+
 export default function AttendanceScreen() {
-  const [attendanceList, setAttendanceList] = useState<AthleteAttendance[]>(
-    initialAttendanceList
+  const [attendanceList, setAttendanceList] =
+    useState<AthleteAttendance[]>(initialAttendanceList);
+  const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
+  const [statusMessage, setStatusMessage] = useState(
+    "Yoklama değişiklikleri şimdilik bu oturum içinde tutuluyor."
   );
 
-  const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
+  const attendanceSummary = useMemo(() => {
+    const presentCount = attendanceList.filter(
+      (athlete) => athlete.status === "Katıldı"
+    ).length;
 
-  const presentCount = attendanceList.filter(
-    (athlete) => athlete.status === "Katıldı"
-  ).length;
+    const absentCount = attendanceList.filter(
+      (athlete) => athlete.status === "Katılmadı"
+    ).length;
 
-  const absentCount = attendanceList.filter(
-    (athlete) => athlete.status === "Katılmadı"
-  ).length;
+    const lateCount = attendanceList.filter(
+      (athlete) => athlete.status === "Geç kaldı"
+    ).length;
 
-  const lateCount = attendanceList.filter(
-    (athlete) => athlete.status === "Geç kaldı"
-  ).length;
+    const excusedCount = attendanceList.filter(
+      (athlete) => athlete.status === "Mazeretli"
+    ).length;
 
-  const excusedCount = attendanceList.filter(
-    (athlete) => athlete.status === "Mazeretli"
-  ).length;
+    const totalCount = attendanceList.length;
+    const activeCount = presentCount + lateCount;
+    const attendanceRate =
+      totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
+
+    return {
+      presentCount,
+      absentCount,
+      lateCount,
+      excusedCount,
+      totalCount,
+      attendanceRate,
+    };
+  }, [attendanceList]);
 
   function updateAttendanceStatus(
     athleteId: number,
@@ -99,31 +124,35 @@ export default function AttendanceScreen() {
         return athlete;
       })
     );
+
+    setStatusMessage("Yoklama güncellendi. Kaydetmeyi unutma.");
   }
 
   function handleSaveAttendance() {
-    setLastSavedAt("Şimdi");
+    setLastSavedAt(getCurrentSaveLabel());
+    setStatusMessage("Yoklama kaydedildi.");
+  }
+
+  function resetAttendance() {
+    setAttendanceList(initialAttendanceList);
+    setLastSavedAt("Henüz kaydedilmedi");
+    setStatusMessage("Yoklama demo haline sıfırlandı.");
   }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>Yoklama</Text>
-            <Text style={styles.pageSubtitle}>
-              Koçlar sporcuların antrenman katılım durumunu buradan takip eder.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Yoklama</Text>
+          <Text style={styles.pageSubtitle}>
+            Koçlar sporcuların antrenman katılım durumunu buradan takip eder.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Antrenman takibi</Text>
-
           <Text style={styles.heroTitle}>U16 Erkek yoklaması</Text>
-
           <Text style={styles.heroSubtitle}>
             Sporcuları Katıldı, Katılmadı, Geç kaldı veya Mazeretli olarak
             işaretleyebilirsin.
@@ -132,37 +161,41 @@ export default function AttendanceScreen() {
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{presentCount}</Text>
+            <Text style={styles.statValue}>
+              {attendanceSummary.presentCount}
+            </Text>
             <Text style={styles.statLabel}>Katıldı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{absentCount}</Text>
+            <Text style={styles.statValue}>{attendanceSummary.absentCount}</Text>
             <Text style={styles.statLabel}>Katılmadı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{lateCount}</Text>
+            <Text style={styles.statValue}>{attendanceSummary.lateCount}</Text>
             <Text style={styles.statLabel}>Geç kaldı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{excusedCount}</Text>
+            <Text style={styles.statValue}>
+              {attendanceSummary.excusedCount}
+            </Text>
             <Text style={styles.statLabel}>Mazeretli</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <View style={styles.listHeader}>
-            <View>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>Sporcu listesi</Text>
               <Text style={styles.sectionSubtitle}>
                 Son kayıt: {lastSavedAt}
               </Text>
             </View>
 
-            <Text style={styles.countText}>
-              {attendanceList.length} sporcu
+            <Text style={styles.statusPill}>
+              %{attendanceSummary.attendanceRate} katılım
             </Text>
           </View>
 
@@ -192,14 +225,14 @@ export default function AttendanceScreen() {
                         }
                         style={({ pressed }) => [
                           styles.statusButton,
-                          isSelected && styles.statusButtonSelected,
-                          pressed && styles.statusButtonPressed,
+                          isSelected ? styles.statusButtonSelected : null,
+                          pressed ? styles.pressed : null,
                         ]}
                       >
                         <Text
                           style={[
                             styles.statusButtonText,
-                            isSelected && styles.statusButtonTextSelected,
+                            isSelected ? styles.statusButtonTextSelected : null,
                           ]}
                         >
                           {status}
@@ -212,25 +245,23 @@ export default function AttendanceScreen() {
             ))}
           </View>
 
-          <Pressable
-            onPress={handleSaveAttendance}
-            style={({ pressed }) => [
-              styles.saveButton,
-              pressed && styles.saveButtonPressed,
-            ]}
-          >
-            <Text style={styles.saveButtonText}>Yoklamayı kaydet</Text>
-          </Pressable>
-        </View>
+          <View style={styles.actionRow}>
+            <AppButton
+              title="Yoklamayı kaydet"
+              onPress={handleSaveAttendance}
+              style={styles.actionButton}
+            />
 
-        <Link href="/dashboard" asChild>
-          <AppButton
-            title="Dashboard'a dön"
-            variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
-          />
-        </Link>
+            <AppButton
+              title="Sıfırla"
+              variant="ghost"
+              onPress={resetAttendance}
+              style={styles.actionButton}
+            />
+          </View>
+
+          <Text style={styles.statusText}>{statusMessage}</Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -244,34 +275,34 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
   },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
@@ -313,7 +344,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 180,
+    flexBasis: 145,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.xl,
@@ -341,12 +372,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  listHeader: {
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
@@ -359,17 +393,21 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
   },
-  countText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
   attendanceList: {
     gap: theme.spacing.md,
   },
   athleteCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
@@ -416,35 +454,31 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.brand.primary,
     borderColor: theme.colors.brand.primary,
   },
-  statusButtonPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
   statusButtonText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.secondary,
   },
   statusButtonTextSelected: {
     color: theme.colors.text.inverse,
   },
-  saveButton: {
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radius.lg,
-    paddingVertical: theme.spacing.lg,
-    alignItems: "center",
-    marginTop: theme.spacing.xl,
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing["2xl"],
   },
-  saveButtonPressed: {
+  actionButton: {
+    flexGrow: 1,
+  },
+  statusText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
+  },
+  pressed: {
     opacity: 0.84,
     transform: [{ scale: 0.99 }],
-  },
-  saveButtonText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
   },
 });

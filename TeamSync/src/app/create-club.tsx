@@ -1,5 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Link, useRouter } from "expo-router";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -7,41 +6,41 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
 
 const t = translations[defaultLanguage];
 
-const CLUB_STORAGE_KEY = "teamsync_created_club_data";
-const PROFILE_STORAGE_KEY = "teamsync_profile_data";
+function getParamValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
 
-type CreatedClubData = {
-  name: string;
-  sport: string;
-  city: string;
-  code: string;
-};
+  return value ?? "";
+}
 
-type ProfileData = {
-  name: string;
-  email: string;
-  club: string;
-  team: string;
-  role: string;
-  season: string;
-  membership: string;
-};
+function generatePreviewCode(clubName: string) {
+  const prefix = clubName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "")
+    .slice(0, 3);
+
+  return `${prefix || "TS"}${new Date().getFullYear()}`;
+}
 
 export default function CreateClubScreen() {
   const router = useRouter();
+  const { fullName, email } = useLocalSearchParams();
+
+  const ownerFullName = getParamValue(fullName);
+  const ownerEmail = getParamValue(email);
 
   const [clubName, setClubName] = useState("");
   const [sport, setSport] = useState("");
   const [city, setCity] = useState("");
   const [error, setError] = useState("");
 
-  const previewCode =
-    clubName.trim() === ""
-      ? "TS-2026"
-      : `${clubName.trim().slice(0, 2).toUpperCase()}-2026`;
+  const previewCode = generatePreviewCode(clubName);
 
   async function handleCreateClub() {
     const trimmedClubName = clubName.trim();
@@ -63,33 +62,19 @@ export default function CreateClubScreen() {
       return;
     }
 
-    const createdClubData: CreatedClubData = {
-      name: trimmedClubName,
-      sport: trimmedSport,
-      city: trimmedCity,
-      code: previewCode,
-    };
-
-    const demoProfileData: ProfileData = {
-      name: "Yönetici",
-      email: "demo@teamsync.app",
-      club: trimmedClubName,
-      team: `${trimmedSport} Takımı`,
-      role: "Kulüp yöneticisi",
-      season: "2026 Bahar",
-      membership: "Kulüp öder, veli/sporcu ücretsiz",
-    };
-
     try {
-      await AsyncStorage.multiSet([
-        [CLUB_STORAGE_KEY, JSON.stringify(createdClubData)],
-        [PROFILE_STORAGE_KEY, JSON.stringify(demoProfileData)],
-      ]);
+      await teamSyncService.createClubWorkspace({
+        ownerFullName: ownerFullName || "Kulüp Yöneticisi",
+        ownerEmail: ownerEmail || "demo@teamsync.app",
+        clubName: trimmedClubName,
+        sport: trimmedSport,
+        city: trimmedCity,
+      });
 
       setError("");
       router.replace("/dashboard");
     } catch {
-      setError("Kulüp bilgileri kaydedilirken bir sorun oluştu.");
+      setError("Kulüp bilgileri merkezi data service içine kaydedilirken bir sorun oluştu.");
     }
   }
 
@@ -106,6 +91,12 @@ export default function CreateClubScreen() {
           Kulübünüz için TeamSync çalışma alanını hazırlayın. Oyuncular,
           veliler ve koçlar daha sonra kulüp kodu ile katılabilecek.
         </Text>
+
+        <View style={styles.ownerBox}>
+          <Text style={styles.ownerLabel}>Kayıt bilgileri</Text>
+          <Text style={styles.ownerText}>{ownerFullName || "İsim register ekranından gelecek"}</Text>
+          <Text style={styles.ownerText}>{ownerEmail || "E-posta register ekranından gelecek"}</Text>
+        </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
@@ -152,8 +143,7 @@ export default function CreateClubScreen() {
           <Text style={styles.codePreviewLabel}>Oluşacak örnek kulüp kodu</Text>
           <Text style={styles.codePreviewValue}>{previewCode}</Text>
           <Text style={styles.codePreviewHint}>
-            Bu kodu ileride oyuncu, veli ve koçlar kulübe katılmak için
-            kullanacak.
+            Bu kod merkezi TeamSync datasına kaydedilecek. İleride oyuncu, veli ve koçlar kulübe katılmak için kullanacak.
           </Text>
         </View>
 
@@ -229,6 +219,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
+  },
+  ownerBox: {
+    width: "100%",
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  ownerLabel: {
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+    marginBottom: theme.spacing.sm,
+  },
+  ownerText: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    marginTop: theme.spacing.xs,
   },
   form: {
     width: "100%",

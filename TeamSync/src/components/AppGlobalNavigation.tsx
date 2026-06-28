@@ -1,9 +1,10 @@
 import { router, usePathname } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppDrawer } from "@/components/AppDrawer";
+import { AppDataDrawer } from "@/components/AppDataDrawer";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
 
 const routesWithoutTopControls = [
   "/",
@@ -14,9 +15,47 @@ const routesWithoutTopControls = [
   "/join-request-sent",
 ];
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TS";
+}
+
 export function AppGlobalNavigation() {
   const pathname = usePathname();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
+  const [profileInitials, setProfileInitials] = useState("TS");
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadProfileInitials() {
+      try {
+        const currentUser = await teamSyncService.getCurrentUser();
+
+        if (isActive) {
+          setProfileInitials(getInitials(currentUser.fullName));
+        }
+      } catch {
+        if (isActive) {
+          setProfileInitials("TS");
+        }
+      }
+    }
+
+    loadProfileInitials();
+
+    return () => {
+      isActive = false;
+    };
+  }, [pathname]);
 
   if (routesWithoutTopControls.includes(pathname)) {
     return null;
@@ -41,14 +80,14 @@ export function AppGlobalNavigation() {
             style={({ pressed }) => [styles.profileButton, pressed ? styles.pressed : null]}
             accessibilityLabel="Profil sayfasına git"
           >
-            <Text style={styles.profileText}>MA</Text>
+            <Text style={styles.profileText}>{profileInitials}</Text>
           </Pressable>
         ) : (
           <View style={styles.profileSpacer} />
         )}
       </View>
 
-      <AppDrawer visible={drawerIsOpen} onClose={() => setDrawerIsOpen(false)} />
+      <AppDataDrawer visible={drawerIsOpen} onClose={() => setDrawerIsOpen(false)} />
     </View>
   );
 }

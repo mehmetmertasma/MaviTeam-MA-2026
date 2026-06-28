@@ -16,6 +16,13 @@ function getNextRoute(value: string | string[] | undefined) {
   return "/create-club";
 }
 
+function isValidEmail(value: string) {
+  const trimmedValue = value.trim();
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  return emailPattern.test(trimmedValue);
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { next } = useLocalSearchParams();
@@ -25,13 +32,21 @@ export default function RegisterScreen() {
   const [statusMessage, setStatusMessage] = useState("Bilgilerini girip devam edebilirsin.");
 
   function handleContinue() {
-    if (fullName.trim() === "") {
+    const trimmedName = fullName.trim();
+    const trimmedEmail = contactInfo.trim().toLowerCase();
+
+    if (trimmedName === "") {
       setStatusMessage("Lütfen ad soyad bilgisini giriniz.");
       return;
     }
 
-    if (contactInfo.trim() === "") {
-      setStatusMessage("Lütfen iletişim bilgisini giriniz.");
+    if (trimmedEmail === "") {
+      setStatusMessage("Lütfen e-posta adresini giriniz.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setStatusMessage("Lütfen geçerli bir e-posta adresi giriniz. Örn. isim@email.com");
       return;
     }
 
@@ -63,15 +78,16 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>İletişim</Text>
+            <Text style={styles.label}>E-posta</Text>
             <TextInput
               value={contactInfo}
               onChangeText={setContactInfo}
-              placeholder="E-posta adresini gir"
+              placeholder="ornek@email.com"
               placeholderTextColor={theme.colors.text.muted}
+              keyboardType="email-address"
               autoCapitalize="none"
               style={styles.input}
-              accessibilityLabel="İletişim bilgisi"
+              accessibilityLabel="E-posta adresi"
             />
           </View>
         </View>

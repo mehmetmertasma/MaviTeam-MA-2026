@@ -62,10 +62,10 @@ type DashboardData = {
 const PROFILE_STORAGE_KEY = "teamsync_profile_data";
 
 const startingProfileData: ProfileData = {
-  name: "Mert Asma",
-  email: "mertasma7580@gmail.com",
-  club: "İstanbul Voleybol Kulübü",
-  team: "U16 Erkek",
+  name: "Yönetici",
+  email: "demo@teamsync.app",
+  club: "Demo Voleybol Kulübü",
+  team: "Voleybol Takımı",
   role: "Kulüp yöneticisi",
   season: "2026 Bahar",
   membership: "Kulüp öder, veli/sporcu ücretsiz",
@@ -107,8 +107,8 @@ const roleOptions: RoleOption[] = [
 
 const dashboardData: Record<UserRole, DashboardData> = {
   admin: {
-    welcomeTitle: "Hoş geldin, Mert",
-    clubSubtitle: "İstanbul Voleybol Kulübü",
+    welcomeTitle: "Hoş geldin",
+    clubSubtitle: "Demo Voleybol Kulübü",
     heroTitle: "Kulüp yönetim paneli",
     heroSubtitle:
       "Üyeleri, takımları, duyuruları, programları, ödemeleri ve mesajları tek yerden yönet.",
@@ -137,7 +137,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
   },
   coach: {
     welcomeTitle: "Koç paneli",
-    clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
+    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
     heroTitle: "Takımını yönet",
     heroSubtitle:
       "Antrenman planlarını, oyuncu katılımını, uygunluk cevaplarını ve mesajları hızlıca takip et.",
@@ -156,7 +156,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
       { title: "Video / drill paylaş", meta: "Replays ekranına git", route: "/replays" },
     ],
     overview: [
-      { label: "Takım", value: "U17 Erkek" },
+      { label: "Takım", value: "Voleybol Takımı" },
       { label: "Rolün", value: "Koç" },
       { label: "Sıradaki antrenman", value: "Bugün 18:30" },
       { label: "Katılım takibi", value: "Açık" },
@@ -164,7 +164,7 @@ const dashboardData: Record<UserRole, DashboardData> = {
   },
   parent: {
     welcomeTitle: "Veli paneli",
-    clubSubtitle: "Efe Asma · İstanbul Voleybol Kulübü",
+    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
     heroTitle: "Çocuğunun takım sürecini takip et",
     heroSubtitle:
       "Antrenman saatlerini, maç programını, duyuruları, mesajları ve ödeme durumunu tek yerden gör.",
@@ -183,15 +183,15 @@ const dashboardData: Record<UserRole, DashboardData> = {
       { title: "İstatistikleri gör", meta: "Katılım ve performans özeti", route: "/statistics" },
     ],
     overview: [
-      { label: "Sporcu", value: "Efe Asma" },
+      { label: "Sporcu", value: "Yönetici" },
       { label: "Rolün", value: "Veli" },
-      { label: "Takım", value: "U17 Erkek" },
+      { label: "Takım", value: "Voleybol Takımı" },
       { label: "Ödeme", value: "Haziran ödendi" },
     ],
   },
   athlete: {
     welcomeTitle: "Sporcu paneli",
-    clubSubtitle: "U17 Erkek · İstanbul Voleybol Kulübü",
+    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
     heroTitle: "Kendi takım programını takip et",
     heroSubtitle:
       "Antrenmanlarını, maçlarını, duyuruları ve takım mesajlarını gör. Uygunluk durumunu koçuna bildir.",
@@ -210,9 +210,9 @@ const dashboardData: Record<UserRole, DashboardData> = {
       { title: "İstatistiklerimi gör", meta: "Katılım ve performans özeti", route: "/statistics" },
     ],
     overview: [
-      { label: "Sporcu", value: "Mert Asma" },
+      { label: "Sporcu", value: "Yönetici" },
       { label: "Rolün", value: "Sporcu" },
-      { label: "Takım", value: "U17 Erkek" },
+      { label: "Takım", value: "Voleybol Takımı" },
       { label: "Sıradaki etkinlik", value: "Bugün 18:30 antrenman" },
     ],
   },

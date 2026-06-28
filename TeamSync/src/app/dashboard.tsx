@@ -1,12 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
-
-type UserRole = "admin" | "coach" | "parent" | "athlete";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { ScheduleEvent, TeamSyncAppData, UserRole } from "@/types/teamSync";
 
 type AppRoute =
   | "/teams"
@@ -18,223 +17,83 @@ type AppRoute =
   | "/availability"
   | "/statistics"
   | "/replays"
-  | "/payments";
-
-type ProfileData = {
-  name: string;
-  email: string;
-  club: string;
-  team: string;
-  role: string;
-  season: string;
-  membership: string;
-};
-
-type RoleOption = {
-  id: UserRole;
-  title: string;
-  tag: string;
-  description: string;
-};
+  | "/payments"
+  | "/profile";
 
 type QuickAction = {
   title: string;
   meta: string;
-  route?: AppRoute;
-};
-
-type DashboardData = {
-  welcomeTitle: string;
-  clubSubtitle: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  stats: {
-    label: string;
-    value: string;
-  }[];
-  actions: QuickAction[];
-  overview: {
-    label: string;
-    value: string;
-  }[];
-};
-
-const PROFILE_STORAGE_KEY = "teamsync_profile_data";
-
-const startingProfileData: ProfileData = {
-  name: "Yönetici",
-  email: "demo@teamsync.app",
-  club: "Demo Voleybol Kulübü",
-  team: "Voleybol Takımı",
-  role: "Kulüp yöneticisi",
-  season: "2026 Bahar",
-  membership: "Kulüp öder, veli/sporcu ücretsiz",
+  route: AppRoute;
 };
 
 const roleDisplayNames: Record<UserRole, string> = {
-  admin: "Kulüp yöneticisi",
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
   coach: "Koç",
   parent: "Veli",
   athlete: "Sporcu",
 };
 
-const roleOptions: RoleOption[] = [
-  {
-    id: "admin",
-    title: "Kulüp Yöneticisi",
-    tag: "Admin",
-    description: "Kulübü, takımları, üyeleri ve ödemeleri yönetir.",
+const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = {
+  superAdmin: {
+    title: "Platform kontrol merkezi",
+    subtitle: "Kulüpleri, kullanıcıları ve TeamSync sistemini merkezi data üzerinden takip et.",
   },
-  {
-    id: "coach",
-    title: "Koç",
-    tag: "Coach",
-    description: "Antrenmanları planlar, yoklama alır ve takımı takip eder.",
-  },
-  {
-    id: "parent",
-    title: "Veli",
-    tag: "Parent",
-    description: "Çocuğunun programını, duyurularını ve ödemelerini takip eder.",
-  },
-  {
-    id: "athlete",
-    title: "Sporcu",
-    tag: "Athlete",
-    description: "Kendi programını görür ve uygunluk durumunu bildirir.",
-  },
-];
-
-const dashboardData: Record<UserRole, DashboardData> = {
-  admin: {
-    welcomeTitle: "Hoş geldin",
-    clubSubtitle: "Demo Voleybol Kulübü",
-    heroTitle: "Kulüp yönetim paneli",
-    heroSubtitle:
-      "Üyeleri, takımları, duyuruları, programları, ödemeleri ve mesajları tek yerden yönet.",
-    stats: [
-      { label: "Sporcu", value: "128" },
-      { label: "Takım", value: "7" },
-      { label: "Bekleyen onay", value: "12" },
-      { label: "Etkinlik", value: "24" },
-    ],
-    actions: [
-      { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
-      { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
-      { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-      { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
-      { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-      { title: "Yoklama yönet", meta: "Katılım durumları", route: "/attendance" },
-      { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
-      { title: "İstatistikleri gör", meta: "Performans ve kulüp özeti", route: "/statistics" },
-    ],
-    overview: [
-      { label: "Aktif sezon", value: "2026 Bahar" },
-      { label: "Rolün", value: "Kulüp yöneticisi" },
-      { label: "Davet kodu", value: "TS-2026" },
-      { label: "Üyelik modeli", value: "Kulüp öder, veli/sporcu ücretsiz" },
-    ],
+  clubAdmin: {
+    title: "Kulüp yönetim paneli",
+    subtitle: "Kulübünü, takımlarını, üyelerini, duyurularını, programını ve ödemelerini tek yerden yönet.",
   },
   coach: {
-    welcomeTitle: "Koç paneli",
-    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
-    heroTitle: "Takımını yönet",
-    heroSubtitle:
-      "Antrenman planlarını, oyuncu katılımını, uygunluk cevaplarını ve mesajları hızlıca takip et.",
-    stats: [
-      { label: "Oyuncu", value: "18" },
-      { label: "Bu hafta", value: "4" },
-      { label: "Yaklaşan maç", value: "2" },
-      { label: "Cevap bekleyen", value: "3" },
-    ],
-    actions: [
-      { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
-      { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
-      { title: "Uygunluk cevapları", meta: "Kim geliyor, kim gelmiyor?", route: "/availability" },
-      { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
-      { title: "Mesajları aç", meta: "Veli ve sporcularla iletişim", route: "/messages" },
-      { title: "Video / drill paylaş", meta: "Replays ekranına git", route: "/replays" },
-    ],
-    overview: [
-      { label: "Takım", value: "Voleybol Takımı" },
-      { label: "Rolün", value: "Koç" },
-      { label: "Sıradaki antrenman", value: "Bugün 18:30" },
-      { label: "Katılım takibi", value: "Açık" },
-    ],
+    title: "Takımını yönet",
+    subtitle: "Antrenman planlarını, yoklamayı, uygunluk cevaplarını ve takım mesajlarını takip et.",
   },
   parent: {
-    welcomeTitle: "Veli paneli",
-    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
-    heroTitle: "Çocuğunun takım sürecini takip et",
-    heroSubtitle:
-      "Antrenman saatlerini, maç programını, duyuruları, mesajları ve ödeme durumunu tek yerden gör.",
-    stats: [
-      { label: "Antrenman", value: "3" },
-      { label: "Maç", value: "1" },
-      { label: "Duyuru", value: "2" },
-      { label: "Ödeme", value: "OK" },
-    ],
-    actions: [
-      { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-      { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-      { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-      { title: "Uygunluk bildir", meta: "Çocuğun için katılım bildir", route: "/availability" },
-      { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
-      { title: "İstatistikleri gör", meta: "Katılım ve performans özeti", route: "/statistics" },
-    ],
-    overview: [
-      { label: "Sporcu", value: "Yönetici" },
-      { label: "Rolün", value: "Veli" },
-      { label: "Takım", value: "Voleybol Takımı" },
-      { label: "Ödeme", value: "Haziran ödendi" },
-    ],
+    title: "Çocuğunun takım sürecini takip et",
+    subtitle: "Programı, duyuruları, mesajları ve ödeme durumunu tek yerden gör.",
   },
   athlete: {
-    welcomeTitle: "Sporcu paneli",
-    clubSubtitle: "Voleybol Takımı · Demo Voleybol Kulübü",
-    heroTitle: "Kendi takım programını takip et",
-    heroSubtitle:
-      "Antrenmanlarını, maçlarını, duyuruları ve takım mesajlarını gör. Uygunluk durumunu koçuna bildir.",
-    stats: [
-      { label: "Antrenman", value: "3" },
-      { label: "Maç", value: "1" },
-      { label: "Duyuru", value: "2" },
-      { label: "Uygunluk", value: "✓" },
-    ],
-    actions: [
-      { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-      { title: "Uygunluk bildir", meta: "Geliyorum / gelemiyorum", route: "/availability" },
-      { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
-      { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-      { title: "Video / drill izle", meta: "Koçun paylaştığı içerikler", route: "/replays" },
-      { title: "İstatistiklerimi gör", meta: "Katılım ve performans özeti", route: "/statistics" },
-    ],
-    overview: [
-      { label: "Sporcu", value: "Yönetici" },
-      { label: "Rolün", value: "Sporcu" },
-      { label: "Takım", value: "Voleybol Takımı" },
-      { label: "Sıradaki etkinlik", value: "Bugün 18:30 antrenman" },
-    ],
+    title: "Kendi takım programını takip et",
+    subtitle: "Antrenmanlarını, maçlarını, duyuruları ve takım mesajlarını gör.",
   },
 };
 
-const upcomingEvents = [
-  {
-    title: "U17 Erkek antrenmanı",
-    time: "Bugün, 18:30",
-    location: "Burhan Felek Spor Salonu",
-  },
-  {
-    title: "Hazırlık maçı",
-    time: "Yarın, 20:00",
-    location: "Kadıköy Spor Kompleksi",
-  },
-  {
-    title: "Veli bilgilendirme toplantısı",
-    time: "Cuma, 19:00",
-    location: "Kulüp Toplantı Salonu",
-  },
-];
+const quickActionsByRole: Record<UserRole, QuickAction[]> = {
+  superAdmin: [
+    { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" as AppRoute },
+    { title: "İstatistikleri gör", meta: "Platform ve kulüp özeti", route: "/statistics" },
+    { title: "Profil bilgileri", meta: "Hesap merkezine git", route: "/profile" },
+  ],
+  clubAdmin: [
+    { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
+    { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
+    { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+    { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+    { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
+    { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
+  ],
+  coach: [
+    { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
+    { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
+    { title: "Uygunluk cevapları", meta: "Kim geliyor, kim gelmiyor?", route: "/availability" },
+    { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
+    { title: "Mesajları aç", meta: "Veli ve sporcularla iletişim", route: "/messages" },
+    { title: "Video / drill paylaş", meta: "Replays ekranına git", route: "/replays" },
+  ],
+  parent: [
+    { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+    { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+    { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+    { title: "Uygunluk bildir", meta: "Çocuğun için katılım bildir", route: "/availability" },
+    { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
+  ],
+  athlete: [
+    { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+    { title: "Uygunluk bildir", meta: "Geliyorum / gelemiyorum", route: "/availability" },
+    { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
+    { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+    { title: "Video / drill izle", meta: "Koçun paylaştığı içerikler", route: "/replays" },
+  ],
+};
 
 function getFirstName(name: string) {
   const trimmedName = name.trim();
@@ -246,46 +105,54 @@ function getFirstName(name: string) {
   return trimmedName.split(" ")[0];
 }
 
-function getDashboardSubtitle(role: UserRole, profileData: ProfileData) {
-  if (role === "admin") {
-    return profileData.club;
+function formatEventTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok";
   }
 
-  return `${profileData.team} · ${profileData.club}`;
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function getUpcomingEvents(events: ScheduleEvent[]) {
+  return [...events]
+    .sort((firstEvent, secondEvent) => {
+      return new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime();
+    })
+    .slice(0, 3);
 }
 
 export default function DashboardScreen() {
-  const [activeRole, setActiveRole] = useState<UserRole>("admin");
-  const [savedProfileData, setSavedProfileData] =
-    useState<ProfileData>(startingProfileData);
-
-  const currentDashboard = dashboardData[activeRole];
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [statusMessage, setStatusMessage] = useState("Merkezi data yükleniyor...");
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function loadSavedProfile() {
+      async function loadDashboardData() {
         try {
-          const savedProfile = await AsyncStorage.getItem(PROFILE_STORAGE_KEY);
-
-          if (savedProfile === null) {
-            return;
-          }
-
-          const parsedProfile = JSON.parse(savedProfile) as ProfileData;
+          const loadedAppData = await teamSyncService.getAppData();
 
           if (isActive) {
-            setSavedProfileData(parsedProfile);
+            setAppData(loadedAppData);
+            setStatusMessage("Dashboard merkezi TeamSync datasından yüklendi.");
           }
         } catch {
           if (isActive) {
-            setSavedProfileData(startingProfileData);
+            setAppData(null);
+            setStatusMessage("Dashboard datası yüklenirken bir sorun oluştu.");
           }
         }
       }
 
-      loadSavedProfile();
+      loadDashboardData();
 
       return () => {
         isActive = false;
@@ -293,46 +160,74 @@ export default function DashboardScreen() {
     }, [])
   );
 
-  const dashboardWelcome = `Hoş geldin, ${getFirstName(savedProfileData.name)}`;
-  const dashboardSubtitle = getDashboardSubtitle(activeRole, savedProfileData);
-
-  const overviewItems = currentDashboard.overview.map((item) => {
-    if (item.label === "Aktif sezon") {
-      return { ...item, value: savedProfileData.season };
+  const dashboardModel = useMemo(() => {
+    if (appData === null) {
+      return null;
     }
 
-    if (item.label === "Rolün") {
-      return { ...item, value: roleDisplayNames[activeRole] };
-    }
+    const { club, currentUser, users, teams, announcements, scheduleEvents, payments, joinRequests } = appData;
+    const activeUsers = users.filter((user) => user.status === "active");
+    const athleteCount = activeUsers.filter((user) => user.role === "athlete").length;
+    const pendingRequestCount = joinRequests.filter((request) => request.status === "pending").length;
+    const unpaidPaymentCount = payments.filter((payment) => payment.status !== "paid").length;
+    const primaryTeam = teams.find((team) => currentUser.teamIds.includes(team.id));
+    const heroText = roleHeroText[currentUser.role];
 
-    if (item.label === "Takım") {
-      return { ...item, value: savedProfileData.team };
-    }
+    return {
+      club,
+      currentUser,
+      primaryTeam,
+      heroText,
+      quickActions: quickActionsByRole[currentUser.role],
+      upcomingEvents: getUpcomingEvents(scheduleEvents),
+      stats: [
+        { label: "Aktif üye", value: String(activeUsers.length) },
+        { label: "Sporcu", value: String(athleteCount) },
+        { label: "Takım", value: String(teams.length) },
+        { label: "Etkinlik", value: String(scheduleEvents.length) },
+        { label: "Duyuru", value: String(announcements.length) },
+        { label: "Bekleyen onay", value: String(pendingRequestCount) },
+      ],
+      overview: [
+        { label: "Kulüp", value: club.name },
+        { label: "Rolün", value: roleDisplayNames[currentUser.role] },
+        { label: "Takım", value: primaryTeam?.name ?? "Takım seçilmedi" },
+        { label: "Kulüp kodu", value: club.code },
+        { label: "Şehir", value: club.city },
+        { label: "Ödeme kontrol", value: unpaidPaymentCount === 0 ? "Sorun yok" : `${unpaidPaymentCount} açık ödeme` },
+        { label: "Data modu", value: "AsyncStorage service layer" },
+      ],
+    };
+  }, [appData]);
 
-    if (item.label === "Üyelik modeli") {
-      return { ...item, value: savedProfileData.membership };
-    }
-
-    if (item.label === "Sporcu") {
-      return { ...item, value: savedProfileData.name };
-    }
-
-    return item;
-  });
+  if (dashboardModel === null) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+        <View style={styles.container}>
+          <View style={styles.pageHeader}>
+            <Text style={styles.logo}>TeamSync</Text>
+            <Text style={styles.welcome}>Dashboard</Text>
+            <Text style={styles.subtitle}>{statusMessage}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-          <Text style={styles.welcome}>{dashboardWelcome}</Text>
-          <Text style={styles.subtitle}>{dashboardSubtitle}</Text>
+          <Text style={styles.welcome}>Hoş geldin, {getFirstName(dashboardModel.currentUser.fullName)}</Text>
+          <Text style={styles.subtitle}>{dashboardModel.club.name}</Text>
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Rol bazlı kontrol paneli</Text>
-          <Text style={styles.heroTitle}>{currentDashboard.heroTitle}</Text>
-          <Text style={styles.heroSubtitle}>{currentDashboard.heroSubtitle}</Text>
+          <Text style={styles.heroLabel}>Merkezi data paneli</Text>
+          <Text style={styles.heroTitle}>{dashboardModel.heroText.title}</Text>
+          <Text style={styles.heroSubtitle}>{dashboardModel.heroText.subtitle}</Text>
+          <Text style={styles.statusText}>{statusMessage}</Text>
 
           <AppButton
             title="Profili düzenle"
@@ -344,7 +239,7 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.statsGrid}>
-          {currentDashboard.stats.map((stat) => (
+          {dashboardModel.stats.map((stat) => (
             <View key={stat.label} style={styles.statCard}>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
@@ -353,60 +248,18 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rol seçimi</Text>
+          <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
           <Text style={styles.sectionSubtitle}>
-            Şimdilik gerçek giriş sistemi yok. Bu bölümle farklı kullanıcı rollerinin dashboard’da nasıl görüneceğini test ediyoruz.
+            Bu butonlar kullanıcının gerçek rolüne göre merkezi datadan gelen role bilgisiyle gösteriliyor.
           </Text>
 
-          <View style={styles.roleGrid}>
-            {roleOptions.map((role) => {
-              const isActive = activeRole === role.id;
-
-              return (
-                <Pressable
-                  key={role.id}
-                  onPress={() => setActiveRole(role.id)}
-                  style={({ pressed }) => [
-                    styles.roleCard,
-                    isActive ? styles.roleCardActive : null,
-                    pressed ? styles.cardPressed : null,
-                  ]}
-                >
-                  <View style={styles.roleHeader}>
-                    <Text style={[styles.roleTitle, isActive ? styles.roleTitleActive : null]}>
-                      {role.title}
-                    </Text>
-                    <Text style={[styles.roleTag, isActive ? styles.roleTagActive : null]}>
-                      {role.tag}
-                    </Text>
-                  </View>
-
-                  <Text style={[styles.roleDescription, isActive ? styles.roleDescriptionActive : null]}>
-                    {role.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
-
           <View style={styles.actionGrid}>
-            {currentDashboard.actions.map((action) => {
+            {dashboardModel.quickActions.map((action) => {
               return (
                 <Pressable
                   key={action.title}
-                  onPress={() => {
-                    if (action.route !== undefined) {
-                      router.push(action.route as never);
-                    }
-                  }}
-                  style={({ pressed }) => [
-                    styles.actionCard,
-                    pressed ? styles.cardPressed : null,
-                  ]}
+                  onPress={() => router.push(action.route as never)}
+                  style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
                 >
                   <View style={styles.actionTextArea}>
                     <Text style={styles.actionText}>{action.title}</Text>
@@ -422,26 +275,30 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Yaklaşan etkinlikler</Text>
 
-          <View style={styles.eventList}>
-            {upcomingEvents.map((event) => (
-              <View key={event.title} style={styles.eventCard}>
-                <View style={styles.eventDot} />
+          {dashboardModel.upcomingEvents.length === 0 ? (
+            <Text style={styles.emptyText}>Henüz etkinlik yok.</Text>
+          ) : (
+            <View style={styles.eventList}>
+              {dashboardModel.upcomingEvents.map((event) => (
+                <View key={event.id} style={styles.eventCard}>
+                  <View style={styles.eventDot} />
 
-                <View style={styles.eventContent}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  <Text style={styles.eventTime}>{event.time}</Text>
-                  <Text style={styles.eventLocation}>{event.location}</Text>
+                  <View style={styles.eventContent}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventTime}>{formatEventTime(event.startsAt)}</Text>
+                    <Text style={styles.eventLocation}>{event.location}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Kulüp özeti</Text>
 
-          {overviewItems.map((item, index) => {
-            const isLastItem = index === overviewItems.length - 1;
+          {dashboardModel.overview.map((item, index) => {
+            const isLastItem = index === dashboardModel.overview.length - 1;
 
             return (
               <View key={item.label} style={isLastItem ? styles.infoRowLast : styles.infoRow}>
@@ -524,6 +381,12 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
   },
+  statusText: {
+    marginTop: theme.spacing.lg,
+    color: theme.colors.text.success,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+  },
   editProfileButton: {
     marginTop: theme.spacing["2xl"],
     alignSelf: "flex-start",
@@ -577,66 +440,15 @@ const styles = StyleSheet.create({
     lineHeight: theme.lineHeights.md,
     marginBottom: theme.spacing.xl,
   },
-  roleGrid: {
+  actionGrid: {
     gap: theme.spacing.md,
   },
-  roleCard: {
+  actionCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-  },
-  roleCardActive: {
-    backgroundColor: theme.colors.brand.primary,
-    borderColor: theme.colors.brand.primary,
-  },
-  roleHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  roleTitle: {
-    flex: 1,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-  },
-  roleTitleActive: {
-    color: theme.colors.text.inverse,
-  },
-  roleTag: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-  },
-  roleTagActive: {
-    backgroundColor: theme.colors.background.surface,
-  },
-  roleDescription: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
-  },
-  roleDescriptionActive: {
-    color: theme.colors.text.inverse,
-  },
-  actionGrid: {
-    gap: theme.spacing.md,
-  },
-  actionCard: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.brand.primarySoft,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
@@ -646,19 +458,28 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.brand,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   actionMeta: {
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
   },
   actionArrow: {
     color: theme.colors.text.brand,
-    fontSize: theme.fontSizes["2xl"],
+    fontSize: theme.fontSizes["3xl"],
     fontWeight: theme.fontWeights.black,
+  },
+  cardPressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
   },
   eventList: {
     gap: theme.spacing.md,
@@ -666,6 +487,7 @@ const styles = StyleSheet.create({
   eventCard: {
     flexDirection: "row",
     gap: theme.spacing.md,
+    alignItems: "flex-start",
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
@@ -673,11 +495,11 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   eventDot: {
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: theme.radius.full,
     backgroundColor: theme.colors.brand.primary,
-    marginTop: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
   },
   eventContent: {
     flex: 1,
@@ -695,39 +517,29 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   eventLocation: {
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
   },
   infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
   infoRowLast: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
     paddingTop: theme.spacing.lg,
+    gap: theme.spacing.sm,
   },
   infoLabel: {
-    flex: 1,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.secondary,
+    textTransform: "uppercase",
   },
   infoValue: {
-    flex: 1,
-    textAlign: "right",
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-  },
-  cardPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
   },
 });

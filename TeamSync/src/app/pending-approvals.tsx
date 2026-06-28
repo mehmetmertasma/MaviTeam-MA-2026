@@ -1,48 +1,26 @@
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { JoinRequest, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
 
-type MemberStatus = "pending" | "approved" | "rejected";
-
-type PendingMember = {
-  id: string;
-  name: string;
-  role: string;
-  team: string;
-  requestedAt: string;
-  status: MemberStatus;
+type RequestRow = {
+  request: JoinRequest;
+  user?: UserProfile;
 };
 
-const initialPendingMembers: PendingMember[] = [
-  {
-    id: "1",
-    name: "Efe Yılmaz",
-    role: "Sporcu",
-    team: "U16 Erkek",
-    requestedAt: "Bugün, 14:20",
-    status: "pending",
-  },
-  {
-    id: "2",
-    name: "Ayşe Yılmaz",
-    role: "Veli",
-    team: "U16 Erkek",
-    requestedAt: "Bugün, 14:23",
-    status: "pending",
-  },
-  {
-    id: "3",
-    name: "Can Demir",
-    role: "Koç",
-    team: "A Takım",
-    requestedAt: "Dün, 19:10",
-    status: "pending",
-  },
-];
+const roleDisplayNames: Record<UserRole, string> = {
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
+};
 
-function getStatusText(status: MemberStatus) {
+function getStatusText(status: JoinRequest["status"]) {
   if (status === "approved") {
     return "Onaylandı";
   }
@@ -54,46 +32,85 @@ function getStatusText(status: MemberStatus) {
   return "Onay bekliyor";
 }
 
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok";
+  }
+
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function PendingApprovalsScreen() {
-  const [members, setMembers] = useState<PendingMember[]>(initialPendingMembers);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet."
   );
 
+  const loadApprovalData = useCallback(async () => {
+    try {
+      const loadedAppData = await teamSyncService.getAppData();
+      setAppData(loadedAppData);
+      setStatusMessage("Bekleyen istekler merkezi TeamSync datasından yüklendi.");
+    } catch {
+      setStatusMessage("Bekleyen istekler yüklenirken bir sorun oluştu.");
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadApprovalData();
+    }, [loadApprovalData])
+  );
+
+  const requestRows = useMemo<RequestRow[]>(() => {
+    if (appData === null) {
+      return [];
+    }
+
+    return appData.joinRequests.map((request) => ({
+      request,
+      user: appData.users.find((user) => user.id === request.userId),
+    }));
+  }, [appData]);
+
   const summary = useMemo(() => {
-    const pendingCount = members.filter((member) => member.status === "pending").length;
-    const approvedCount = members.filter((member) => member.status === "approved").length;
-    const rejectedCount = members.filter((member) => member.status === "rejected").length;
+    const pendingCount = requestRows.filter((row) => row.request.status === "pending").length;
+    const approvedCount = requestRows.filter((row) => row.request.status === "approved").length;
+    const rejectedCount = requestRows.filter((row) => row.request.status === "rejected").length;
 
     return {
       pendingCount,
       approvedCount,
       rejectedCount,
-      totalCount: members.length,
+      totalCount: requestRows.length,
     };
-  }, [members]);
+  }, [requestRows]);
 
-  function handleApprove(memberId: string) {
-    setMembers((currentMembers) =>
-      currentMembers.map((member) =>
-        member.id === memberId ? { ...member, status: "approved" } : member
-      )
-    );
-    setStatusMessage("Üye onaylandı.");
+  async function handleApprove(requestId: string) {
+    try {
+      const nextAppData = await teamSyncService.approveJoinRequest(requestId);
+      setAppData(nextAppData);
+      setStatusMessage("Üye onaylandı ve kullanıcı active yapıldı.");
+    } catch {
+      setStatusMessage("Üye onaylanırken bir sorun oluştu.");
+    }
   }
 
-  function handleReject(memberId: string) {
-    setMembers((currentMembers) =>
-      currentMembers.map((member) =>
-        member.id === memberId ? { ...member, status: "rejected" } : member
-      )
-    );
-    setStatusMessage("Üye reddedildi.");
-  }
-
-  function resetMembers() {
-    setMembers(initialPendingMembers);
-    setStatusMessage("Bekleyen üyeler demo haline sıfırlandı.");
+  async function handleReject(requestId: string) {
+    try {
+      const nextAppData = await teamSyncService.rejectJoinRequest(requestId);
+      setAppData(nextAppData);
+      setStatusMessage("Üye reddedildi ve kullanıcı removed yapıldı.");
+    } catch {
+      setStatusMessage("Üye reddedilirken bir sorun oluştu.");
+    }
   }
 
   return (
@@ -111,7 +128,7 @@ export default function PendingApprovalsScreen() {
           <Text style={styles.heroLabel}>Üye onay sistemi</Text>
           <Text style={styles.heroTitle}>Kulübe giriş kontrolü</Text>
           <Text style={styles.heroSubtitle}>
-            Onaylanan kullanıcılar ileride kendi rolüne göre dashboard, takım, mesaj ve program erişimi alacak.
+            Onaylanan kullanıcılar merkezi data içinde active olur. Reddedilen kullanıcılar removed durumuna alınır.
           </Text>
         </View>
 
@@ -142,60 +159,73 @@ export default function PendingApprovalsScreen() {
             <Text style={styles.statusPill}>{summary.totalCount} kayıt</Text>
           </View>
 
-          <View style={styles.memberList}>
-            {members.map((member) => {
-              const isPending = member.status === "pending";
+          {requestRows.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Henüz bekleyen istek yok</Text>
+              <Text style={styles.emptyText}>
+                Join Club ekranından doğru kulüp kodu ile başvuru gönderildiğinde burada görünecek.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.memberList}>
+              {requestRows.map((row) => {
+                const { request, user } = row;
+                const isPending = request.status === "pending";
+                const displayName = user?.fullName ?? "Kullanıcı bulunamadı";
+                const displayEmail = user?.email ?? "E-posta yok";
+                const displayRole = roleDisplayNames[request.requestedRole];
 
-              return (
-                <View key={member.id} style={styles.memberCard}>
-                  <View style={styles.memberTopRow}>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>{member.name}</Text>
-                      <Text style={styles.memberMeta}>
-                        {member.role} · {member.team}
+                return (
+                  <View key={request.id} style={styles.memberCard}>
+                    <View style={styles.memberTopRow}>
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{displayName}</Text>
+                        <Text style={styles.memberMeta}>
+                          {displayRole} · {displayEmail}
+                        </Text>
+                        <Text style={styles.memberDate}>İstek zamanı: {formatDate(request.createdAt)}</Text>
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.memberStatus,
+                          request.status === "approved" ? styles.statusApproved : null,
+                          request.status === "rejected" ? styles.statusRejected : null,
+                        ]}
+                      >
+                        {getStatusText(request.status)}
                       </Text>
-                      <Text style={styles.memberDate}>İstek zamanı: {member.requestedAt}</Text>
                     </View>
 
-                    <Text
-                      style={[
-                        styles.memberStatus,
-                        member.status === "approved" ? styles.statusApproved : null,
-                        member.status === "rejected" ? styles.statusRejected : null,
-                      ]}
-                    >
-                      {getStatusText(member.status)}
-                    </Text>
+                    {isPending ? (
+                      <View style={styles.actionRow}>
+                        <AppButton
+                          title="Onayla"
+                          onPress={() => handleApprove(request.id)}
+                          accessibilityLabel={`${displayName} kullanıcısını onayla`}
+                          style={styles.actionButton}
+                        />
+
+                        <AppButton
+                          title="Reddet"
+                          variant="ghost"
+                          onPress={() => handleReject(request.id)}
+                          accessibilityLabel={`${displayName} kullanıcısını reddet`}
+                          style={styles.actionButton}
+                        />
+                      </View>
+                    ) : null}
                   </View>
-
-                  {isPending ? (
-                    <View style={styles.actionRow}>
-                      <AppButton
-                        title="Onayla"
-                        onPress={() => handleApprove(member.id)}
-                        accessibilityLabel={`${member.name} kullanıcısını onayla`}
-                        style={styles.actionButton}
-                      />
-
-                      <AppButton
-                        title="Reddet"
-                        variant="ghost"
-                        onPress={() => handleReject(member.id)}
-                        accessibilityLabel={`${member.name} kullanıcısını reddet`}
-                        style={styles.actionButton}
-                      />
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
 
           <AppButton
-            title="Demo veriyi sıfırla"
+            title="Merkezi datayı yenile"
             variant="ghost"
-            onPress={resetMembers}
-            accessibilityLabel="Bekleyen üyeleri sıfırla"
+            onPress={loadApprovalData}
+            accessibilityLabel="Bekleyen istekleri yeniden yükle"
             style={styles.resetButton}
           />
         </View>
@@ -340,6 +370,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.full,
   },
+  emptyBox: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+  },
   memberList: {
     gap: theme.spacing.md,
   },
@@ -401,8 +450,10 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flexGrow: 1,
+    minWidth: 130,
   },
   resetButton: {
     marginTop: theme.spacing["2xl"],
+    alignSelf: "flex-start",
   },
 });

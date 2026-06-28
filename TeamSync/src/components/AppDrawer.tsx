@@ -1,7 +1,10 @@
 import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
 
 type DrawerItem = {
   label: string;
@@ -13,6 +16,14 @@ type DrawerItem = {
 type AppDrawerProps = {
   visible: boolean;
   onClose: () => void;
+};
+
+const roleDisplayNames: Record<UserRole, string> = {
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
 };
 
 const drawerItems: DrawerItem[] = [
@@ -30,10 +41,65 @@ const drawerItems: DrawerItem[] = [
   { label: "Settings", subtitle: "Uygulama ayarları", isDisabled: true },
 ];
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TS";
+}
+
 export function AppDrawer({ visible, onClose }: AppDrawerProps) {
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadDrawerData() {
+      try {
+        const loadedAppData = await teamSyncService.getAppData();
+
+        if (isActive) {
+          setAppData(loadedAppData);
+        }
+      } catch {
+        if (isActive) {
+          setAppData(null);
+        }
+      }
+    }
+
+    loadDrawerData();
+
+    return () => {
+      isActive = false;
+    };
+  }, [visible]);
+
   if (!visible) {
     return null;
   }
+
+  const currentUser = appData?.currentUser;
+  const currentClub = appData?.club;
+  const primaryTeam = currentUser
+    ? appData?.teams.find((team) => currentUser.teamIds.includes(team.id))
+    : undefined;
+
+  const profileName = currentUser?.fullName ?? "TeamSync Kullanıcı";
+  const profileInitials = getInitials(profileName);
+  const profileSubtitle = currentUser
+    ? `${roleDisplayNames[currentUser.role]} · ${primaryTeam?.name ?? currentClub?.name ?? "Kulüp yok"}`
+    : "Profil bilgileri yükleniyor";
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
     if (isDisabled || route === undefined) {
@@ -65,12 +131,12 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
 
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>MA</Text>
+            <Text style={styles.avatarText}>{profileInitials}</Text>
           </View>
 
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>Mert Asma</Text>
-            <Text style={styles.profileRole}>Athlete · U17 Erkek</Text>
+            <Text style={styles.profileName}>{profileName}</Text>
+            <Text style={styles.profileRole}>{profileSubtitle}</Text>
           </View>
         </View>
 

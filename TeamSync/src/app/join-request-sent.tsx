@@ -1,10 +1,55 @@
-import { Link } from "expo-router";
+import { Link, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
+
+const roleLabels: Record<UserRole, string> = {
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
+};
 
 export default function JoinRequestSentScreen() {
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadRequestData() {
+        try {
+          const loadedAppData = await teamSyncService.getAppData();
+
+          if (isActive) {
+            setAppData(loadedAppData);
+          }
+        } catch {
+          if (isActive) {
+            setAppData(null);
+          }
+        }
+      }
+
+      loadRequestData();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const currentUser = appData?.currentUser;
+  const currentClub = appData?.club;
+  const currentRequest = appData?.joinRequests.find(
+    (request) => request.userId === currentUser?.id && request.status === "pending"
+  );
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
@@ -16,25 +61,30 @@ export default function JoinRequestSentScreen() {
           <Text style={styles.title}>Admin onayı bekleniyor</Text>
 
           <Text style={styles.subtitle}>
-            Takım kodunuz alındı. Kulüp yöneticisi isteğinizi onayladıktan sonra
-            kendi rolünüze göre TeamSync dashboard ekranına erişebileceksiniz.
+            Katılma isteğin merkezi TeamSync datasına pending olarak kaydedildi. Kulüp yöneticisi onayladıktan sonra kendi rolüne göre dashboard erişimi açılacak.
           </Text>
+
+          <View style={styles.requestBox}>
+            <Text style={styles.requestLabel}>Başvuru özeti</Text>
+            <Text style={styles.requestValue}>{currentUser?.fullName ?? "Kullanıcı bilgisi yükleniyor"}</Text>
+            <Text style={styles.requestText}>{currentUser?.email ?? "E-posta yükleniyor"}</Text>
+            <Text style={styles.requestText}>{currentClub?.name ?? "Kulüp bilgisi yükleniyor"}</Text>
+            <Text style={styles.requestText}>
+              Rol: {currentRequest ? roleLabels[currentRequest.requestedRole] : "Onay bekliyor"}
+            </Text>
+          </View>
 
           <View style={styles.stepsBox}>
             <Text style={styles.stepsTitle}>Süreç nasıl çalışır?</Text>
 
-            <Text style={styles.stepText}>1. Takım kodunu girersin.</Text>
-            <Text style={styles.stepText}>
-              2. Katılma isteğin kulüp yöneticisine gider.
-            </Text>
-            <Text style={styles.stepText}>
-              3. Admin seni onayladıktan sonra uygulamayı kullanırsın.
-            </Text>
+            <Text style={styles.stepText}>1. Takım/kulüp kodunu girersin.</Text>
+            <Text style={styles.stepText}>2. Katılma isteğin merkezi joinRequests datasına yazılır.</Text>
+            <Text style={styles.stepText}>3. Admin seni onayladıktan sonra uygulamayı kullanırsın.</Text>
           </View>
 
           <View style={styles.statusBox}>
             <Text style={styles.statusLabel}>Şu anki durum</Text>
-            <Text style={styles.statusValue}>Onay bekliyor</Text>
+            <Text style={styles.statusValue}>{currentRequest?.status === "pending" ? "Onay bekliyor" : "Pending kayıt aranıyor"}</Text>
           </View>
 
           <View style={styles.buttonGroup}>
@@ -120,6 +170,34 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
+  },
+  requestBox: {
+    width: "100%",
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  requestLabel: {
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    color: theme.colors.text.secondary,
+    textTransform: "uppercase",
+    marginBottom: theme.spacing.sm,
+  },
+  requestValue: {
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  requestText: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    marginTop: theme.spacing.xs,
   },
   stepsBox: {
     width: "100%",

@@ -1,5 +1,4 @@
-import { Link } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Pressable,
   ScrollView,
@@ -95,29 +94,58 @@ function getStatusLabel(status: AvailabilityStatus) {
   return "Cevap yok";
 }
 
+function getCurrentSaveLabel() {
+  const time = new Date().toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `Şimdi · ${time}`;
+}
+
 export default function AvailabilityScreen() {
   const [activeView, setActiveView] = useState<AvailabilityView>("athleteParent");
   const [selectedEventId, setSelectedEventId] = useState(events[0].id);
   const [availabilityList, setAvailabilityList] =
     useState<AthleteAvailability[]>(initialAvailability);
   const [myNote, setMyNote] = useState("Geliyorum.");
+  const [statusMessage, setStatusMessage] = useState(
+    "Uygunluk cevapları şimdilik bu oturum içinde tutuluyor."
+  );
+  const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
 
-  const selectedEvent = events.find((event) => event.id === selectedEventId);
+  const selectedEvent = events.find((event) => event.id === selectedEventId) ?? events[0];
 
-  const availableCount = availabilityList.filter(
-    (athlete) => athlete.status === "available",
-  ).length;
+  const availabilitySummary = useMemo(() => {
+    const availableCount = availabilityList.filter(
+      (athlete) => athlete.status === "available"
+    ).length;
 
-  const notAvailableCount = availabilityList.filter(
-    (athlete) => athlete.status === "notAvailable",
-  ).length;
+    const notAvailableCount = availabilityList.filter(
+      (athlete) => athlete.status === "notAvailable"
+    ).length;
 
-  const notAnsweredCount = availabilityList.filter(
-    (athlete) => athlete.status === "notAnswered",
-  ).length;
+    const notAnsweredCount = availabilityList.filter(
+      (athlete) => athlete.status === "notAnswered"
+    ).length;
+
+    const totalCount = availabilityList.length;
+    const responseRate =
+      totalCount > 0
+        ? Math.round(((availableCount + notAvailableCount) / totalCount) * 100)
+        : 0;
+
+    return {
+      availableCount,
+      notAvailableCount,
+      notAnsweredCount,
+      totalCount,
+      responseRate,
+    };
+  }, [availabilityList]);
 
   const myAvailability = availabilityList.find(
-    (athlete) => athlete.athleteName === "Mert Asma",
+    (athlete) => athlete.athleteName === "Mert Asma"
   );
 
   function updateMyStatus(newStatus: AvailabilityStatus) {
@@ -132,8 +160,11 @@ export default function AvailabilityScreen() {
           status: newStatus,
           note: myNote.trim(),
         };
-      }),
+      })
     );
+
+    setLastSavedAt(getCurrentSaveLabel());
+    setStatusMessage("Uygunluk durumun kaydedildi.");
   }
 
   function saveMyNote() {
@@ -147,49 +178,52 @@ export default function AvailabilityScreen() {
           ...athlete,
           note: myNote.trim(),
         };
-      }),
+      })
     );
+
+    setLastSavedAt(getCurrentSaveLabel());
+    setStatusMessage("Not kaydedildi.");
+  }
+
+  function resetAvailability() {
+    setAvailabilityList(initialAvailability);
+    setMyNote("Geliyorum.");
+    setLastSavedAt("Henüz kaydedilmedi");
+    setStatusMessage("Uygunluk demo haline sıfırlandı.");
   }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>Uygunluk Bildirme</Text>
-
-            <Text style={styles.pageSubtitle}>
-              Sporcular ve veliler antrenman veya maç için uygunluk durumunu
-              bildirir. Koçlar takımın durumunu tek ekranda görür.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Uygunluk</Text>
+          <Text style={styles.pageSubtitle}>
+            Sporcu ve veliler etkinlik için gelip gelemeyeceğini bildirir.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Katılım planlama</Text>
-
           <Text style={styles.heroTitle}>Kim geliyor, kim gelemiyor?</Text>
-
           <Text style={styles.heroSubtitle}>
-            Bu ekran maç ve antrenman öncesi koçun kadro planlamasını
-            kolaylaştırır.
+            Maç ve antrenman öncesi koçun kadro planlamasını kolaylaştırır.
           </Text>
         </View>
 
         <View style={styles.viewSwitcher}>
           <Pressable
             onPress={() => setActiveView("athleteParent")}
-            style={[
+            style={({ pressed }) => [
               styles.viewButton,
-              activeView === "athleteParent" && styles.viewButtonActive,
+              activeView === "athleteParent" ? styles.viewButtonActive : null,
+              pressed ? styles.pressed : null,
             ]}
           >
             <Text
               style={[
                 styles.viewButtonText,
-                activeView === "athleteParent" && styles.viewButtonTextActive,
+                activeView === "athleteParent" ? styles.viewButtonTextActive : null,
               ]}
             >
               Sporcu / Veli
@@ -198,15 +232,16 @@ export default function AvailabilityScreen() {
 
           <Pressable
             onPress={() => setActiveView("coachAdmin")}
-            style={[
+            style={({ pressed }) => [
               styles.viewButton,
-              activeView === "coachAdmin" && styles.viewButtonActive,
+              activeView === "coachAdmin" ? styles.viewButtonActive : null,
+              pressed ? styles.pressed : null,
             ]}
           >
             <Text
               style={[
                 styles.viewButtonText,
-                activeView === "coachAdmin" && styles.viewButtonTextActive,
+                activeView === "coachAdmin" ? styles.viewButtonTextActive : null,
               ]}
             >
               Koç / Admin
@@ -215,12 +250,16 @@ export default function AvailabilityScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Etkinlik seç</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Etkinlik seç</Text>
+              <Text style={styles.sectionSubtitle}>
+                Demo için etkinliği buradan seçiyoruz. Gerçek sistemde takvimden gelecek.
+              </Text>
+            </View>
 
-          <Text style={styles.sectionSubtitle}>
-            Demo için etkinliği buradan seçiyoruz. Gerçek sistemde bu bilgiler
-            takvimden gelecek.
-          </Text>
+            <Text style={styles.statusPill}>{events.length} etkinlik</Text>
+          </View>
 
           <View style={styles.eventList}>
             {events.map((event) => {
@@ -232,14 +271,14 @@ export default function AvailabilityScreen() {
                   onPress={() => setSelectedEventId(event.id)}
                   style={({ pressed }) => [
                     styles.eventCard,
-                    isSelected && styles.eventCardActive,
-                    pressed && styles.pressed,
+                    isSelected ? styles.eventCardActive : null,
+                    pressed ? styles.pressed : null,
                   ]}
                 >
                   <Text
                     style={[
                       styles.eventTitle,
-                      isSelected && styles.eventTitleActive,
+                      isSelected ? styles.eventTitleActive : null,
                     ]}
                   >
                     {event.title}
@@ -248,10 +287,10 @@ export default function AvailabilityScreen() {
                   <Text
                     style={[
                       styles.eventMeta,
-                      isSelected && styles.eventMetaActive,
+                      isSelected ? styles.eventMetaActive : null,
                     ]}
                   >
-                    {event.date} · {event.location}
+                    {event.teamName} · {event.date} · {event.location}
                   </Text>
                 </Pressable>
               );
@@ -259,27 +298,27 @@ export default function AvailabilityScreen() {
           </View>
         </View>
 
-        {activeView === "athleteParent" && (
+        {activeView === "athleteParent" ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Benim durumum</Text>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>Benim durumum</Text>
+                <Text style={styles.sectionSubtitle}>
+                  {selectedEvent.title} için uygunluk durumunu seç.
+                </Text>
+              </View>
 
-            <Text style={styles.sectionSubtitle}>
-              {selectedEvent?.title} için uygunluk durumunu seç.
-            </Text>
+              <Text style={styles.statusPill}>
+                {getStatusLabel(myAvailability?.status ?? "notAnswered")}
+              </Text>
+            </View>
 
             <View style={styles.myStatusCard}>
               <Text style={styles.myName}>Mert Asma</Text>
-              <Text style={styles.myTeam}>U17 Erkek</Text>
-
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeText}>
-                  Şu an: {getStatusLabel(myAvailability?.status ?? "notAnswered")}
-                </Text>
-              </View>
+              <Text style={styles.myTeam}>U17 Erkek · Son kayıt: {lastSavedAt}</Text>
             </View>
 
             <Text style={styles.label}>Not</Text>
-
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Örn: Geliyorum / Geç kalabilirim / Gelemiyorum"
@@ -289,67 +328,66 @@ export default function AvailabilityScreen() {
               multiline
             />
 
-            <View style={styles.statusActions}>
-              <Pressable
+            <View style={styles.actionRow}>
+              <AppButton
+                title="Uygunum"
                 onPress={() => updateMyStatus("available")}
-                style={({ pressed }) => [
-                  styles.statusButton,
-                  styles.availableButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.statusButtonText}>Uygunum</Text>
-              </Pressable>
+                style={styles.actionButton}
+              />
 
-              <Pressable
+              <AppButton
+                title="Uygun değilim"
+                variant="secondary"
                 onPress={() => updateMyStatus("notAvailable")}
-                style={({ pressed }) => [
-                  styles.statusButton,
-                  styles.notAvailableButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.statusButtonText}>Uygun değilim</Text>
-              </Pressable>
+                style={styles.actionButton}
+              />
 
-              <Pressable
+              <AppButton
+                title="Notu kaydet"
+                variant="ghost"
                 onPress={saveMyNote}
-                style={({ pressed }) => [
-                  styles.statusButton,
-                  styles.noteButton,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={styles.statusButtonText}>Notu kaydet</Text>
-              </Pressable>
+                style={styles.actionButton}
+              />
             </View>
+
+            <Text style={styles.statusText}>{statusMessage}</Text>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{availableCount}</Text>
+            <Text style={styles.statValue}>{availabilitySummary.availableCount}</Text>
             <Text style={styles.statLabel}>Uygun</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{notAvailableCount}</Text>
+            <Text style={styles.statValue}>{availabilitySummary.notAvailableCount}</Text>
             <Text style={styles.statLabel}>Uygun değil</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{notAnsweredCount}</Text>
+            <Text style={styles.statValue}>{availabilitySummary.notAnsweredCount}</Text>
             <Text style={styles.statLabel}>Cevap yok</Text>
+          </View>
+
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>%{availabilitySummary.responseRate}</Text>
+            <Text style={styles.statLabel}>Cevap oranı</Text>
           </View>
         </View>
 
-        {activeView === "coachAdmin" && (
+        {activeView === "coachAdmin" ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Takım uygunluk listesi</Text>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>Takım uygunluk listesi</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Koç ve admin, seçilen etkinlik için oyuncuların durumunu görür.
+                </Text>
+              </View>
 
-            <Text style={styles.sectionSubtitle}>
-              Koç ve admin, seçilen etkinlik için oyuncuların durumunu görür.
-            </Text>
+              <Text style={styles.statusPill}>{availabilitySummary.totalCount} sporcu</Text>
+            </View>
 
             <View style={styles.athleteList}>
               {availabilityList.map((athlete) => {
@@ -360,28 +398,22 @@ export default function AvailabilityScreen() {
                   <View key={athlete.id} style={styles.athleteCard}>
                     <View style={styles.athleteTopRow}>
                       <View style={styles.athleteInfo}>
-                        <Text style={styles.athleteName}>
-                          {athlete.athleteName}
-                        </Text>
-
-                        <Text style={styles.parentName}>
-                          Veli: {athlete.parentName}
-                        </Text>
+                        <Text style={styles.athleteName}>{athlete.athleteName}</Text>
+                        <Text style={styles.parentName}>Veli: {athlete.parentName}</Text>
                       </View>
 
                       <View
                         style={[
                           styles.listStatusBadge,
-                          isAvailable && styles.listStatusBadgeAvailable,
-                          isNotAvailable && styles.listStatusBadgeNotAvailable,
+                          isAvailable ? styles.listStatusBadgeAvailable : null,
+                          isNotAvailable ? styles.listStatusBadgeNotAvailable : null,
                         ]}
                       >
                         <Text
                           style={[
                             styles.listStatusText,
-                            isAvailable && styles.listStatusTextAvailable,
-                            isNotAvailable &&
-                              styles.listStatusTextNotAvailable,
+                            isAvailable ? styles.listStatusTextAvailable : null,
+                            isNotAvailable ? styles.listStatusTextNotAvailable : null,
                           ]}
                         >
                           {getStatusLabel(athlete.status)}
@@ -397,25 +429,22 @@ export default function AvailabilityScreen() {
               })}
             </View>
           </View>
-        )}
+        ) : null}
 
         <View style={styles.noteCard}>
           <Text style={styles.noteTitle}>Gerçek sistemde nasıl olacak?</Text>
-
           <Text style={styles.noteText}>
-            Firebase eklendiğinde her etkinlik için ayrı uygunluk kayıtları
-            tutulacak. Sporcu veya veli durum değiştirince koç anında görecek.
+            Firebase eklendiğinde her etkinlik için ayrı uygunluk kayıtları tutulacak.
+            Sporcu veya veli durum değiştirince koç anında görecek.
           </Text>
-        </View>
 
-        <Link href="/dashboard" asChild>
           <AppButton
-            title="Dashboard'a dön"
+            title="Demo veriyi sıfırla"
             variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
+            onPress={resetAvailability}
+            style={styles.resetButton}
           />
-        </Link>
+        </View>
       </View>
     </ScrollView>
   );
@@ -429,34 +458,34 @@ const styles = StyleSheet.create({
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
   container: {
     width: "100%",
     maxWidth: 980,
     alignSelf: "center",
   },
-  header: {
-    marginTop: theme.spacing["2xl"],
+  pageHeader: {
     marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
   },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
@@ -498,10 +527,11 @@ const styles = StyleSheet.create({
   viewButton: {
     flex: 1,
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
     alignItems: "center",
   },
   viewButtonActive: {
@@ -509,9 +539,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand.primary,
   },
   viewButtonText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
   },
   viewButtonTextActive: {
     color: theme.colors.text.inverse,
@@ -525,25 +555,43 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   sectionSubtitle: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-    marginBottom: theme.spacing.lg,
+  },
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
   eventList: {
     gap: theme.spacing.md,
   },
   eventCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     padding: theme.spacing.lg,
@@ -553,106 +601,78 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.brand.primary,
   },
   eventTitle: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   eventTitleActive: {
     color: theme.colors.text.inverse,
   },
   eventMeta: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
   },
   eventMetaActive: {
     color: theme.colors.text.inverse,
   },
   myStatusCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
   },
   myName: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   myTeam: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.md,
-  },
-  statusBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.brand.primarySoft,
-    borderRadius: theme.radius.full,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  statusBadgeText: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.brand,
   },
   label: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.sm,
   },
   input: {
+    minHeight: 52,
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
+    marginBottom: theme.spacing.lg,
   },
   textArea: {
     minHeight: 110,
     textAlignVertical: "top",
   },
-  statusActions: {
+  actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing.md,
   },
-  statusButton: {
+  actionButton: {
     flexGrow: 1,
-    flexBasis: 160,
-    borderRadius: theme.radius.full,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    alignItems: "center",
   },
-  availableButton: {
-    backgroundColor: theme.colors.state.success,
-  },
-  notAvailableButton: {
-    backgroundColor: theme.colors.state.danger,
-  },
-  noteButton: {
-    backgroundColor: theme.colors.brand.primary,
-  },
-  statusButtonText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
+  statusText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.lg,
   },
   statsGrid: {
     flexDirection: "row",
@@ -662,7 +682,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 180,
+    flexBasis: 145,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.xl,
@@ -671,75 +691,73 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   statValue: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
     marginBottom: theme.spacing.xs,
   },
   statLabel: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
   },
   athleteList: {
     gap: theme.spacing.md,
   },
   athleteCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
+    borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
   },
   athleteTopRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
     marginBottom: theme.spacing.md,
   },
   athleteInfo: {
     flex: 1,
   },
   athleteName: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   parentName: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
   },
   listStatusBadge: {
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
-    paddingVertical: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    alignSelf: "flex-start",
   },
   listStatusBadgeAvailable: {
-    backgroundColor: theme.colors.state.successSoft,
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primarySoft,
   },
   listStatusBadgeNotAvailable: {
-    backgroundColor: theme.colors.state.dangerSoft,
+    backgroundColor: theme.colors.background.surface,
+    borderColor: theme.colors.border.default,
   },
   listStatusText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.muted,
   },
   listStatusTextAvailable: {
-    color: theme.colors.text.success,
+    color: theme.colors.text.brand,
   },
   listStatusTextNotAvailable: {
-    color: theme.colors.text.danger,
-  },
-  noteText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   noteCard: {
     backgroundColor: theme.colors.background.surface,
@@ -748,14 +766,25 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing["2xl"],
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    ...theme.shadows.sm,
   },
   noteTitle: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
   },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
+  noteText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+  },
+  resetButton: {
+    marginTop: theme.spacing.lg,
+  },
+  pressed: {
+    opacity: 0.84,
+    transform: [{ scale: 0.99 }],
   },
 });

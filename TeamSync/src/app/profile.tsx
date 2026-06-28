@@ -161,7 +161,7 @@ export default function ProfileScreen() {
 
               <AppButton
                 title="Vazgeç"
-                variant="ghost"
+                variant="secondary"
                 accessibilityLabel="Profil düzenlemeyi iptal et"
                 style={styles.actionButton}
                 onPress={cancelEditing}
@@ -348,7 +348,7 @@ export default function ProfileScreen() {
 
           <AppButton
             title="Demo profili sıfırla"
-            variant="ghost"
+            variant="secondary"
             accessibilityLabel="Profil bilgilerini sıfırla"
             style={styles.actionButton}
             onPress={resetProfile}

@@ -1,20 +1,15 @@
-import { Link } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 
-type PlayerStat = {
-  id: number;
-  name: string;
-  team: string;
-  attendanceRate: string;
-  matchesPlayed: number;
-  practicesAttended: number;
-  coachNote: string;
-};
+const teamStats = [
+  { label: "Toplam sporcu", value: "128" },
+  { label: "Ortalama katılım", value: "86%" },
+  { label: "Bu ay maç", value: "12" },
+  { label: "Bu ay antrenman", value: "34" },
+];
 
-const playerStats: PlayerStat[] = [
+const playerStats = [
   {
     id: 1,
     name: "Mert Asma",
@@ -44,49 +39,23 @@ const playerStats: PlayerStat[] = [
   },
 ];
 
-const teamStats = [
-  {
-    label: "Toplam sporcu",
-    value: "128",
-  },
-  {
-    label: "Ortalama katılım",
-    value: "86%",
-  },
-  {
-    label: "Bu ay maç",
-    value: "12",
-  },
-  {
-    label: "Bu ay antrenman",
-    value: "34",
-  },
-];
-
 export default function StatisticsScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.pageTitle}>İstatistikler</Text>
-            <Text style={styles.pageSubtitle}>
-              Sporcu katılımı, maç sayıları, antrenman takibi ve koç notlarını
-              tek ekranda görüntüle.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>İstatistikler</Text>
+          <Text style={styles.pageSubtitle}>
+            Sporcu katılımı, maç sayıları ve koç notlarını tek ekranda görüntüle.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Performans merkezi</Text>
-
           <Text style={styles.heroTitle}>Kulüp ve sporcu istatistikleri</Text>
-
           <Text style={styles.heroSubtitle}>
-            Adminler tüm kulüp verilerini görebilir. Koçlar kendi takımlarını,
-            veliler ve sporcular ise sadece kendilerine ait bilgileri görecek.
+            Gerçek sistemde bu veriler yoklama, program ve maç kayıtlarından otomatik oluşacak.
           </Text>
         </View>
 
@@ -100,16 +69,14 @@ export default function StatisticsScreen() {
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>Sporcu performansı</Text>
               <Text style={styles.sectionSubtitle}>
-                Şimdilik demo veri kullanıyoruz. Firebase eklendiğinde bu
-                bilgiler gerçek yoklama, maç ve antrenman kayıtlarından gelecek.
+                Şimdilik demo veri kullanıyoruz. Firebase eklendiğinde gerçek kayıtlar burada görünecek.
               </Text>
             </View>
-
-            <Text style={styles.countText}>{playerStats.length} sporcu</Text>
+            <Text style={styles.statusPill}>{playerStats.length} sporcu</Text>
           </View>
 
           <View style={styles.playerList}>
@@ -120,13 +87,7 @@ export default function StatisticsScreen() {
                     <Text style={styles.playerName}>{player.name}</Text>
                     <Text style={styles.playerTeam}>{player.team}</Text>
                   </View>
-
-                  <View style={styles.attendanceBadge}>
-                    <Text style={styles.attendanceValue}>
-                      {player.attendanceRate}
-                    </Text>
-                    <Text style={styles.attendanceLabel}>Katılım</Text>
-                  </View>
+                  <Text style={styles.attendanceBadge}>{player.attendanceRate}</Text>
                 </View>
 
                 <View style={styles.infoGrid}>
@@ -134,12 +95,9 @@ export default function StatisticsScreen() {
                     <Text style={styles.infoLabel}>Maç</Text>
                     <Text style={styles.infoValue}>{player.matchesPlayed}</Text>
                   </View>
-
                   <View style={styles.infoBox}>
                     <Text style={styles.infoLabel}>Antrenman</Text>
-                    <Text style={styles.infoValue}>
-                      {player.practicesAttended}
-                    </Text>
+                    <Text style={styles.infoValue}>{player.practicesAttended}</Text>
                   </View>
                 </View>
 
@@ -151,56 +109,38 @@ export default function StatisticsScreen() {
             ))}
           </View>
         </View>
-
-        <Link href="/dashboard" asChild>
-          <AppButton
-            title="Dashboard'a dön"
-            variant="ghost"
-            accessibilityLabel="Dashboard sayfasına dön"
-            style={styles.backButton}
-          />
-        </Link>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 980,
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
-  },
+  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
+  pageHeader: { marginBottom: theme.spacing["2xl"] },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
   pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
   pageSubtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.xl,
   },
@@ -242,7 +182,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 180,
+    flexBasis: 145,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.xl,
@@ -251,15 +191,15 @@ const styles = StyleSheet.create({
     ...theme.shadows.sm,
   },
   statValue: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
     marginBottom: theme.spacing.xs,
   },
   statLabel: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
   },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -270,35 +210,39 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  sectionHeader: {
+  sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
+  sectionHeaderText: { flex: 1 },
   sectionTitle: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
   },
   sectionSubtitle: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
-  countText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+  statusPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
-  playerList: {
-    gap: theme.spacing.md,
-  },
+  playerList: { gap: theme.spacing.md },
   playerCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
@@ -309,81 +253,66 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.lg,
   },
-  playerInfo: {
-    flex: 1,
-  },
+  playerInfo: { flex: 1 },
   playerName: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.xs,
   },
   playerTeam: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
   },
   attendanceBadge: {
     backgroundColor: theme.colors.brand.primarySoft,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    alignItems: "center",
-    minWidth: 84,
-  },
-  attendanceValue: {
-    fontSize: theme.fontSizes["2xl"],
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.brand,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
-  attendanceLabel: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.brand,
-  },
-  infoGrid: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-  },
+  infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
   infoBox: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 120,
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
   infoLabel: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.muted,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   infoValue: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
   },
   noteBox: {
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.lg,
     padding: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
+    marginTop: theme.spacing.md,
   },
   noteLabel: {
+    color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.muted,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.xs,
   },
   noteText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-  },
-  backButton: {
-    marginBottom: theme.spacing["2xl"],
   },
 });

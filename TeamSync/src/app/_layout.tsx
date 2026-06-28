@@ -15,6 +15,7 @@ const GLOBAL_NAV_TOP_SPACE = 64;
 const routesWithoutGlobalNavigation = [
   "/",
   "/login",
+  "/register",
   "/create-club",
   "/join-club",
   "/join-request-sent",
@@ -45,6 +46,7 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
+          <Stack.Screen name="register" />
           <Stack.Screen name="create-club" />
           <Stack.Screen name="join-club" />
           <Stack.Screen name="join-request-sent" />

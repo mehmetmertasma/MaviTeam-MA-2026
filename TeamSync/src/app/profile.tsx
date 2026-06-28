@@ -1,14 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Link } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
@@ -35,13 +27,22 @@ const startingProfileData: ProfileData = {
   membership: "Kulüp öder, veli/sporcu ücretsiz",
 };
 
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TS";
+}
+
 export default function ProfileScreen() {
-  const [profileData, setProfileData] =
-    useState<ProfileData>(startingProfileData);
-
-  const [draftProfileData, setDraftProfileData] =
-    useState<ProfileData>(startingProfileData);
-
+  const [profileData, setProfileData] = useState<ProfileData>(startingProfileData);
+  const [draftProfileData, setDraftProfileData] = useState<ProfileData>(startingProfileData);
   const [isEditing, setIsEditing] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
@@ -59,7 +60,6 @@ export default function ProfileScreen() {
         }
 
         const parsedProfile = JSON.parse(savedProfile) as ProfileData;
-
         setProfileData(parsedProfile);
         setDraftProfileData(parsedProfile);
         setStatusMessage("Kaydedilmiş profil bilgileri yüklendi.");
@@ -85,11 +85,7 @@ export default function ProfileScreen() {
 
   async function saveProfile() {
     try {
-      await AsyncStorage.setItem(
-        PROFILE_STORAGE_KEY,
-        JSON.stringify(draftProfileData)
-      );
-
+      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(draftProfileData));
       setProfileData(draftProfileData);
       setIsEditing(false);
       setStatusMessage("Profil bilgileri kaydedildi.");
@@ -101,7 +97,6 @@ export default function ProfileScreen() {
   async function resetProfile() {
     try {
       await AsyncStorage.removeItem(PROFILE_STORAGE_KEY);
-
       setProfileData(startingProfileData);
       setDraftProfileData(startingProfileData);
       setIsEditing(false);
@@ -118,28 +113,33 @@ export default function ProfileScreen() {
     }));
   }
 
+  const displayData = isEditing ? draftProfileData : profileData;
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
-
-          <View>
-            <Text style={styles.welcome}>Profil ayarları</Text>
-            <Text style={styles.subtitle}>
-              Hesap bilgilerini, kulüp rolünü ve bildirim tercihlerini yönet.
-            </Text>
-          </View>
+          <Text style={styles.pageTitle}>Profil</Text>
+          <Text style={styles.pageSubtitle}>
+            Hesap bilgilerini, kulüp rolünü ve bildirim tercihlerini yönet.
+          </Text>
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Hesap merkezi</Text>
+          <View style={styles.profileHeroRow}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{getInitials(displayData.name)}</Text>
+            </View>
 
-          <Text style={styles.heroTitle}>{profileData.name}</Text>
-
-          <Text style={styles.heroSubtitle}>
-            {profileData.email} · {profileData.club}
-          </Text>
+            <View style={styles.profileHeroText}>
+              <Text style={styles.heroLabel}>Hesap merkezi</Text>
+              <Text style={styles.heroTitle}>{displayData.name}</Text>
+              <Text style={styles.heroSubtitle}>
+                {displayData.email} · {displayData.club}
+              </Text>
+            </View>
+          </View>
 
           {!isEditing ? (
             <AppButton
@@ -150,12 +150,12 @@ export default function ProfileScreen() {
               onPress={startEditing}
             />
           ) : (
-            <View style={styles.editButtonRow}>
+            <View style={styles.actionRow}>
               <AppButton
                 title="Kaydet"
                 variant="secondary"
                 accessibilityLabel="Profil bilgilerini kaydet"
-                style={styles.editButton}
+                style={styles.actionButton}
                 onPress={saveProfile}
               />
 
@@ -163,95 +163,129 @@ export default function ProfileScreen() {
                 title="Vazgeç"
                 variant="ghost"
                 accessibilityLabel="Profil düzenlemeyi iptal et"
-                style={styles.editButton}
+                style={styles.actionButton}
                 onPress={cancelEditing}
               />
             </View>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kullanıcı bilgileri</Text>
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statLabel}>Kulüp</Text>
+          </View>
 
-          <View style={styles.profileTop}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>MA</Text>
-            </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>1</Text>
+            <Text style={styles.statLabel}>Takım</Text>
+          </View>
 
-            <View style={styles.profileInfo}>
-              <Text style={styles.profileName}>{profileData.name}</Text>
-              <Text style={styles.profileRole}>{profileData.role}</Text>
-              <Text style={styles.profileMeta}>{profileData.team}</Text>
-            </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>5</Text>
+            <Text style={styles.statLabel}>Rol sistemi</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {isEditing ? "Profil bilgilerini düzenle" : "Kulüp özeti"}
-          </Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>
+                {isEditing ? "Profil bilgilerini düzenle" : "Kulüp özeti"}
+              </Text>
+              <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+            </View>
+
+            <Text style={styles.statusPill}>{displayData.role}</Text>
+          </View>
 
           {isEditing ? (
             <View style={styles.form}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Ad Soyad</Text>
-                <TextInput
-                  value={draftProfileData.name}
-                  onChangeText={(value) => updateDraftProfile("name", value)}
-                  placeholder="Ad Soyad"
-                  placeholderTextColor={theme.colors.text.muted}
-                  style={styles.input}
-                />
+              <View style={styles.formGrid}>
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>Ad Soyad</Text>
+                  <TextInput
+                    value={draftProfileData.name}
+                    onChangeText={(value) => updateDraftProfile("name", value)}
+                    placeholder="Ad Soyad"
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>E-posta</Text>
+                  <TextInput
+                    value={draftProfileData.email}
+                    onChangeText={(value) => updateDraftProfile("email", value)}
+                    placeholder="E-posta"
+                    placeholderTextColor={theme.colors.text.muted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    style={styles.input}
+                  />
+                </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>E-posta</Text>
-                <TextInput
-                  value={draftProfileData.email}
-                  onChangeText={(value) => updateDraftProfile("email", value)}
-                  placeholder="E-posta"
-                  placeholderTextColor={theme.colors.text.muted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  style={styles.input}
-                />
+              <View style={styles.formGrid}>
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>Kulüp</Text>
+                  <TextInput
+                    value={draftProfileData.club}
+                    onChangeText={(value) => updateDraftProfile("club", value)}
+                    placeholder="Kulüp adı"
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>Takım</Text>
+                  <TextInput
+                    value={draftProfileData.team}
+                    onChangeText={(value) => updateDraftProfile("team", value)}
+                    placeholder="Takım adı"
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
+                </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Kulüp</Text>
-                <TextInput
-                  value={draftProfileData.club}
-                  onChangeText={(value) => updateDraftProfile("club", value)}
-                  placeholder="Kulüp adı"
-                  placeholderTextColor={theme.colors.text.muted}
-                  style={styles.input}
-                />
+              <View style={styles.formGrid}>
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>Rol</Text>
+                  <TextInput
+                    value={draftProfileData.role}
+                    onChangeText={(value) => updateDraftProfile("role", value)}
+                    placeholder="Rol"
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
+                </View>
+
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>Aktif sezon</Text>
+                  <TextInput
+                    value={draftProfileData.season}
+                    onChangeText={(value) => updateDraftProfile("season", value)}
+                    placeholder="Aktif sezon"
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
+                </View>
               </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Takım</Text>
-                <TextInput
-                  value={draftProfileData.team}
-                  onChangeText={(value) => updateDraftProfile("team", value)}
-                  placeholder="Takım adı"
-                  placeholderTextColor={theme.colors.text.muted}
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Aktif sezon</Text>
-                <TextInput
-                  value={draftProfileData.season}
-                  onChangeText={(value) => updateDraftProfile("season", value)}
-                  placeholder="Aktif sezon"
-                  placeholderTextColor={theme.colors.text.muted}
-                  style={styles.input}
-                />
-              </View>
+              <Text style={styles.inputLabel}>Üyelik modeli</Text>
+              <TextInput
+                value={draftProfileData.membership}
+                onChangeText={(value) => updateDraftProfile("membership", value)}
+                placeholder="Üyelik modeli"
+                placeholderTextColor={theme.colors.text.muted}
+                style={styles.input}
+              />
             </View>
           ) : (
-            <>
+            <View style={styles.infoList}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Kulüp</Text>
                 <Text style={styles.infoValue}>{profileData.club}</Text>
@@ -263,7 +297,7 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Rolün</Text>
+                <Text style={styles.infoLabel}>Rol</Text>
                 <Text style={styles.infoValue}>{profileData.role}</Text>
               </View>
 
@@ -273,176 +307,87 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.infoRowLast}>
-                <Text style={styles.infoLabel}>Üyelik modeli</Text>
+                <Text style={styles.infoLabel}>Üyelik</Text>
                 <Text style={styles.infoValue}>{profileData.membership}</Text>
               </View>
-            </>
+            </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bildirim ayarları</Text>
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>Push bildirimleri</Text>
-              <Text style={styles.settingSubtitle}>
-                Antrenman, maç ve duyuru bildirimleri.
-              </Text>
-            </View>
-
-            <Switch
-              value={pushNotifications}
-              onValueChange={setPushNotifications}
-              trackColor={{
-                false: theme.colors.border.default,
-                true: theme.colors.brand.primarySoft,
-              }}
-              thumbColor={
-                pushNotifications
-                  ? theme.colors.brand.primary
-                  : theme.colors.text.muted
-              }
-            />
-          </View>
-
-          <View style={styles.settingDivider} />
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingContent}>
-              <Text style={styles.settingTitle}>E-posta bildirimleri</Text>
-              <Text style={styles.settingSubtitle}>
-                Ödeme ve kulüp güncellemeleri için e-posta.
-              </Text>
-            </View>
-
-            <Switch
-              value={emailNotifications}
-              onValueChange={setEmailNotifications}
-              trackColor={{
-                false: theme.colors.border.default,
-                true: theme.colors.brand.primarySoft,
-              }}
-              thumbColor={
-                emailNotifications
-                  ? theme.colors.brand.primary
-                  : theme.colors.text.muted
-              }
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kaydetme durumu</Text>
-
-          <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
-
-          <View style={styles.resetButtonWrapper}>
-            <AppButton
-              title="Demo profile sıfırla"
-              variant="ghost"
-              accessibilityLabel="Demo profil bilgilerini sıfırla"
-              onPress={resetProfile}
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Gelecek hesap özellikleri</Text>
-
-          <View style={styles.actionGrid}>
-            <View style={styles.actionCard}>
-              <Text style={styles.actionText}>Şifre değiştir</Text>
-              <Text style={styles.actionMeta}>
-                Firebase Auth eklenince aktif olacak
-              </Text>
-            </View>
-
-            <View style={styles.actionCard}>
-              <Text style={styles.actionText}>Profil fotoğrafı</Text>
-              <Text style={styles.actionMeta}>
-                Firebase Storage eklenince gerçek fotoğraf yüklenecek
-              </Text>
-            </View>
-
-            <View style={styles.actionCard}>
-              <Text style={styles.actionText}>Çıkış yap</Text>
-              <Text style={styles.actionMeta}>
-                Login sistemi bağlanınca gerçek çıkış yapılacak
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Demo notu</Text>
-
+          <Text style={styles.sectionTitle}>Bildirimler</Text>
           <Text style={styles.sectionSubtitle}>
-            Bu artık sadece ekranda değişmiyor. Profil bilgileri local storage
-            içine kaydediliyor. Ama bu hâlâ Firebase değildir. Yani başka
-            cihazda veya başka kullanıcıda görünmez.
+            Gerçek push notification sistemi Firebase/Expo notifications ile bağlanacak.
           </Text>
+
+          <View style={styles.preferenceRow}>
+            <View style={styles.preferenceTextArea}>
+              <Text style={styles.preferenceTitle}>Push bildirimleri</Text>
+              <Text style={styles.preferenceSubtitle}>Duyuru, program ve mesaj bildirimleri.</Text>
+            </View>
+            <Switch value={pushNotifications} onValueChange={setPushNotifications} />
+          </View>
+
+          <View style={styles.preferenceRowLast}>
+            <View style={styles.preferenceTextArea}>
+              <Text style={styles.preferenceTitle}>E-posta bildirimleri</Text>
+              <Text style={styles.preferenceSubtitle}>Önemli kulüp güncellemeleri için e-posta.</Text>
+            </View>
+            <Switch value={emailNotifications} onValueChange={setEmailNotifications} />
+          </View>
         </View>
 
-        <Link href="/dashboard" asChild>
-          <AppButton
-            title="Dashboard'a dön"
-            variant="secondary"
-            accessibilityLabel="Dashboard ekranına dön"
-            style={styles.backButton}
-          />
-        </Link>
+        <View style={styles.actionRowBottom}>
+          {!isEditing ? (
+            <AppButton
+              title="Profili düzenle"
+              onPress={startEditing}
+              style={styles.actionButton}
+            />
+          ) : null}
 
-        <Link href="/" asChild>
           <AppButton
-            title="Ana sayfaya dön"
+            title="Demo profili sıfırla"
             variant="ghost"
-            accessibilityLabel="Ana sayfaya dön"
-            style={styles.backButton}
+            accessibilityLabel="Profil bilgilerini sıfırla"
+            style={styles.actionButton}
+            onPress={resetProfile}
           />
-        </Link>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing["2xl"],
+    paddingBottom: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 980,
-    alignSelf: "center",
-  },
-  header: {
-    marginTop: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    gap: theme.spacing.lg,
-  },
+  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
+  pageHeader: { marginBottom: theme.spacing["2xl"] },
   logo: {
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    marginBottom: theme.spacing.md,
   },
-  welcome: {
+  pageTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["5xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.inverse,
     lineHeight: theme.lineHeights["5xl"],
     marginBottom: theme.spacing.sm,
   },
-  subtitle: {
-    fontSize: theme.fontSizes.lg,
+  pageSubtitle: {
     color: theme.colors.text.inverse,
     opacity: 0.76,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.xl,
   },
   heroCard: {
     backgroundColor: theme.colors.background.surface,
@@ -451,6 +396,25 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing["2xl"],
     ...theme.shadows.md,
   },
+  profileHeroRow: {
+    flexDirection: "row",
+    gap: theme.spacing.lg,
+    alignItems: "center",
+  },
+  avatar: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+  },
+  profileHeroText: { flex: 1 },
   heroLabel: {
     alignSelf: "flex-start",
     backgroundColor: theme.colors.brand.primarySoft,
@@ -474,18 +438,33 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
   },
-  heroButton: {
-    marginTop: theme.spacing["2xl"],
-    alignSelf: "flex-start",
-  },
-  editButtonRow: {
+  heroButton: { marginTop: theme.spacing["2xl"], alignSelf: "flex-start" },
+  statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing["2xl"],
   },
-  editButton: {
-    minWidth: 140,
+  statCard: {
+    flexGrow: 1,
+    flexBasis: 145,
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    ...theme.shadows.sm,
+  },
+  statValue: {
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  statLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.extrabold,
   },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -496,80 +475,58 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: { flex: 1 },
   sectionTitle: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   sectionSubtitle: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
-  profileTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.lg,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: theme.radius.full,
+  statusPill: {
     backgroundColor: theme.colors.brand.primarySoft,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  avatarText: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.brand,
-  },
-  profileInfo: {
-    flex: 1,
-  },
-  profileName: {
-    fontSize: theme.fontSizes["2xl"],
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radius.full,
   },
-  profileRole: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.brand,
-    marginBottom: theme.spacing.xs,
-  },
-  profileMeta: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-  },
-  form: {
-    gap: theme.spacing.lg,
-  },
-  inputGroup: {
-    gap: theme.spacing.sm,
-  },
+  form: { gap: theme.spacing.md },
+  formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
+  formField: { flexGrow: 1, flexBasis: 220 },
   inputLabel: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
   },
   input: {
+    minHeight: 52,
     backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.lg,
   },
+  infoList: { gap: 0 },
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -582,74 +539,60 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     gap: theme.spacing.lg,
-    paddingVertical: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
   infoLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    flex: 1,
     color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
   },
   infoValue: {
     flex: 1,
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     textAlign: "right",
   },
-  settingRow: {
+  preferenceRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: theme.spacing.lg,
+    paddingVertical: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border.default,
   },
-  settingContent: {
-    flex: 1,
+  preferenceRowLast: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
   },
-  settingTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+  preferenceTextArea: { flex: 1 },
+  preferenceTitle: {
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  settingSubtitle: {
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
-  },
-  settingDivider: {
-    height: 1,
-    backgroundColor: theme.colors.border.default,
-    marginVertical: theme.spacing.lg,
-  },
-  resetButtonWrapper: {
-    marginTop: theme.spacing.lg,
-    alignSelf: "flex-start",
-  },
-  actionGrid: {
-    gap: theme.spacing.md,
-  },
-  actionCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    opacity: 0.72,
-  },
-  actionText: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.brand,
+    fontWeight: theme.fontWeights.black,
     marginBottom: theme.spacing.xs,
   },
-  actionMeta: {
+  preferenceSubtitle: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
   },
-  backButton: {
-    width: "100%",
-    marginBottom: theme.spacing.md,
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginTop: theme.spacing["2xl"],
   },
+  actionRowBottom: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing["2xl"],
+  },
+  actionButton: { flexGrow: 1 },
 });

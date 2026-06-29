@@ -36,5 +36,6 @@ export const initialTeamSyncData: TeamSyncAppData = {
   chatGroups: [],
   chatMessages: [],
   payments: [],
+  replays: [],
   joinRequests: [],
 };

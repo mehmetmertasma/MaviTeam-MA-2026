@@ -218,221 +218,75 @@ export default function PaymentsScreen() {
           <Text style={styles.heroLabel}>Kulüp finans merkezi</Text>
           <Text style={styles.heroTitle}>Aidat ve ödeme takibi</Text>
           <Text style={styles.heroSubtitle}>
-            Bu sayfa artık fake ödeme listesi kullanmıyor. Ödemeler TeamSync service layer içindeki appData.payments üzerinden gelir.
+            Ödemeler TeamSync service layer içindeki appData.payments üzerinden gelir ve güncellenir.
           </Text>
         </View>
 
         <View style={styles.viewSwitcher}>
-          <Pressable
-            onPress={() => setActiveView("admin")}
-            style={({ pressed }) => [
-              styles.viewButton,
-              activeView === "admin" ? styles.viewButtonActive : null,
-              pressed ? styles.pressed : null,
-            ]}
-          >
+          <Pressable onPress={() => setActiveView("admin")} style={({ pressed }) => [styles.viewButton, activeView === "admin" ? styles.viewButtonActive : null, pressed ? styles.pressed : null]}>
             <Text style={[styles.viewButtonText, activeView === "admin" ? styles.viewButtonTextActive : null]}>Admin görünümü</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => setActiveView("parent")}
-            style={({ pressed }) => [
-              styles.viewButton,
-              activeView === "parent" ? styles.viewButtonActive : null,
-              pressed ? styles.pressed : null,
-            ]}
-          >
+          <Pressable onPress={() => setActiveView("parent")} style={({ pressed }) => [styles.viewButton, activeView === "parent" ? styles.viewButtonActive : null, pressed ? styles.pressed : null]}>
             <Text style={[styles.viewButtonText, activeView === "parent" ? styles.viewButtonTextActive : null]}>Veli görünümü</Text>
           </Pressable>
         </View>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{summary.paidCount}</Text>
-            <Text style={styles.statLabel}>Ödenen</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{summary.unpaidCount}</Text>
-            <Text style={styles.statLabel}>Ödenmeyen</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{summary.lateCount}</Text>
-            <Text style={styles.statLabel}>Geciken</Text>
-          </View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{summary.paidCount}</Text><Text style={styles.statLabel}>Ödenen</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{summary.unpaidCount}</Text><Text style={styles.statLabel}>Ödenmeyen</Text></View>
+          <View style={styles.statCard}><Text style={styles.statValue}>{summary.lateCount}</Text><Text style={styles.statLabel}>Geciken</Text></View>
         </View>
 
         {activeView === "admin" ? (
           <View style={styles.topActions}>
-            <AppButton
-              title={showCreateForm ? "Form açık" : "Yeni ödeme oluştur"}
-              onPress={() => {
-                setShowCreateForm(true);
-                setStatusMessage("Yeni ödeme bilgilerini doldurabilirsin.");
-              }}
-              disabled={showCreateForm}
-              style={styles.actionButton}
-            />
+            <AppButton title={showCreateForm ? "Form açık" : "Yeni ödeme oluştur"} onPress={() => { setShowCreateForm(true); setStatusMessage("Yeni ödeme bilgilerini doldurabilirsin."); }} disabled={showCreateForm} style={styles.actionButton} />
             <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={loadPaymentsData} style={styles.actionButton} />
           </View>
         ) : null}
 
         {showCreateForm && activeView === "admin" ? (
           <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>Yeni ödeme oluştur</Text>
-                <Text style={styles.sectionSubtitle}>Bir üyeye aidat veya ödeme kaydı ekle.</Text>
-              </View>
-              <Text style={styles.statusPill}>Yeni</Text>
-            </View>
-
+            <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>Yeni ödeme oluştur</Text><Text style={styles.sectionSubtitle}>Bir üyeye aidat veya ödeme kaydı ekle.</Text></View><Text style={styles.statusPill}>Yeni</Text></View>
             <Text style={styles.label}>Kullanıcı</Text>
-            <View style={styles.optionGrid}>
-              {activeUsers.map((user) => {
-                const isSelected = selectedUserId === user.id;
-
-                return (
-                  <Pressable
-                    key={user.id}
-                    onPress={() => setSelectedUserId(user.id)}
-                    style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}
-                  >
-                    <Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{user.fullName}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
+            <View style={styles.optionGrid}>{activeUsers.map((user) => { const isSelected = selectedUserId === user.id; return (<Pressable key={user.id} onPress={() => setSelectedUserId(user.id)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{user.fullName}</Text></Pressable>); })}</View>
             <Text style={styles.label}>Başlık</Text>
-            <TextInput
-              value={paymentTitle}
-              onChangeText={setPaymentTitle}
-              placeholder="Örn: Temmuz aidatı"
-              placeholderTextColor={theme.colors.text.muted}
-              style={styles.input}
-            />
-
+            <TextInput value={paymentTitle} onChangeText={setPaymentTitle} placeholder="Örn: Temmuz aidatı" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
             <View style={styles.formGrid}>
-              <View style={styles.formField}>
-                <Text style={styles.label}>Tutar</Text>
-                <TextInput
-                  value={amountText}
-                  onChangeText={setAmountText}
-                  placeholder="Örn: 1250"
-                  placeholderTextColor={theme.colors.text.muted}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
-
-              <View style={styles.formField}>
-                <Text style={styles.label}>Son tarih</Text>
-                <TextInput
-                  value={dueDateText}
-                  onChangeText={setDueDateText}
-                  placeholder="Örn: 2026-07-15"
-                  placeholderTextColor={theme.colors.text.muted}
-                  autoCapitalize="none"
-                  style={styles.input}
-                />
-              </View>
+              <View style={styles.formField}><Text style={styles.label}>Tutar</Text><TextInput value={amountText} onChangeText={setAmountText} placeholder="Örn: 1250" placeholderTextColor={theme.colors.text.muted} keyboardType="numeric" style={styles.input} /></View>
+              <View style={styles.formField}><Text style={styles.label}>Son tarih</Text><TextInput value={dueDateText} onChangeText={setDueDateText} placeholder="Örn: 2026-07-15" placeholderTextColor={theme.colors.text.muted} autoCapitalize="none" style={styles.input} /></View>
             </View>
-
             <View style={styles.topActions}>
               <AppButton title="Ödemeyi kaydet" onPress={handleCreatePayment} disabled={!canCreatePayment} style={styles.actionButton} />
-              <AppButton
-                title="Vazgeç"
-                variant="ghost"
-                onPress={() => {
-                  clearForm();
-                  setShowCreateForm(false);
-                  setStatusMessage("Ödeme oluşturma iptal edildi.");
-                }}
-                style={styles.actionButton}
-              />
+              <AppButton title="Vazgeç" variant="ghost" onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage("Ödeme oluşturma iptal edildi."); }} style={styles.actionButton} />
             </View>
           </View>
         ) : null}
 
         <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>{activeView === "admin" ? "Kulüp ödeme listesi" : "Benim ödeme durumum"}</Text>
-              <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
-            </View>
-
-            <Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text>
-          </View>
+          <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>{activeView === "admin" ? "Kulüp ödeme listesi" : "Benim ödeme durumum"}</Text><Text style={styles.sectionSubtitle}>{statusMessage}</Text></View><Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text></View>
 
           {appData !== null && visiblePayments.length > 0 ? (
             <View style={styles.paymentList}>
               {visiblePayments.map((payment) => {
                 const isPaid = payment.status === "paid";
                 const isLate = payment.status === "late";
-
                 return (
                   <View key={payment.id} style={styles.paymentCard}>
-                    <View style={styles.cardTopRow}>
-                      <View style={styles.cardTitleGroup}>
-                        <Text style={styles.athleteName}>{getUserName(payment.userId, users)}</Text>
-                        <Text style={styles.parentName}>{payment.title}</Text>
-                      </View>
-
-                      <Text style={[styles.statusBadge, isPaid ? styles.statusBadgePaid : null, isLate ? styles.statusBadgeOverdue : null]}>
-                        {getStatusLabel(payment.status)}
-                      </Text>
-                    </View>
-
+                    <View style={styles.cardTopRow}><View style={styles.cardTitleGroup}><Text style={styles.athleteName}>{getUserName(payment.userId, users)}</Text><Text style={styles.parentName}>{payment.title}</Text></View><Text style={[styles.statusBadge, isPaid ? styles.statusBadgePaid : null, isLate ? styles.statusBadgeOverdue : null]}>{getStatusLabel(payment.status)}</Text></View>
                     <View style={styles.infoGrid}>
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Takım</Text>
-                        <Text style={styles.infoValue}>{getPrimaryTeamName(payment.userId, appData)}</Text>
-                      </View>
-
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Tutar</Text>
-                        <Text style={styles.infoValue}>{formatAmount(payment.amountCents)}</Text>
-                      </View>
-
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Son tarih</Text>
-                        <Text style={styles.infoValue}>{formatDate(payment.dueAt)}</Text>
-                      </View>
-
-                      <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Ödendi</Text>
-                        <Text style={styles.infoValue}>{payment.paidAt ? formatDate(payment.paidAt) : "Bekleniyor"}</Text>
-                      </View>
+                      <View style={styles.infoBox}><Text style={styles.infoLabel}>Takım</Text><Text style={styles.infoValue}>{getPrimaryTeamName(payment.userId, appData)}</Text></View>
+                      <View style={styles.infoBox}><Text style={styles.infoLabel}>Tutar</Text><Text style={styles.infoValue}>{formatAmount(payment.amountCents)}</Text></View>
+                      <View style={styles.infoBox}><Text style={styles.infoLabel}>Son tarih</Text><Text style={styles.infoValue}>{formatDate(payment.dueAt)}</Text></View>
+                      <View style={styles.infoBox}><Text style={styles.infoLabel}>Ödendi</Text><Text style={styles.infoValue}>{payment.paidAt ? formatDate(payment.paidAt) : "Bekleniyor"}</Text></View>
                     </View>
-
-                    {activeView === "admin" ? (
-                      <View style={styles.statusActions}>
-                        {paymentStatusOptions.map((option) => {
-                          const isSelected = payment.status === option.status;
-
-                          return (
-                            <Pressable
-                              key={option.status}
-                              onPress={() => handleChangePaymentStatus(payment.id, option.status)}
-                              style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}
-                            >
-                              <Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>{option.label}</Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    ) : null}
+                    {activeView === "admin" ? (<View style={styles.statusActions}>{paymentStatusOptions.map((option) => { const isSelected = payment.status === option.status; return (<Pressable key={option.status} onPress={() => handleChangePaymentStatus(payment.id, option.status)} style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>) : null}
                   </View>
                 );
               })}
             </View>
           ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Henüz ödeme kaydı yok</Text>
-              <Text style={styles.emptyText}>Yeni ödeme oluştur butonuyla ilk merkezi ödeme kaydını ekleyebilirsin.</Text>
-            </View>
+            <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Henüz ödeme kaydı yok</Text><Text style={styles.emptyText}>Yeni ödeme oluştur butonuyla ilk merkezi ödeme kaydını ekleyebilirsin.</Text></View>
           )}
         </View>
       </View>

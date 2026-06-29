@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
+import { AuthProvider } from "@/providers/AuthProvider";
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -22,7 +23,7 @@ const routesWithoutGlobalNavigation = [
 ];
 
 function AppProviders({ children }: PropsWithChildren) {
-  return <>{children}</>;
+  return <AuthProvider>{children}</AuthProvider>;
 }
 
 export default function RootLayout() {

@@ -11,6 +11,7 @@ import type {
   JoinRequest,
   Payment,
   PaymentStatus,
+  Replay,
   ScheduleEvent,
   Team,
   TeamSyncAppData,
@@ -38,10 +39,12 @@ type CreateJoinRequestInput = {
 type SaveAttendanceInput = {
   teamId?: string;
   sessionDate: string;
-  records: {
-    userId: string;
-    status: AttendanceStatus;
-  }[];
+  records: { userId: string; status: AttendanceStatus }[];
+};
+
+type StoredAppData = TeamSyncAppData & {
+  attendanceRecords?: AttendanceRecord[];
+  replays?: Replay[];
 };
 
 function nowIso() {
@@ -49,22 +52,19 @@ function nowIso() {
 }
 
 function normalizeClubCode(value: string) {
-  return value
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
+  return value.trim().toUpperCase().replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
 }
 
 function generateClubCode(clubName: string) {
   const prefix = normalizeClubCode(clubName).slice(0, 3);
-
   return `${prefix || "TS"}${new Date().getFullYear()}`;
 }
 
-function ensureAppDataShape(data: TeamSyncAppData & { attendanceRecords?: AttendanceRecord[] }) {
+function ensureAppDataShape(data: StoredAppData) {
   return {
     ...data,
     attendanceRecords: Array.isArray(data.attendanceRecords) ? data.attendanceRecords : [],
+    replays: Array.isArray(data.replays) ? data.replays : [],
   } satisfies TeamSyncAppData;
 }
 
@@ -76,11 +76,7 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     return initialTeamSyncData;
   }
 
-  const parsedData = JSON.parse(savedData) as TeamSyncAppData & {
-    attendanceRecords?: AttendanceRecord[];
-  };
-
-  return ensureAppDataShape(parsedData);
+  return ensureAppDataShape(JSON.parse(savedData) as StoredAppData);
 }
 
 async function saveAppData(data: TeamSyncAppData) {
@@ -161,6 +157,7 @@ export const teamSyncService = {
       chatGroups: [],
       chatMessages: [],
       payments: [],
+      replays: [],
       joinRequests: [],
     };
 
@@ -169,10 +166,8 @@ export const teamSyncService = {
 
   async createJoinRequest(input: CreateJoinRequestInput) {
     const data = await loadAppData();
-    const normalizedInputCode = normalizeClubCode(input.inviteCode);
-    const normalizedClubCode = normalizeClubCode(data.club.code);
 
-    if (normalizedInputCode !== normalizedClubCode) {
+    if (normalizeClubCode(input.inviteCode) !== normalizeClubCode(data.club.code)) {
       throw new Error("INVALID_CLUB_CODE");
     }
 
@@ -206,10 +201,7 @@ export const teamSyncService = {
       ...data,
       currentUser: pendingUser,
       users: [pendingUser, ...data.users.filter((user) => user.email !== normalizedEmail)],
-      joinRequests: [
-        joinRequest,
-        ...data.joinRequests.filter((request) => request.userId !== pendingUserId),
-      ],
+      joinRequests: [joinRequest, ...data.joinRequests],
     });
   },
 
@@ -219,42 +211,17 @@ export const teamSyncService = {
     let approvedUserId = "";
 
     const joinRequests = data.joinRequests.map((request) => {
-      if (request.id !== joinRequestId) {
-        return request;
-      }
-
+      if (request.id !== joinRequestId) return request;
       approvedUserId = request.userId;
-
-      return {
-        ...request,
-        status: "approved" as const,
-        reviewedByUserId: data.currentUser.id,
-        reviewedAt,
-      };
+      return { ...request, status: "approved" as const, reviewedByUserId: data.currentUser.id, reviewedAt };
     });
 
     const users = data.users.map((user) => {
-      if (user.id !== approvedUserId) {
-        return user;
-      }
-
-      return {
-        ...user,
-        status: "active" as const,
-        updatedAt: reviewedAt,
-      };
+      if (user.id !== approvedUserId) return user;
+      return { ...user, status: "active" as const, updatedAt: reviewedAt };
     });
 
-    const currentUser = data.currentUser.id === approvedUserId
-      ? users.find((user) => user.id === approvedUserId) ?? data.currentUser
-      : data.currentUser;
-
-    return saveAppData({
-      ...data,
-      currentUser,
-      users,
-      joinRequests,
-    });
+    return saveAppData({ ...data, users, joinRequests });
   },
 
   async rejectJoinRequest(joinRequestId: string) {
@@ -263,78 +230,33 @@ export const teamSyncService = {
     let rejectedUserId = "";
 
     const joinRequests = data.joinRequests.map((request) => {
-      if (request.id !== joinRequestId) {
-        return request;
-      }
-
+      if (request.id !== joinRequestId) return request;
       rejectedUserId = request.userId;
-
-      return {
-        ...request,
-        status: "rejected" as const,
-        reviewedByUserId: data.currentUser.id,
-        reviewedAt,
-      };
+      return { ...request, status: "rejected" as const, reviewedByUserId: data.currentUser.id, reviewedAt };
     });
 
     const users = data.users.map((user) => {
-      if (user.id !== rejectedUserId) {
-        return user;
-      }
-
-      return {
-        ...user,
-        status: "removed" as const,
-        updatedAt: reviewedAt,
-      };
+      if (user.id !== rejectedUserId) return user;
+      return { ...user, status: "removed" as const, updatedAt: reviewedAt };
     });
 
-    const currentUser = data.currentUser.id === rejectedUserId
-      ? users.find((user) => user.id === rejectedUserId) ?? data.currentUser
-      : data.currentUser;
-
-    return saveAppData({
-      ...data,
-      currentUser,
-      users,
-      joinRequests,
-    });
+    return saveAppData({ ...data, users, joinRequests });
   },
 
   async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
     const data = await loadAppData();
-    const updatedAt = nowIso();
-    const nextCurrentUser: UserProfile = {
-      ...data.currentUser,
-      ...updates,
-      updatedAt,
-    };
+    const nextCurrentUser: UserProfile = { ...data.currentUser, ...updates, updatedAt: nowIso() };
 
     return saveAppData({
       ...data,
       currentUser: nextCurrentUser,
-      users: data.users.map((user) => {
-        if (user.id !== nextCurrentUser.id) {
-          return user;
-        }
-
-        return nextCurrentUser;
-      }),
+      users: data.users.map((user) => (user.id === nextCurrentUser.id ? nextCurrentUser : user)),
     });
   },
 
   async updateCurrentClub(updates: Partial<Pick<Club, "name" | "sport" | "city" | "code" | "logoUrl" | "primaryColor">>) {
     const data = await loadAppData();
-    const nextClub: Club = {
-      ...data.club,
-      ...updates,
-      updatedAt: nowIso(),
-    };
-
-    return saveAppData({
-      ...data,
-      club: nextClub,
-    });
+    return saveAppData({ ...data, club: { ...data.club, ...updates, updatedAt: nowIso() } });
   },
 
   async listUsersByClub(clubId: string) {
@@ -360,136 +282,64 @@ export const teamSyncService = {
   async createTeam(input: Omit<Team, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
     const createdAt = nowIso();
-    const newTeam: Team = {
-      ...input,
-      id: `team-${Date.now()}`,
-      createdAt,
-      updatedAt: createdAt,
-    };
-
-    return saveAppData({
-      ...data,
-      teams: [newTeam, ...data.teams],
-    });
+    const newTeam: Team = { ...input, id: `team-${Date.now()}`, createdAt, updatedAt: createdAt };
+    return saveAppData({ ...data, teams: [newTeam, ...data.teams] });
   },
 
   async createAnnouncement(input: Omit<Announcement, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
-    const newAnnouncement: Announcement = {
-      ...input,
-      id: `announcement-${Date.now()}`,
-      createdAt: nowIso(),
-    };
-
-    return saveAppData({
-      ...data,
-      announcements: [newAnnouncement, ...data.announcements],
-    });
+    const newAnnouncement: Announcement = { ...input, id: `announcement-${Date.now()}`, createdAt: nowIso() };
+    return saveAppData({ ...data, announcements: [newAnnouncement, ...data.announcements] });
   },
 
   async updateAnnouncement(announcementId: string, updates: Partial<Pick<Announcement, "title" | "message" | "targetType" | "targetTeamId">>) {
     const data = await loadAppData();
-
     return saveAppData({
       ...data,
-      announcements: data.announcements.map((announcement) => {
-        if (announcement.id !== announcementId) {
-          return announcement;
-        }
-
-        return {
-          ...announcement,
-          ...updates,
-          updatedAt: nowIso(),
-        };
-      }),
+      announcements: data.announcements.map((announcement) => (
+        announcement.id === announcementId ? { ...announcement, ...updates, updatedAt: nowIso() } : announcement
+      )),
     });
   },
 
   async removeAnnouncement(announcementId: string) {
     const data = await loadAppData();
-
-    return saveAppData({
-      ...data,
-      announcements: data.announcements.filter((announcement) => announcement.id !== announcementId),
-    });
+    return saveAppData({ ...data, announcements: data.announcements.filter((announcement) => announcement.id !== announcementId) });
   },
 
   async createScheduleEvent(input: Omit<ScheduleEvent, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
-    const newEvent: ScheduleEvent = {
-      ...input,
-      id: `event-${Date.now()}`,
-      createdAt: nowIso(),
-    };
-
-    return saveAppData({
-      ...data,
-      scheduleEvents: [newEvent, ...data.scheduleEvents],
-    });
+    const newEvent: ScheduleEvent = { ...input, id: `event-${Date.now()}`, createdAt: nowIso() };
+    return saveAppData({ ...data, scheduleEvents: [newEvent, ...data.scheduleEvents] });
   },
 
   async updateScheduleEvent(eventId: string, updates: Partial<Pick<ScheduleEvent, "title" | "type" | "startsAt" | "endsAt" | "location" | "note" | "teamId">>) {
     const data = await loadAppData();
-
     return saveAppData({
       ...data,
-      scheduleEvents: data.scheduleEvents.map((event) => {
-        if (event.id !== eventId) {
-          return event;
-        }
-
-        return {
-          ...event,
-          ...updates,
-          updatedAt: nowIso(),
-        };
-      }),
+      scheduleEvents: data.scheduleEvents.map((event) => (
+        event.id === eventId ? { ...event, ...updates, updatedAt: nowIso() } : event
+      )),
     });
   },
 
   async createChatGroup(input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
     const createdAt = nowIso();
-    const newChatGroup: ChatGroup = {
-      ...input,
-      id: `chat-${Date.now()}`,
-      createdAt,
-      updatedAt: createdAt,
-    };
-
-    return saveAppData({
-      ...data,
-      chatGroups: [newChatGroup, ...data.chatGroups],
-    });
+    const newChatGroup: ChatGroup = { ...input, id: `chat-${Date.now()}`, createdAt, updatedAt: createdAt };
+    return saveAppData({ ...data, chatGroups: [newChatGroup, ...data.chatGroups] });
   },
 
   async createChatMessage(input: Omit<ChatMessage, "id" | "createdAt">) {
     const data = await loadAppData();
-    const newChatMessage: ChatMessage = {
-      ...input,
-      id: `message-${Date.now()}`,
-      createdAt: nowIso(),
-    };
-
-    return saveAppData({
-      ...data,
-      chatMessages: [...data.chatMessages, newChatMessage],
-    });
+    const newChatMessage: ChatMessage = { ...input, id: `message-${Date.now()}`, createdAt: nowIso() };
+    return saveAppData({ ...data, chatMessages: [...data.chatMessages, newChatMessage] });
   },
 
   async createPayment(input: Omit<Payment, "id" | "updatedAt">) {
     const data = await loadAppData();
-    const newPayment: Payment = {
-      ...input,
-      id: `payment-${Date.now()}`,
-      updatedAt: nowIso(),
-    };
-
-    return saveAppData({
-      ...data,
-      payments: [newPayment, ...data.payments],
-    });
+    const newPayment: Payment = { ...input, id: `payment-${Date.now()}`, updatedAt: nowIso() };
+    return saveAppData({ ...data, payments: [newPayment, ...data.payments] });
   },
 
   async updatePaymentStatus(paymentId: string, status: PaymentStatus) {
@@ -498,19 +348,24 @@ export const teamSyncService = {
 
     return saveAppData({
       ...data,
-      payments: data.payments.map((payment) => {
-        if (payment.id !== paymentId) {
-          return payment;
-        }
-
-        return {
-          ...payment,
-          status,
-          paidAt: status === "paid" ? updatedAt : undefined,
-          updatedAt,
-        };
-      }),
+      payments: data.payments.map((payment) => (
+        payment.id === paymentId
+          ? { ...payment, status, paidAt: status === "paid" ? updatedAt : undefined, updatedAt }
+          : payment
+      )),
     });
+  },
+
+  async createReplay(input: Omit<Replay, "id" | "createdAt" | "updatedAt">) {
+    const data = await loadAppData();
+    const createdAt = nowIso();
+    const newReplay: Replay = { ...input, id: `replay-${Date.now()}`, createdAt, updatedAt: createdAt };
+    return saveAppData({ ...data, replays: [newReplay, ...data.replays] });
+  },
+
+  async removeReplay(replayId: string) {
+    const data = await loadAppData();
+    return saveAppData({ ...data, replays: data.replays.filter((replay) => replay.id !== replayId) });
   },
 
   async saveAttendance(input: SaveAttendanceInput) {
@@ -532,9 +387,7 @@ export const teamSyncService = {
       ...data,
       attendanceRecords: [
         ...nextRecords,
-        ...data.attendanceRecords.filter((record) => {
-          return !(record.teamId === input.teamId && record.sessionDate === input.sessionDate);
-        }),
+        ...data.attendanceRecords.filter((record) => !(record.teamId === input.teamId && record.sessionDate === input.sessionDate)),
       ],
     });
   },
@@ -542,35 +395,18 @@ export const teamSyncService = {
   async removeUserFromClub(userId: string) {
     const data = await loadAppData();
     const removedAt = nowIso();
-    let removedUser: UserProfile | undefined;
 
-    const users = data.users.map((user) => {
-      if (user.id !== userId) {
-        return user;
-      }
-
-      removedUser = {
-        ...user,
-        status: "removed",
-        teamIds: [],
-        updatedAt: removedAt,
-      };
-
-      return removedUser;
-    });
+    const users = data.users.map((user) => (
+      user.id === userId ? { ...user, status: "removed" as const, teamIds: [], updatedAt: removedAt } : user
+    ));
 
     const teams = data.teams.map((team) => ({
       ...team,
       coachIds: team.coachIds.filter((coachId) => coachId !== userId),
       memberIds: team.memberIds.filter((memberId) => memberId !== userId),
-      updatedAt: removedUser ? removedAt : team.updatedAt,
     }));
 
-    return saveAppData({
-      ...data,
-      users,
-      teams,
-    });
+    return saveAppData({ ...data, users, teams });
   },
 };
 

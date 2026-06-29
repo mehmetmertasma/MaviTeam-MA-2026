@@ -5,19 +5,11 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { JoinRequest, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
+import type { JoinRequest, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
 type RequestRow = {
   request: JoinRequest;
   user?: UserProfile;
-};
-
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
 };
 
 function getStatusText(status: JoinRequest["status"]) {
@@ -173,16 +165,13 @@ export default function PendingApprovalsScreen() {
                 const isPending = request.status === "pending";
                 const displayName = user?.fullName ?? "Kullanıcı bulunamadı";
                 const displayEmail = user?.email ?? "E-posta yok";
-                const displayRole = roleDisplayNames[request.requestedRole];
 
                 return (
                   <View key={request.id} style={styles.memberCard}>
                     <View style={styles.memberTopRow}>
                       <View style={styles.memberInfo}>
                         <Text style={styles.memberName}>{displayName}</Text>
-                        <Text style={styles.memberMeta}>
-                          {displayRole} · {displayEmail}
-                        </Text>
+                        <Text style={styles.memberMeta}>{displayEmail}</Text>
                         <Text style={styles.memberDate}>İstek zamanı: {formatDate(request.createdAt)}</Text>
                       </View>
 
@@ -235,24 +224,15 @@ export default function PendingApprovalsScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
     paddingHorizontal: theme.spacing["2xl"],
     paddingBottom: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 980,
-    alignSelf: "center",
-  },
-  pageHeader: {
-    marginBottom: theme.spacing["2xl"],
-  },
+  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
+  pageHeader: { marginBottom: theme.spacing["2xl"] },
   logo: {
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
@@ -298,17 +278,8 @@ const styles = StyleSheet.create({
     lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
-  heroSubtitle: {
-    fontSize: theme.fontSizes.lg,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.xl,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
-  },
+  heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing["2xl"] },
   statCard: {
     flexGrow: 1,
     flexBasis: 145,
@@ -319,17 +290,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  statValue: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  statLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-  },
+  statValue: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold },
   section: {
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius["2xl"],
@@ -339,121 +301,25 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
-  },
-  sectionHeaderText: {
-    flex: 1,
-  },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  sectionSubtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-  },
-  statusPill: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-  },
-  emptyBox: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  emptyTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-  },
-  memberList: {
-    gap: theme.spacing.md,
-  },
-  memberCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  memberTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.md,
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  memberMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    marginBottom: theme.spacing.xs,
-  },
-  memberDate: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  memberStatus: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-  },
-  statusApproved: {
-    color: theme.colors.text.brand,
-  },
-  statusRejected: {
-    color: theme.colors.text.secondary,
-    backgroundColor: theme.colors.background.surface,
-  },
-  actionRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  actionButton: {
-    flexGrow: 1,
-    minWidth: 130,
-  },
-  resetButton: {
-    marginTop: theme.spacing["2xl"],
-    alignSelf: "flex-start",
-  },
+  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  sectionHeaderText: { flex: 1 },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full },
+  emptyBox: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
+  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  memberList: { gap: theme.spacing.md },
+  memberCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
+  memberTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.md },
+  memberInfo: { flex: 1 },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  memberDate: { color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  memberStatus: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full },
+  statusApproved: { color: theme.colors.text.brand },
+  statusRejected: { color: theme.colors.text.secondary, backgroundColor: theme.colors.background.surface },
+  actionRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.md },
+  actionButton: { flexGrow: 1, minWidth: 130 },
+  resetButton: { marginTop: theme.spacing["2xl"], alignSelf: "flex-start" },
 });

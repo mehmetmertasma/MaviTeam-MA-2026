@@ -42,11 +42,11 @@ const variantStyles: Record<
   },
   ghost: {
     button: {
-      backgroundColor: "transparent",
+      backgroundColor: theme.colors.background.surface,
       borderColor: theme.colors.border.default,
     },
     text: {
-      color: theme.colors.text.primary,
+      color: theme.colors.text.brand,
     },
   },
 };

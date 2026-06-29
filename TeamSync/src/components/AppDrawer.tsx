@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
+import type { TeamSyncAppData } from "@/types/teamSync";
 
 type DrawerItem = {
   label: string;
@@ -16,14 +16,6 @@ type DrawerItem = {
 type AppDrawerProps = {
   visible: boolean;
   onClose: () => void;
-};
-
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
 };
 
 const drawerItems: DrawerItem[] = [
@@ -97,9 +89,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
 
   const profileName = currentUser?.fullName ?? "TeamSync Kullanıcı";
   const profileInitials = getInitials(profileName);
-  const profileSubtitle = currentUser
-    ? `${roleDisplayNames[currentUser.role]} · ${primaryTeam?.name ?? currentClub?.name ?? "Kulüp yok"}`
-    : "Profil bilgileri yükleniyor";
+  const profileSubtitle = primaryTeam?.name ?? currentClub?.name ?? "Profil bilgileri yükleniyor";
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
     if (isDisabled || route === undefined) {

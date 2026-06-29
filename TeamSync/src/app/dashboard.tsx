@@ -8,6 +8,7 @@ import { teamSyncService } from "@/services/teamSyncService";
 import type { ScheduleEvent, TeamSyncAppData, UserRole } from "@/types/teamSync";
 
 type AppRoute =
+  | "/dashboard"
   | "/teams"
   | "/pending-approvals"
   | "/announcements"
@@ -51,7 +52,7 @@ const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = {
 
 const quickActionsByRole: Record<UserRole, QuickAction[]> = {
   superAdmin: [
-    { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" as AppRoute },
+    { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" },
     { title: "İstatistikleri gör", meta: "Platform ve kulüp özeti", route: "/statistics" },
     { title: "Profil bilgileri", meta: "Hesap merkezine git", route: "/profile" },
   ],
@@ -173,12 +174,12 @@ export default function DashboardScreen() {
       quickActions: quickActionsByRole[currentUser.role],
       upcomingEvents: getUpcomingEvents(scheduleEvents),
       stats: [
-        { label: "Aktif üye", value: String(activeUsers.length) },
-        { label: "Sporcu", value: String(athleteCount) },
-        { label: "Takım", value: String(teams.length) },
-        { label: "Etkinlik", value: String(scheduleEvents.length) },
-        { label: "Duyuru", value: String(announcements.length) },
-        { label: "Bekleyen onay", value: String(pendingRequestCount) },
+        { label: "Aktif üye", value: String(activeUsers.length), hint: "Kulüp erişimi" },
+        { label: "Oyuncu", value: String(athleteCount), hint: "Takım havuzu" },
+        { label: "Takım", value: String(teams.length), hint: "Organizasyon" },
+        { label: "Etkinlik", value: String(scheduleEvents.length), hint: "Takvim" },
+        { label: "Duyuru", value: String(announcements.length), hint: "İletişim" },
+        { label: "Onay", value: String(pendingRequestCount), hint: "Bekleyen" },
       ],
       overview: [
         { label: "Kulüp", value: club.name },
@@ -209,95 +210,127 @@ export default function DashboardScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.pageHeader}>
-          <Text style={styles.logo}>TeamSync</Text>
+          <View style={styles.brandRow}>
+            <Text style={styles.logo}>TeamSync</Text>
+            <Text style={styles.headerPill}>{dashboardModel.club.city || "Kulüp merkezi"}</Text>
+          </View>
           <Text style={styles.welcome}>Hoş geldin, {getFirstName(dashboardModel.currentUser.fullName)}</Text>
           <Text style={styles.subtitle}>{dashboardModel.club.name}</Text>
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Merkezi data paneli</Text>
-          <Text style={styles.heroTitle}>{dashboardModel.heroText.title}</Text>
-          <Text style={styles.heroSubtitle}>{dashboardModel.heroText.subtitle}</Text>
-          <Text style={styles.statusText}>{statusMessage}</Text>
+          <View style={styles.heroContent}>
+            <Text style={styles.heroLabel}>Canlı kulüp paneli</Text>
+            <Text style={styles.heroTitle}>{dashboardModel.heroText.title}</Text>
+            <Text style={styles.heroSubtitle}>{dashboardModel.heroText.subtitle}</Text>
 
-          <AppButton
-            title="Profili düzenle"
-            variant="secondary"
-            accessibilityLabel="Profil düzenleme sayfasına git"
-            style={styles.editProfileButton}
-            onPress={() => router.push("/profile" as never)}
-          />
+            <View style={styles.heroActionRow}>
+              <AppButton
+                title="Profili düzenle"
+                variant="secondary"
+                accessibilityLabel="Profil düzenleme sayfasına git"
+                style={styles.editProfileButton}
+                onPress={() => router.push("/profile" as never)}
+              />
+              <Text style={styles.statusText}>{statusMessage}</Text>
+            </View>
+          </View>
+
+          <View style={styles.heroSideCard}>
+            <Text style={styles.heroSideLabel}>Kulüp kodu</Text>
+            <Text style={styles.heroSideValue}>{dashboardModel.club.code}</Text>
+            <Text style={styles.heroSideMeta}>{dashboardModel.primaryTeam?.name ?? "Takım seçilmedi"}</Text>
+          </View>
         </View>
 
         <View style={styles.statsGrid}>
           {dashboardModel.stats.map((stat) => (
             <View key={stat.label} style={styles.statCard}>
+              <Text style={styles.statHint}>{stat.hint}</Text>
               <Text style={styles.statValue}>{stat.value}</Text>
               <Text style={styles.statLabel}>{stat.label}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
-          <Text style={styles.sectionSubtitle}>
-            Bu butonlar hesabına göre gösterilen en önemli işlemleri açar.
-          </Text>
+        <View style={styles.contentGrid}>
+          <View style={[styles.section, styles.contentColumnLarge]}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
+                <Text style={styles.sectionSubtitle}>Hesabına göre en önemli ekranlara tek tıkla geç.</Text>
+              </View>
+              <Text style={styles.sectionBadge}>{dashboardModel.quickActions.length}</Text>
+            </View>
 
-          <View style={styles.actionGrid}>
-            {dashboardModel.quickActions.map((action) => {
-              return (
-                <Pressable
-                  key={action.title}
-                  onPress={() => router.push(action.route as never)}
-                  style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
-                >
-                  <View style={styles.actionTextArea}>
-                    <Text style={styles.actionText}>{action.title}</Text>
-                    <Text style={styles.actionMeta}>{action.meta}</Text>
+            <View style={styles.actionGrid}>
+              {dashboardModel.quickActions.map((action) => {
+                return (
+                  <Pressable
+                    key={action.title}
+                    onPress={() => router.push(action.route as never)}
+                    style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
+                  >
+                    <View style={styles.actionIcon}>
+                      <Text style={styles.actionIconText}>↗</Text>
+                    </View>
+                    <View style={styles.actionTextArea}>
+                      <Text style={styles.actionText}>{action.title}</Text>
+                      <Text style={styles.actionMeta}>{action.meta}</Text>
+                    </View>
+                    <Text style={styles.actionArrow}>›</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={[styles.section, styles.contentColumnSmall]}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionHeaderText}>
+                <Text style={styles.sectionTitle}>Yaklaşan etkinlikler</Text>
+                <Text style={styles.sectionSubtitle}>Takvimden gelen en yakın kayıtlar.</Text>
+              </View>
+            </View>
+
+            {dashboardModel.upcomingEvents.length === 0 ? (
+              <Text style={styles.emptyText}>Henüz etkinlik yok.</Text>
+            ) : (
+              <View style={styles.eventList}>
+                {dashboardModel.upcomingEvents.map((event) => (
+                  <View key={event.id} style={styles.eventCard}>
+                    <View style={styles.eventDot} />
+
+                    <View style={styles.eventContent}>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <Text style={styles.eventTime}>{formatEventTime(event.startsAt)}</Text>
+                      <Text style={styles.eventLocation}>{event.location}</Text>
+                    </View>
                   </View>
-                  <Text style={styles.actionArrow}>›</Text>
-                </Pressable>
-              );
-            })}
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Yaklaşan etkinlikler</Text>
-
-          {dashboardModel.upcomingEvents.length === 0 ? (
-            <Text style={styles.emptyText}>Henüz etkinlik yok.</Text>
-          ) : (
-            <View style={styles.eventList}>
-              {dashboardModel.upcomingEvents.map((event) => (
-                <View key={event.id} style={styles.eventCard}>
-                  <View style={styles.eventDot} />
-
-                  <View style={styles.eventContent}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <Text style={styles.eventTime}>{formatEventTime(event.startsAt)}</Text>
-                    <Text style={styles.eventLocation}>{event.location}</Text>
-                  </View>
-                </View>
-              ))}
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Kulüp özeti</Text>
+              <Text style={styles.sectionSubtitle}>Ana bilgiler tek kart görünümünde.</Text>
             </View>
-          )}
-        </View>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kulüp özeti</Text>
-
-          {dashboardModel.overview.map((item, index) => {
-            const isLastItem = index === dashboardModel.overview.length - 1;
-
-            return (
-              <View key={item.label} style={isLastItem ? styles.infoRowLast : styles.infoRow}>
-                <Text style={styles.infoLabel}>{item.label}</Text>
-                <Text style={styles.infoValue}>{item.value}</Text>
-              </View>
-            );
-          })}
+          <View style={styles.overviewGrid}>
+            {dashboardModel.overview.map((item) => {
+              return (
+                <View key={item.label} style={styles.infoCard}>
+                  <Text style={styles.infoLabel}>{item.label}</Text>
+                  <Text style={styles.infoValue}>{item.value}</Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -317,17 +350,35 @@ const styles = StyleSheet.create({
   },
   container: {
     width: "100%",
-    maxWidth: 980,
+    maxWidth: 1180,
     alignSelf: "center",
   },
   pageHeader: {
     marginBottom: theme.spacing["2xl"],
   },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.brand.primary,
-    marginBottom: theme.spacing.md,
+  },
+  headerPill: {
+    color: theme.colors.text.inverse,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    borderRadius: theme.radius.full,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    overflow: "hidden",
   },
   welcome: {
     fontSize: theme.fontSizes["5xl"],
@@ -347,7 +398,16 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius["2xl"],
     padding: theme.spacing["3xl"],
     marginBottom: theme.spacing["2xl"],
-    ...theme.shadows.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing["2xl"],
+    ...theme.shadows.lg,
+  },
+  heroContent: {
+    flex: 1,
+    minWidth: 280,
   },
   heroLabel: {
     alignSelf: "flex-start",
@@ -359,6 +419,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.full,
     marginBottom: theme.spacing.lg,
+    overflow: "hidden",
   },
   heroTitle: {
     fontSize: theme.fontSizes["4xl"],
@@ -372,15 +433,51 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
   },
+  heroActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: theme.spacing.lg,
+    marginTop: theme.spacing["2xl"],
+  },
+  editProfileButton: {
+    minWidth: 170,
+  },
   statusText: {
-    marginTop: theme.spacing.lg,
+    flexShrink: 1,
     color: theme.colors.text.success,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
   },
-  editProfileButton: {
-    marginTop: theme.spacing["2xl"],
-    alignSelf: "flex-start",
+  heroSideCard: {
+    flexGrow: 1,
+    flexBasis: 220,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    justifyContent: "center",
+  },
+  heroSideLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    textTransform: "uppercase",
+    marginBottom: theme.spacing.sm,
+  },
+  heroSideValue: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
+  },
+  heroSideMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
   },
   statsGrid: {
     flexDirection: "row",
@@ -398,16 +495,39 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  statHint: {
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.extrabold,
+    color: theme.colors.text.brand,
+    textTransform: "uppercase",
+    marginBottom: theme.spacing.sm,
+  },
   statValue: {
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   statLabel: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.secondary,
+  },
+  contentGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing["2xl"],
+    marginBottom: theme.spacing["2xl"],
+  },
+  contentColumnLarge: {
+    flexGrow: 2,
+    flexBasis: 520,
+    marginBottom: 0,
+  },
+  contentColumnSmall: {
+    flexGrow: 1,
+    flexBasis: 320,
+    marginBottom: 0,
   },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -418,31 +538,65 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+  },
+  sectionHeaderText: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   sectionSubtitle: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-    marginBottom: theme.spacing.xl,
+  },
+  sectionBadge: {
+    minWidth: 38,
+    height: 38,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    textAlign: "center",
+    textAlignVertical: "center",
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    paddingTop: theme.spacing.sm,
   },
   actionGrid: {
     gap: theme.spacing.md,
   },
   actionCard: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
+  },
+  actionIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionIconText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
   },
   actionTextArea: {
     flex: 1,
@@ -457,6 +611,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
   actionArrow: {
     color: theme.colors.text.brand,
@@ -464,7 +619,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
   },
   cardPressed: {
-    opacity: 0.84,
+    opacity: 0.88,
     transform: [{ scale: 0.99 }],
   },
   emptyText: {
@@ -480,7 +635,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     alignItems: "flex-start",
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
@@ -512,25 +667,31 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
   },
-  infoRow: {
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.lg,
-    gap: theme.spacing.sm,
+  overviewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.lg,
   },
-  infoRowLast: {
-    paddingTop: theme.spacing.lg,
-    gap: theme.spacing.sm,
+  infoCard: {
+    flexGrow: 1,
+    flexBasis: 240,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
   },
   infoLabel: {
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.secondary,
     textTransform: "uppercase",
+    marginBottom: theme.spacing.sm,
   },
   infoValue: {
     fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    lineHeight: theme.lineHeights.lg,
   },
 });

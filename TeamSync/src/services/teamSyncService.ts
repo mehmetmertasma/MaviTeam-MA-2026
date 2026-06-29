@@ -9,6 +9,8 @@ import type {
   ChatMessage,
   Club,
   JoinRequest,
+  Payment,
+  PaymentStatus,
   ScheduleEvent,
   Team,
   TeamSyncAppData,
@@ -473,6 +475,41 @@ export const teamSyncService = {
     return saveAppData({
       ...data,
       chatMessages: [...data.chatMessages, newChatMessage],
+    });
+  },
+
+  async createPayment(input: Omit<Payment, "id" | "updatedAt">) {
+    const data = await loadAppData();
+    const newPayment: Payment = {
+      ...input,
+      id: `payment-${Date.now()}`,
+      updatedAt: nowIso(),
+    };
+
+    return saveAppData({
+      ...data,
+      payments: [newPayment, ...data.payments],
+    });
+  },
+
+  async updatePaymentStatus(paymentId: string, status: PaymentStatus) {
+    const data = await loadAppData();
+    const updatedAt = nowIso();
+
+    return saveAppData({
+      ...data,
+      payments: data.payments.map((payment) => {
+        if (payment.id !== paymentId) {
+          return payment;
+        }
+
+        return {
+          ...payment,
+          status,
+          paidAt: status === "paid" ? updatedAt : undefined,
+          updatedAt,
+        };
+      }),
     });
   },
 

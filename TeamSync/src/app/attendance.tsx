@@ -1,142 +1,246 @@
-import { useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { AttendanceStatus, ScheduleEvent, Team, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
-type AttendanceStatus = "Katıldı" | "Katılmadı" | "Geç kaldı" | "Mazeretli";
-
-type AthleteAttendance = {
-  id: number;
-  name: string;
-  team: string;
-  position: string;
-  status: AttendanceStatus;
+type AttendanceOption = {
+  value: AttendanceStatus;
+  label: string;
 };
 
-const attendanceOptions: AttendanceStatus[] = [
-  "Katıldı",
-  "Katılmadı",
-  "Geç kaldı",
-  "Mazeretli",
+const attendanceOptions: AttendanceOption[] = [
+  { value: "present", label: "Katıldı" },
+  { value: "absent", label: "Katılmadı" },
+  { value: "late", label: "Geç kaldı" },
+  { value: "excused", label: "Mazeretli" },
 ];
 
-const initialAttendanceList: AthleteAttendance[] = [
-  {
-    id: 1,
-    name: "Efe Yılmaz",
-    team: "U16 Erkek",
-    position: "Pasör",
-    status: "Katıldı",
-  },
-  {
-    id: 2,
-    name: "Mert Asma",
-    team: "U16 Erkek",
-    position: "Smaçör",
-    status: "Katıldı",
-  },
-  {
-    id: 3,
-    name: "Can Demir",
-    team: "U16 Erkek",
-    position: "Libero",
-    status: "Geç kaldı",
-  },
-  {
-    id: 4,
-    name: "Deniz Kaya",
-    team: "U16 Erkek",
-    position: "Orta oyuncu",
-    status: "Katılmadı",
-  },
-  {
-    id: 5,
-    name: "Emir Çelik",
-    team: "U16 Erkek",
-    position: "Pasör çaprazı",
-    status: "Mazeretli",
-  },
-];
+const EMPTY_TEAMS: Team[] = [];
+const EMPTY_USERS: UserProfile[] = [];
+const EMPTY_EVENTS: ScheduleEvent[] = [];
 
-function getCurrentSaveLabel() {
-  const time = new Date().toLocaleTimeString("tr-TR", {
+function formatEventDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Tarih yok";
+  }
+
+  return date.toLocaleDateString("tr-TR", {
+    day: "2-digit",
+    month: "short",
+    weekday: "short",
+  });
+}
+
+function formatEventTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Saat yok";
+  }
+
+  return date.toLocaleTimeString("tr-TR", {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
 
-  return `Şimdi · ${time}`;
+function getEventTypeLabel(type: ScheduleEvent["type"]) {
+  if (type === "practice") {
+    return "Antrenman";
+  }
+
+  if (type === "match") {
+    return "Maç";
+  }
+
+  return "Toplantı";
+}
+
+function getInitials(name: string) {
+  const initials = name
+    .trim()
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "TS";
+}
+
+function getTeamMembers(team: Team | undefined, users: UserProfile[]) {
+  if (team === undefined) {
+    return [];
+  }
+
+  return users.filter((user) => team.memberIds.includes(user.id) && user.status === "active");
+}
+
+function getTeamEvents(teamId: string, events: ScheduleEvent[]) {
+  return [...events]
+    .filter((event) => event.teamId === teamId)
+    .sort((firstEvent, secondEvent) => new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime());
+}
+
+function getSavedStatus(appData: TeamSyncAppData | null, userId: string, teamId: string, sessionDate: string) {
+  return appData?.attendanceRecords.find((record) => {
+    return record.userId === userId && record.teamId === teamId && record.sessionDate === sessionDate;
+  })?.status;
 }
 
 export default function AttendanceScreen() {
-  const [attendanceList, setAttendanceList] =
-    useState<AthleteAttendance[]>(initialAttendanceList);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const [selectedEventId, setSelectedEventId] = useState("");
+  const [attendanceDraft, setAttendanceDraft] = useState<Record<string, AttendanceStatus>>({});
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
-  const [statusMessage, setStatusMessage] = useState(
-    "Yoklama değişiklikleri şimdilik bu oturum içinde tutuluyor."
+  const [statusMessage, setStatusMessage] = useState("Önce takım ve antrenman seçerek yoklama alabilirsin.");
+
+  const loadAttendanceData = useCallback(async () => {
+    try {
+      const loadedAppData = await teamSyncService.getAppData();
+      setAppData(loadedAppData);
+
+      setSelectedTeamId((currentTeamId) => {
+        const currentStillExists = loadedAppData.teams.some((team) => team.id === currentTeamId);
+        return currentStillExists ? currentTeamId : loadedAppData.teams[0]?.id ?? "";
+      });
+
+      setSelectedEventId((currentEventId) => {
+        const currentStillExists = loadedAppData.scheduleEvents.some((event) => event.id === currentEventId);
+        return currentStillExists ? currentEventId : "";
+      });
+
+      setStatusMessage("Takımlar ve program TeamSync datasından yüklendi.");
+    } catch {
+      setStatusMessage("Yoklama datası yüklenirken bir sorun oluştu.");
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAttendanceData();
+    }, [loadAttendanceData])
   );
 
+  const teams = appData?.teams ?? EMPTY_TEAMS;
+  const users = appData?.users ?? EMPTY_USERS;
+  const scheduleEvents = appData?.scheduleEvents ?? EMPTY_EVENTS;
+
+  const selectedTeam = useMemo(() => {
+    return teams.find((team) => team.id === selectedTeamId);
+  }, [selectedTeamId, teams]);
+
+  const availableEvents = useMemo(() => {
+    if (selectedTeamId === "") {
+      return EMPTY_EVENTS;
+    }
+
+    return getTeamEvents(selectedTeamId, scheduleEvents);
+  }, [selectedTeamId, scheduleEvents]);
+
+  const selectedEvent = useMemo(() => {
+    return availableEvents.find((event) => event.id === selectedEventId);
+  }, [availableEvents, selectedEventId]);
+
+  const teamMembers = useMemo(() => {
+    return getTeamMembers(selectedTeam, users);
+  }, [selectedTeam, users]);
+
   const attendanceSummary = useMemo(() => {
-    const presentCount = attendanceList.filter(
-      (athlete) => athlete.status === "Katıldı"
-    ).length;
-
-    const absentCount = attendanceList.filter(
-      (athlete) => athlete.status === "Katılmadı"
-    ).length;
-
-    const lateCount = attendanceList.filter(
-      (athlete) => athlete.status === "Geç kaldı"
-    ).length;
-
-    const excusedCount = attendanceList.filter(
-      (athlete) => athlete.status === "Mazeretli"
-    ).length;
-
-    const totalCount = attendanceList.length;
-    const activeCount = presentCount + lateCount;
-    const attendanceRate =
-      totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
-
-    return {
-      presentCount,
-      absentCount,
-      lateCount,
-      excusedCount,
-      totalCount,
-      attendanceRate,
+    const counts = {
+      present: 0,
+      absent: 0,
+      late: 0,
+      excused: 0,
     };
-  }, [attendanceList]);
 
-  function updateAttendanceStatus(
-    athleteId: number,
-    newStatus: AttendanceStatus
-  ) {
-    setAttendanceList((currentList) =>
-      currentList.map((athlete) => {
-        if (athlete.id === athleteId) {
-          return {
-            ...athlete,
-            status: newStatus,
-          };
-        }
+    if (selectedTeam === undefined || selectedEvent === undefined) {
+      return { ...counts, totalCount: 0, attendanceRate: 0 };
+    }
 
-        return athlete;
-      })
-    );
+    teamMembers.forEach((member) => {
+      const status = attendanceDraft[member.id]
+        ?? getSavedStatus(appData, member.id, selectedTeam.id, selectedEvent.startsAt)
+        ?? "present";
+      counts[status] += 1;
+    });
+
+    const totalCount = teamMembers.length;
+    const activeCount = counts.present + counts.late;
+    const attendanceRate = totalCount > 0 ? Math.round((activeCount / totalCount) * 100) : 0;
+
+    return { ...counts, totalCount, attendanceRate };
+  }, [appData, attendanceDraft, selectedEvent, selectedTeam, teamMembers]);
+
+  function selectTeam(team: Team) {
+    setSelectedTeamId(team.id);
+    setSelectedEventId("");
+    setAttendanceDraft({});
+    setStatusMessage(`${team.name} seçildi. Şimdi antrenman veya maç oturumu seç.`);
+  }
+
+  function selectEvent(event: ScheduleEvent) {
+    setSelectedEventId(event.id);
+    setAttendanceDraft({});
+    setStatusMessage(`${event.title} için yoklama açıldı.`);
+  }
+
+  function updateAttendanceStatus(userId: string, newStatus: AttendanceStatus) {
+    setAttendanceDraft((currentDraft) => ({
+      ...currentDraft,
+      [userId]: newStatus,
+    }));
 
     setStatusMessage("Yoklama güncellendi. Kaydetmeyi unutma.");
   }
 
-  function handleSaveAttendance() {
-    setLastSavedAt(getCurrentSaveLabel());
-    setStatusMessage("Yoklama kaydedildi.");
+  async function handleSaveAttendance() {
+    if (appData === null || selectedTeam === undefined || selectedEvent === undefined) {
+      setStatusMessage("Yoklama kaydetmek için önce takım ve antrenman seçmelisin.");
+      return;
+    }
+
+    if (teamMembers.length === 0) {
+      setStatusMessage("Bu takımda yoklama alınacak aktif kişi yok.");
+      return;
+    }
+
+    try {
+      const records = teamMembers.map((member) => ({
+        userId: member.id,
+        status: attendanceDraft[member.id]
+          ?? getSavedStatus(appData, member.id, selectedTeam.id, selectedEvent.startsAt)
+          ?? "present",
+      }));
+
+      const nextAppData = await teamSyncService.saveAttendance({
+        teamId: selectedTeam.id,
+        sessionDate: selectedEvent.startsAt,
+        records,
+      });
+
+      const savedTime = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      setAppData(nextAppData);
+      setAttendanceDraft({});
+      setLastSavedAt(`${selectedEvent.title} · ${savedTime}`);
+      setStatusMessage("Yoklama seçilen antrenman için kaydedildi.");
+    } catch {
+      setStatusMessage("Yoklama kaydedilirken bir sorun oluştu.");
+    }
   }
 
-  function resetAttendance() {
-    setAttendanceList(initialAttendanceList);
+  function resetCurrentAttendance() {
+    setAttendanceDraft({});
     setLastSavedAt("Henüz kaydedilmedi");
-    setStatusMessage("Yoklama demo haline sıfırlandı.");
+    setStatusMessage("Bu oturumdaki değişiklikler sıfırlandı.");
   }
 
   return (
@@ -146,41 +250,36 @@ export default function AttendanceScreen() {
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.pageTitle}>Yoklama</Text>
           <Text style={styles.pageSubtitle}>
-            Koçlar sporcuların antrenman katılım durumunu buradan takip eder.
+            Önce takım seç, sonra hangi antrenman veya maç için yoklama aldığını seç.
           </Text>
         </View>
 
         <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Antrenman takibi</Text>
-          <Text style={styles.heroTitle}>U16 Erkek yoklaması</Text>
+          <Text style={styles.heroLabel}>Yoklama akışı</Text>
+          <Text style={styles.heroTitle}>Takım + oturum bazlı yoklama</Text>
           <Text style={styles.heroSubtitle}>
-            Sporcuları Katıldı, Katılmadı, Geç kaldı veya Mazeretli olarak
-            işaretleyebilirsin.
+            Yoklama artık tek bir sporcu listesi değil; seçilen takım ve programdaki belirli antrenman/maç üzerinden kaydedilir.
           </Text>
         </View>
 
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {attendanceSummary.presentCount}
-            </Text>
+            <Text style={styles.statValue}>{attendanceSummary.present}</Text>
             <Text style={styles.statLabel}>Katıldı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{attendanceSummary.absentCount}</Text>
+            <Text style={styles.statValue}>{attendanceSummary.absent}</Text>
             <Text style={styles.statLabel}>Katılmadı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>{attendanceSummary.lateCount}</Text>
+            <Text style={styles.statValue}>{attendanceSummary.late}</Text>
             <Text style={styles.statLabel}>Geç kaldı</Text>
           </View>
 
           <View style={styles.statCard}>
-            <Text style={styles.statValue}>
-              {attendanceSummary.excusedCount}
-            </Text>
+            <Text style={styles.statValue}>{attendanceSummary.excused}</Text>
             <Text style={styles.statLabel}>Mazeretli</Text>
           </View>
         </View>
@@ -188,76 +287,175 @@ export default function AttendanceScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Sporcu listesi</Text>
+              <Text style={styles.sectionTitle}>1. Takım seç</Text>
+              <Text style={styles.sectionSubtitle}>Yoklama hangi takım için alınacak?</Text>
+            </View>
+            <Text style={styles.statusPill}>{teams.length} takım</Text>
+          </View>
+
+          {teams.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Henüz takım yok</Text>
+              <Text style={styles.emptyText}>Önce Takımlar ekranından takım oluşturmalısın.</Text>
+            </View>
+          ) : (
+            <View style={styles.teamGrid}>
+              {teams.map((team) => {
+                const isSelected = selectedTeamId === team.id;
+                const teamEventCount = getTeamEvents(team.id, scheduleEvents).length;
+                const teamMemberCount = getTeamMembers(team, users).length;
+
+                return (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => selectTeam(team)}
+                    style={({ pressed }) => [
+                      styles.teamCard,
+                      isSelected ? styles.teamCardSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <Text style={styles.teamName}>{team.name}</Text>
+                    <Text style={styles.teamMeta}>{team.ageGroup}</Text>
+                    <View style={styles.teamStatsRow}>
+                      <Text style={styles.teamStat}>{teamMemberCount} kişi</Text>
+                      <Text style={styles.teamStat}>{teamEventCount} oturum</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>2. Antrenman / maç seç</Text>
               <Text style={styles.sectionSubtitle}>
-                Son kayıt: {lastSavedAt}
+                Yoklama hangi gün ve hangi program için alınacak?
               </Text>
             </View>
-
-            <Text style={styles.statusPill}>
-              %{attendanceSummary.attendanceRate} katılım
-            </Text>
+            <Text style={styles.statusPill}>{availableEvents.length} oturum</Text>
           </View>
 
-          <View style={styles.attendanceList}>
-            {attendanceList.map((athlete) => (
-              <View key={athlete.id} style={styles.athleteCard}>
-                <View style={styles.athleteTopRow}>
-                  <View style={styles.athleteInfo}>
-                    <Text style={styles.athleteName}>{athlete.name}</Text>
-                    <Text style={styles.athleteMeta}>
-                      {athlete.team} · {athlete.position}
-                    </Text>
+          {selectedTeam === undefined ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Takım seçilmedi</Text>
+              <Text style={styles.emptyText}>Önce yukarıdan bir takım seçmelisin.</Text>
+            </View>
+          ) : availableEvents.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Bu takım için program yok</Text>
+              <Text style={styles.emptyText}>Program ekranından bu takıma antrenman veya maç eklenince burada görünecek.</Text>
+            </View>
+          ) : (
+            <View style={styles.eventList}>
+              {availableEvents.map((event) => {
+                const isSelected = selectedEventId === event.id;
+
+                return (
+                  <Pressable
+                    key={event.id}
+                    onPress={() => selectEvent(event)}
+                    style={({ pressed }) => [
+                      styles.eventCard,
+                      isSelected ? styles.eventCardSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <View style={styles.eventDateBox}>
+                      <Text style={styles.eventDateText}>{formatEventDate(event.startsAt)}</Text>
+                      <Text style={styles.eventTimeText}>{formatEventTime(event.startsAt)}</Text>
+                    </View>
+
+                    <View style={styles.eventInfo}>
+                      <Text style={styles.eventType}>{getEventTypeLabel(event.type)}</Text>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <Text style={styles.eventMeta}>{event.location}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>3. Yoklama al</Text>
+              <Text style={styles.sectionSubtitle}>
+                {selectedTeam?.name ?? "Takım seçilmedi"} · {selectedEvent?.title ?? "Oturum seçilmedi"} · Son kayıt: {lastSavedAt}
+              </Text>
+            </View>
+            <Text style={styles.statusPill}>%{attendanceSummary.attendanceRate} katılım</Text>
+          </View>
+
+          {selectedTeam === undefined || selectedEvent === undefined ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Yoklama hazır değil</Text>
+              <Text style={styles.emptyText}>Sporcu listesi için önce takım ve antrenman/maç seç.</Text>
+            </View>
+          ) : teamMembers.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyTitle}>Bu takımda aktif kişi yok</Text>
+              <Text style={styles.emptyText}>Takıma üye eklenince yoklama listesi burada görünecek.</Text>
+            </View>
+          ) : (
+            <View style={styles.attendanceList}>
+              {teamMembers.map((member) => {
+                const currentStatus = attendanceDraft[member.id]
+                  ?? getSavedStatus(appData, member.id, selectedTeam.id, selectedEvent.startsAt)
+                  ?? "present";
+
+                return (
+                  <View key={member.id} style={styles.memberCard}>
+                    <View style={styles.memberTopRow}>
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                      </View>
+
+                      <View style={styles.memberInfo}>
+                        <Text style={styles.memberName}>{member.fullName}</Text>
+                        <Text style={styles.memberMeta}>{member.email}</Text>
+                      </View>
+
+                      <Text style={styles.currentStatus}>
+                        {attendanceOptions.find((option) => option.value === currentStatus)?.label}
+                      </Text>
+                    </View>
+
+                    <View style={styles.statusGrid}>
+                      {attendanceOptions.map((option) => {
+                        const isSelected = currentStatus === option.value;
+
+                        return (
+                          <Pressable
+                            key={option.value}
+                            onPress={() => updateAttendanceStatus(member.id, option.value)}
+                            style={({ pressed }) => [
+                              styles.statusButton,
+                              isSelected ? styles.statusButtonSelected : null,
+                              pressed ? styles.pressed : null,
+                            ]}
+                          >
+                            <Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>
+                              {option.label}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </View>
-
-                  <Text style={styles.currentStatus}>{athlete.status}</Text>
-                </View>
-
-                <View style={styles.statusGrid}>
-                  {attendanceOptions.map((status) => {
-                    const isSelected = athlete.status === status;
-
-                    return (
-                      <Pressable
-                        key={status}
-                        onPress={() =>
-                          updateAttendanceStatus(athlete.id, status)
-                        }
-                        style={({ pressed }) => [
-                          styles.statusButton,
-                          isSelected ? styles.statusButtonSelected : null,
-                          pressed ? styles.pressed : null,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.statusButtonText,
-                            isSelected ? styles.statusButtonTextSelected : null,
-                          ]}
-                        >
-                          {status}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-          </View>
+                );
+              })}
+            </View>
+          )}
 
           <View style={styles.actionRow}>
-            <AppButton
-              title="Yoklamayı kaydet"
-              onPress={handleSaveAttendance}
-              style={styles.actionButton}
-            />
-
-            <AppButton
-              title="Sıfırla"
-              variant="ghost"
-              onPress={resetAttendance}
-              style={styles.actionButton}
-            />
+            <AppButton title="Yoklamayı kaydet" onPress={handleSaveAttendance} style={styles.actionButton} />
+            <AppButton title="Değişiklikleri sıfırla" variant="ghost" onPress={resetCurrentAttendance} style={styles.actionButton} />
           </View>
 
           <Text style={styles.statusText}>{statusMessage}</Text>
@@ -268,24 +466,15 @@ export default function AttendanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
     paddingHorizontal: theme.spacing["2xl"],
     paddingBottom: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 980,
-    alignSelf: "center",
-  },
-  pageHeader: {
-    marginBottom: theme.spacing["2xl"],
-  },
+  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
+  pageHeader: { marginBottom: theme.spacing["2xl"] },
   logo: {
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
@@ -323,6 +512,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.radius.full,
     marginBottom: theme.spacing.lg,
+    overflow: "hidden",
   },
   heroTitle: {
     fontSize: theme.fontSizes["4xl"],
@@ -379,9 +569,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
-  sectionHeaderText: {
-    flex: 1,
-  },
+  sectionHeaderText: { flex: 1 },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
@@ -392,6 +580,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
   statusPill: {
     backgroundColor: theme.colors.brand.primarySoft,
@@ -401,41 +590,166 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.full,
+    overflow: "hidden",
   },
-  attendanceList: {
+  teamGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
+  teamCard: {
+    flexGrow: 1,
+    flexBasis: 220,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
+  },
+  teamCardSelected: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primary,
+  },
+  teamName: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  teamMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    marginBottom: theme.spacing.md,
+  },
+  teamStatsRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
+  teamStat: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.full,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    overflow: "hidden",
+  },
+  eventList: { gap: theme.spacing.md },
+  eventCard: {
+    flexDirection: "row",
     gap: theme.spacing.md,
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
   },
-  athleteCard: {
+  eventCardSelected: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderColor: theme.colors.brand.primary,
+  },
+  eventDateBox: {
+    width: 92,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.background.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eventDateText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    textAlign: "center",
+    marginBottom: theme.spacing.xs,
+  },
+  eventTimeText: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+  },
+  eventInfo: { flex: 1 },
+  eventType: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  eventTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  eventMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  emptyBox: {
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.xl,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  emptyTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.sm,
+  },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+  },
+  attendanceList: { gap: theme.spacing.md },
+  memberCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
     padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
-  athleteTopRow: {
+  memberTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
+    alignItems: "center",
+    gap: theme.spacing.md,
     marginBottom: theme.spacing.lg,
   },
-  athleteInfo: {
-    flex: 1,
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.brand.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  athleteName: {
+  avatarText: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  memberInfo: { flex: 1 },
+  memberName: {
+    color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
-  athleteMeta: {
+  memberMeta: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
-    color: theme.colors.text.secondary,
   },
   currentStatus: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius.full,
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    overflow: "hidden",
   },
   statusGrid: {
     flexDirection: "row",
@@ -443,12 +757,12 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   statusButton: {
-    backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.background.surface,
   },
   statusButtonSelected: {
     backgroundColor: theme.colors.brand.primary,
@@ -459,26 +773,20 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  statusButtonTextSelected: {
-    color: theme.colors.text.inverse,
-  },
+  statusButtonTextSelected: { color: theme.colors.text.inverse },
   actionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.spacing.md,
     marginTop: theme.spacing["2xl"],
   },
-  actionButton: {
-    flexGrow: 1,
-  },
+  actionButton: { minWidth: 170, flexGrow: 1 },
   statusText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
     marginTop: theme.spacing.lg,
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
   },
-  pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
+  pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
 });

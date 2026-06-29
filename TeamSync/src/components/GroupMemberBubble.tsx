@@ -63,9 +63,7 @@ export function GroupMemberBubble({
 
             <View style={styles.memberInfo}>
               <Text style={styles.memberName}>{member.name}</Text>
-              <Text style={styles.memberMeta}>
-                {member.role} · {member.teamName}
-              </Text>
+              <Text style={styles.memberMeta}>{member.teamName}</Text>
             </View>
 
             <Pressable
@@ -98,14 +96,8 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
     marginBottom: theme.spacing.md,
   },
-  titleArea: {
-    flex: 1,
-  },
-  title: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
-  },
+  titleArea: { flex: 1 },
+  title: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
   subtitle: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
@@ -126,12 +118,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
     marginTop: -2,
   },
-  memberList: {
-    maxHeight: 280,
-  },
-  memberListContent: {
-    gap: theme.spacing.sm,
-  },
+  memberList: { maxHeight: 280 },
+  memberListContent: { gap: theme.spacing.sm },
   memberRow: {
     minHeight: 62,
     backgroundColor: theme.colors.background.subtle,
@@ -157,14 +145,8 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
+  memberInfo: { flex: 1 },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
   memberMeta: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
@@ -182,8 +164,5 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
+  pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

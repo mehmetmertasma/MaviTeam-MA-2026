@@ -26,14 +26,6 @@ type QuickAction = {
   route: AppRoute;
 };
 
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
-};
-
 const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = {
   superAdmin: {
     title: "Platform kontrol merkezi",
@@ -48,11 +40,11 @@ const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = {
     subtitle: "Antrenman planlarını, yoklamayı, uygunluk cevaplarını ve takım mesajlarını takip et.",
   },
   parent: {
-    title: "Çocuğunun takım sürecini takip et",
+    title: "Takım sürecini takip et",
     subtitle: "Programı, duyuruları, mesajları ve ödeme durumunu tek yerden gör.",
   },
   athlete: {
-    title: "Kendi takım programını takip et",
+    title: "Takım programını takip et",
     subtitle: "Antrenmanlarını, maçlarını, duyuruları ve takım mesajlarını gör.",
   },
 };
@@ -83,7 +75,7 @@ const quickActionsByRole: Record<UserRole, QuickAction[]> = {
     { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
     { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
     { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-    { title: "Uygunluk bildir", meta: "Çocuğun için katılım bildir", route: "/availability" },
+    { title: "Uygunluk bildir", meta: "Katılım bildir", route: "/availability" },
     { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
   ],
   athlete: [
@@ -91,7 +83,7 @@ const quickActionsByRole: Record<UserRole, QuickAction[]> = {
     { title: "Uygunluk bildir", meta: "Geliyorum / gelemiyorum", route: "/availability" },
     { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
     { title: "Koça mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-    { title: "Video / drill izle", meta: "Koçun paylaştığı içerikler", route: "/replays" },
+    { title: "Video / drill izle", meta: "Paylaşılan içerikler", route: "/replays" },
   ],
 };
 
@@ -190,7 +182,6 @@ export default function DashboardScreen() {
       ],
       overview: [
         { label: "Kulüp", value: club.name },
-        { label: "Rolün", value: roleDisplayNames[currentUser.role] },
         { label: "Takım", value: primaryTeam?.name ?? "Takım seçilmedi" },
         { label: "Kulüp kodu", value: club.code },
         { label: "Şehir", value: club.city },
@@ -250,7 +241,7 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hızlı işlemler</Text>
           <Text style={styles.sectionSubtitle}>
-            Bu butonlar kullanıcının gerçek rolüne göre merkezi datadan gelen role bilgisiyle gösteriliyor.
+            Bu butonlar hesabına göre gösterilen en önemli işlemleri açar.
           </Text>
 
           <View style={styles.actionGrid}>

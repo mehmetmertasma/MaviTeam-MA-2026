@@ -5,6 +5,8 @@ import type {
   Announcement,
   AttendanceRecord,
   AttendanceStatus,
+  ChatGroup,
+  ChatMessage,
   Club,
   JoinRequest,
   ScheduleEvent,
@@ -441,6 +443,36 @@ export const teamSyncService = {
           updatedAt: nowIso(),
         };
       }),
+    });
+  },
+
+  async createChatGroup(input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {
+    const data = await loadAppData();
+    const createdAt = nowIso();
+    const newChatGroup: ChatGroup = {
+      ...input,
+      id: `chat-${Date.now()}`,
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    return saveAppData({
+      ...data,
+      chatGroups: [newChatGroup, ...data.chatGroups],
+    });
+  },
+
+  async createChatMessage(input: Omit<ChatMessage, "id" | "createdAt">) {
+    const data = await loadAppData();
+    const newChatMessage: ChatMessage = {
+      ...input,
+      id: `message-${Date.now()}`,
+      createdAt: nowIso(),
+    };
+
+    return saveAppData({
+      ...data,
+      chatMessages: [...data.chatMessages, newChatMessage],
     });
   },
 

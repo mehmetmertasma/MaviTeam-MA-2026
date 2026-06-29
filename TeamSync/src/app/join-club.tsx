@@ -7,7 +7,6 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { UserRole } from "@/types/teamSync";
 
 const t = translations[defaultLanguage];
 
@@ -27,7 +26,6 @@ export default function JoinClubScreen() {
   const requestEmail = getParamValue(email);
 
   const [inviteCode, setInviteCode] = useState("");
-  const [requestedRole, setRequestedRole] = useState<UserRole>("athlete");
   const [error, setError] = useState("");
 
   function handleInviteCodeChange(text: string) {
@@ -58,7 +56,7 @@ export default function JoinClubScreen() {
         fullName: requestFullName || "Yeni Kullanıcı",
         email: requestEmail || "pending@teamsync.app",
         inviteCode: cleanedCode,
-        requestedRole,
+        requestedRole: "athlete",
       });
 
       setError("");
@@ -107,30 +105,6 @@ export default function JoinClubScreen() {
               accessibilityLabel="Takım veya kulüp kodu"
             />
           </View>
-
-          <View style={styles.roleBox}>
-            <Text style={styles.label}>Katılmak istediğin rol</Text>
-            <View style={styles.roleGrid}>
-              <AppButton
-                title="Sporcu"
-                variant={requestedRole === "athlete" ? "primary" : "secondary"}
-                onPress={() => setRequestedRole("athlete")}
-                style={styles.roleButton}
-              />
-              <AppButton
-                title="Veli"
-                variant={requestedRole === "parent" ? "primary" : "secondary"}
-                onPress={() => setRequestedRole("parent")}
-                style={styles.roleButton}
-              />
-              <AppButton
-                title="Koç"
-                variant={requestedRole === "coach" ? "primary" : "secondary"}
-                onPress={() => setRequestedRole("coach")}
-                style={styles.roleButton}
-              />
-            </View>
-          </View>
         </View>
 
         {error !== "" && <Text style={styles.errorText}>{error}</Text>}
@@ -158,10 +132,7 @@ export default function JoinClubScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -169,9 +140,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: theme.spacing["2xl"],
   },
-  card: {
-    padding: theme.spacing["3xl"],
-  },
+  card: { padding: theme.spacing["3xl"] },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
@@ -227,13 +196,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
-  form: {
-    width: "100%",
-    gap: theme.spacing.lg,
-  },
-  inputGroup: {
-    width: "100%",
-  },
+  form: { width: "100%", gap: theme.spacing.lg },
+  inputGroup: { width: "100%" },
   label: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
@@ -252,18 +216,6 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.lg,
     color: theme.colors.text.primary,
   },
-  roleBox: {
-    width: "100%",
-  },
-  roleGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-  },
-  roleButton: {
-    flexGrow: 1,
-    minWidth: 120,
-  },
   errorText: {
     marginTop: theme.spacing.lg,
     color: theme.colors.text.danger,
@@ -277,7 +229,5 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginTop: theme.spacing["2xl"],
   },
-  button: {
-    width: "100%",
-  },
+  button: { width: "100%" },
 });

@@ -1,109 +1,41 @@
-import { useMemo, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
+import { AppButton } from "@/components/AppButton";
 import { GroupMemberBubble, type GroupMember } from "@/components/GroupMemberBubble";
 import { theme } from "@/constants/theme";
+import { teamSyncService } from "@/services/teamSyncService";
+import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
 
-type ChatGroup = {
+type ActiveChat = { type: "group"; groupId: string };
+
+type TargetOption = {
   id: string;
-  name: string;
-  teamName: string;
-  description: string;
-  memberCount: number;
+  label: string;
+  teamId?: string;
 };
 
-type ChatMessage = {
-  id: string;
-  conversationId: string;
-  senderName: string;
-  senderRole: string;
-  text: string;
-  createdAt: string;
+const EMPTY_CHAT_GROUPS: ChatGroup[] = [];
+const EMPTY_CHAT_MESSAGES: ChatMessage[] = [];
+const EMPTY_USERS: UserProfile[] = [];
+
+const roleDisplayNames: Record<UserRole, string> = {
+  superAdmin: "Platform yöneticisi",
+  clubAdmin: "Kulüp yöneticisi",
+  coach: "Koç",
+  parent: "Veli",
+  athlete: "Sporcu",
 };
-
-type ActiveChat =
-  | { type: "group"; groupId: string }
-  | { type: "direct"; memberId: string; conversationId: string };
-
-const CURRENT_USER_ID = "athlete-mert";
-const CURRENT_USER_NAME = "Mert Asma";
-const CURRENT_USER_ROLE = "Athlete";
-
-const chatGroups: ChatGroup[] = [
-  {
-    id: "team-u17-chat",
-    name: "Team Chat",
-    teamName: "U17 Erkek",
-    description: "Antrenman, maç ve takım duyuruları",
-    memberCount: 28,
-  },
-  {
-    id: "team-u14-chat",
-    name: "Team Chat",
-    teamName: "U14 Kız",
-    description: "Takım içi hızlı iletişim",
-    memberCount: 22,
-  },
-  {
-    id: "team-u18-chat",
-    name: "Team Chat",
-    teamName: "U18 Elite",
-    description: "Elite takım mesajları",
-    memberCount: 18,
-  },
-];
-
-function createGroupMembers(group: ChatGroup): GroupMember[] {
-  return Array.from({ length: group.memberCount }, (_, index) => {
-    const memberNumber = index + 1;
-    const role = memberNumber === 1 ? "Coach" : memberNumber % 5 === 0 ? "Parent" : "Athlete";
-
-    return {
-      id: `${group.id}-member-${memberNumber}`,
-      name: `${group.teamName} Üye ${memberNumber}`,
-      role,
-      teamName: group.teamName,
-    };
-  });
-}
-
-const groupMembersById = chatGroups.reduce<Record<string, GroupMember[]>>(
-  (groups, group) => ({ ...groups, [group.id]: createGroupMembers(group) }),
-  {}
-);
-
-const allMembers = Object.values(groupMembersById).flat();
-
-function getDirectConversationId(memberId: string) {
-  return `direct-${[CURRENT_USER_ID, memberId].sort().join("-")}`;
-}
-
-const startingMessages: ChatMessage[] = [
-  {
-    id: "1",
-    conversationId: "team-u17-chat",
-    senderName: "Coach Emre",
-    senderRole: "Coach",
-    text: "Bugünkü antrenman 18:30’da başlayacak. Lütfen 15 dakika erken gelin.",
-    createdAt: "2026-06-26T14:30:00.000Z",
-  },
-  {
-    id: "2",
-    conversationId: "team-u14-chat",
-    senderName: "Coach Aylin",
-    senderRole: "Coach",
-    text: "U14 için yarın servis çalışması yapacağız.",
-    createdAt: "2026-06-26T17:20:00.000Z",
-  },
-  {
-    id: "3",
-    conversationId: "team-u18-chat",
-    senderName: "Coach Daniel",
-    senderRole: "Coach",
-    text: "U18 Elite maç kadrosu akşam paylaşılacak.",
-    createdAt: "2026-06-27T13:15:00.000Z",
-  },
-];
 
 function formatMessageTime(createdAt: string) {
   const date = new Date(createdAt);
@@ -115,64 +47,136 @@ function formatMessageTime(createdAt: string) {
   return date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function getLastMessage(conversationId: string, messages: ChatMessage[]) {
-  const conversationMessages = messages.filter((message) => message.conversationId === conversationId);
+function getLastMessage(groupId: string, messages: ChatMessage[]) {
+  const conversationMessages = messages.filter((message) => message.groupId === groupId);
   return conversationMessages[conversationMessages.length - 1];
 }
 
 function getInitials(name: string) {
-  return name
+  const initials = name
+    .trim()
     .split(" ")
+    .filter(Boolean)
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+  return initials || "TS";
+}
+
+function getSenderName(userId: string, users: UserProfile[]) {
+  return users.find((user) => user.id === userId)?.fullName ?? "Bilinmeyen kullanıcı";
+}
+
+function getSenderRole(userId: string, users: UserProfile[]) {
+  const userRole = users.find((user) => user.id === userId)?.role;
+
+  if (userRole === undefined) {
+    return "Rol yok";
+  }
+
+  return roleDisplayNames[userRole];
+}
+
+function getGroupTeamName(group: ChatGroup, appData: TeamSyncAppData) {
+  if (group.teamId === undefined) {
+    return "Tüm Kulüp";
+  }
+
+  return appData.teams.find((team) => team.id === group.teamId)?.name ?? "Takım bulunamadı";
+}
+
+function getGroupMembers(group: ChatGroup, users: UserProfile[]) {
+  return users.filter((user) => group.visibleUserIds.includes(user.id) && user.status !== "removed");
+}
+
+function toGroupMembers(group: ChatGroup, appData: TeamSyncAppData): GroupMember[] {
+  const teamName = getGroupTeamName(group, appData);
+
+  return getGroupMembers(group, appData.users).map((user) => ({
+    id: user.id,
+    name: user.fullName,
+    role: roleDisplayNames[user.role],
+    teamName,
+  }));
 }
 
 export default function MessagesScreen() {
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(startingMessages);
   const [draftText, setDraftText] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newConversationName, setNewConversationName] = useState("");
+  const [newConversationTargetId, setNewConversationTargetId] = useState("all-club");
+  const [newConversationMessage, setNewConversationMessage] = useState("");
   const [openMemberListGroupId, setOpenMemberListGroupId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState("Mesajlar merkezi TeamSync datasından yüklenecek.");
 
-  const activeConversationId = activeChat?.type === "group" ? activeChat.groupId : activeChat?.conversationId;
+  const loadMessagesData = useCallback(async () => {
+    try {
+      const loadedAppData = await teamSyncService.getAppData();
+      setAppData(loadedAppData);
+      setStatusMessage("Mesajlar merkezi TeamSync datasından yüklendi.");
+    } catch {
+      setStatusMessage("Mesajlar yüklenirken bir sorun oluştu.");
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMessagesData();
+    }, [loadMessagesData])
+  );
+
+  const chatGroups = appData?.chatGroups ?? EMPTY_CHAT_GROUPS;
+  const chatMessages = appData?.chatMessages ?? EMPTY_CHAT_MESSAGES;
+  const users = appData?.users ?? EMPTY_USERS;
+
+  const targetOptions = useMemo<TargetOption[]>(() => {
+    const allClubOption: TargetOption = {
+      id: "all-club",
+      label: "Tüm Kulüp",
+    };
+
+    if (appData === null) {
+      return [allClubOption];
+    }
+
+    return [
+      allClubOption,
+      ...appData.teams.map((team) => ({
+        id: team.id,
+        label: team.name,
+        teamId: team.id,
+      })),
+    ];
+  }, [appData]);
 
   const activeGroup = useMemo(() => {
-    if (activeChat?.type !== "group") {
+    if (activeChat === null) {
       return undefined;
     }
 
     return chatGroups.find((group) => group.id === activeChat.groupId);
-  }, [activeChat]);
-
-  const activeMember = useMemo(() => {
-    if (activeChat?.type !== "direct") {
-      return undefined;
-    }
-
-    return allMembers.find((member) => member.id === activeChat.memberId);
-  }, [activeChat]);
+  }, [activeChat, chatGroups]);
 
   const visibleMessages = useMemo(() => {
-    if (!activeConversationId) {
+    if (activeGroup === undefined) {
       return [];
     }
 
-    return messages.filter((message) => message.conversationId === activeConversationId);
-  }, [activeConversationId, messages]);
+    return chatMessages.filter((message) => message.groupId === activeGroup.id);
+  }, [activeGroup, chatMessages]);
+
+  function clearCreateForm() {
+    setNewConversationName("");
+    setNewConversationTargetId("all-club");
+    setNewConversationMessage("");
+  }
 
   function openGroupChat(group: ChatGroup) {
     setActiveChat({ type: "group", groupId: group.id });
-    setOpenMemberListGroupId(null);
-    setDraftText("");
-  }
-
-  function openDirectChat(member: GroupMember) {
-    setActiveChat({
-      type: "direct",
-      memberId: member.id,
-      conversationId: getDirectConversationId(member.id),
-    });
     setOpenMemberListGroupId(null);
     setDraftText("");
   }
@@ -183,29 +187,87 @@ export default function MessagesScreen() {
     setDraftText("");
   }
 
-  function sendMessage() {
-    const trimmedText = draftText.trim();
-
-    if (!activeConversationId || trimmedText.length === 0) {
+  async function createConversation() {
+    if (appData === null) {
+      setStatusMessage("Önce merkezi data yüklenmeli.");
       return;
     }
 
-    const newMessage: ChatMessage = {
-      id: Date.now().toString(),
-      conversationId: activeConversationId,
-      senderName: CURRENT_USER_NAME,
-      senderRole: CURRENT_USER_ROLE,
-      text: trimmedText,
-      createdAt: new Date().toISOString(),
-    };
+    const selectedTarget = targetOptions.find((target) => target.id === newConversationTargetId) ?? targetOptions[0];
+    const activeUsers = appData.users.filter((user) => user.status !== "removed");
+    const targetUsers = selectedTarget.teamId === undefined
+      ? activeUsers
+      : activeUsers.filter((user) => user.teamIds.includes(selectedTarget.teamId ?? ""));
+    const visibleUserIds = Array.from(new Set([appData.currentUser.id, ...targetUsers.map((user) => user.id)]));
 
-    setMessages((currentMessages) => [...currentMessages, newMessage]);
-    setDraftText("");
+    if (visibleUserIds.length === 0) {
+      setStatusMessage("Bu konuşma için kullanıcı bulunamadı.");
+      return;
+    }
+
+    try {
+      const groupName = newConversationName.trim() || `${selectedTarget.label} Mesajları`;
+      const nextAppDataWithGroup = await teamSyncService.createChatGroup({
+        clubId: appData.club.id,
+        teamId: selectedTarget.teamId,
+        name: groupName,
+        visibleUserIds,
+      });
+
+      const createdGroup = nextAppDataWithGroup.chatGroups[0];
+      const firstMessageText = newConversationMessage.trim();
+
+      if (firstMessageText.length > 0) {
+        const nextAppDataWithMessage = await teamSyncService.createChatMessage({
+          clubId: appData.club.id,
+          groupId: createdGroup.id,
+          senderUserId: appData.currentUser.id,
+          text: firstMessageText,
+        });
+
+        setAppData(nextAppDataWithMessage);
+      } else {
+        setAppData(nextAppDataWithGroup);
+      }
+
+      setActiveChat({ type: "group", groupId: createdGroup.id });
+      clearCreateForm();
+      setShowCreateForm(false);
+      setStatusMessage("Yeni mesaj konuşması oluşturuldu.");
+    } catch {
+      setStatusMessage("Yeni mesaj oluşturulurken bir sorun oluştu.");
+    }
   }
 
-  if (activeChat !== null) {
-    const chatTitle = activeChat.type === "group" ? `${activeGroup?.teamName ?? "Team"} Team Chat` : activeMember?.name ?? "Bireysel Mesaj";
-    const chatSubtitle = activeChat.type === "group" ? `${activeGroup?.memberCount ?? 0} üye` : activeMember ? `${activeMember.role} · ${activeMember.teamName}` : "Bireysel mesaj";
+  async function sendMessage() {
+    if (appData === null || activeGroup === undefined) {
+      return;
+    }
+
+    const trimmedText = draftText.trim();
+
+    if (trimmedText.length === 0) {
+      return;
+    }
+
+    try {
+      const nextAppData = await teamSyncService.createChatMessage({
+        clubId: appData.club.id,
+        groupId: activeGroup.id,
+        senderUserId: appData.currentUser.id,
+        text: trimmedText,
+      });
+
+      setAppData(nextAppData);
+      setDraftText("");
+    } catch {
+      setStatusMessage("Mesaj gönderilirken bir sorun oluştu.");
+    }
+  }
+
+  if (activeChat !== null && activeGroup !== undefined && appData !== null) {
+    const chatTitle = activeGroup.name;
+    const chatSubtitle = `${getGroupMembers(activeGroup, users).length} üye · ${getGroupTeamName(activeGroup, appData)}`;
 
     return (
       <KeyboardAvoidingView style={styles.chatScreen} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -216,23 +278,19 @@ export default function MessagesScreen() {
 
           <View style={styles.chatTitleArea}>
             <Text style={styles.chatTitle} numberOfLines={1}>{chatTitle}</Text>
-            {activeChat.type === "group" && activeGroup ? (
-              <Pressable onPress={() => setOpenMemberListGroupId(activeGroup.id)}>
-                <Text style={styles.chatSubtitleLink}>{chatSubtitle} · listeyi gör</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.chatSubtitle}>{chatSubtitle}</Text>
-            )}
+            <Pressable onPress={() => setOpenMemberListGroupId(activeGroup.id)}>
+              <Text style={styles.chatSubtitleLink}>{chatSubtitle} · listeyi gör</Text>
+            </Pressable>
           </View>
         </View>
 
-        {activeGroup && openMemberListGroupId === activeGroup.id ? (
+        {openMemberListGroupId === activeGroup.id ? (
           <View style={styles.chatMemberBubbleWrapper}>
             <GroupMemberBubble
-              title={`${activeGroup.teamName} üyeleri`}
-              members={groupMembersById[activeGroup.id] ?? []}
+              title={`${activeGroup.name} üyeleri`}
+              members={toGroupMembers(activeGroup, appData)}
               onClose={() => setOpenMemberListGroupId(null)}
-              onQuickMessage={openDirectChat}
+              onQuickMessage={() => setOpenMemberListGroupId(null)}
             />
           </View>
         ) : null}
@@ -240,15 +298,15 @@ export default function MessagesScreen() {
         <ScrollView style={styles.messagesScroll} contentContainerStyle={styles.messagesContent}>
           {visibleMessages.length > 0 ? (
             visibleMessages.map((message) => {
-              const isMyMessage = message.senderName === CURRENT_USER_NAME;
+              const isMyMessage = message.senderUserId === appData.currentUser.id;
 
               return (
                 <View key={message.id} style={[styles.messageBubble, isMyMessage ? styles.myMessageBubble : styles.otherMessageBubble]}>
                   <View style={styles.messageTopRow}>
-                    <Text style={styles.messageSender}>{message.senderName}</Text>
+                    <Text style={styles.messageSender}>{getSenderName(message.senderUserId, users)}</Text>
                     <Text style={styles.messageTime}>{formatMessageTime(message.createdAt)}</Text>
                   </View>
-                  <Text style={styles.messageRole}>{message.senderRole}</Text>
+                  <Text style={styles.messageRole}>{getSenderRole(message.senderUserId, users)}</Text>
                   <Text style={styles.messageText}>{message.text}</Text>
                 </View>
               );
@@ -284,56 +342,145 @@ export default function MessagesScreen() {
         <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.title}>Mesajlar</Text>
-          <Text style={styles.subtitle}>Takım grupları ve bireysel mesajlar.</Text>
+          <Text style={styles.subtitle}>Takım grupları ve kulüp mesajları.</Text>
         </View>
 
-        <View style={styles.groupsSection}>
-          <Text style={styles.sectionTitle}>Takım Grupları</Text>
+        <View style={styles.topActions}>
+          <AppButton
+            title={showCreateForm ? "Form açık" : "Yeni mesaj oluştur"}
+            onPress={() => {
+              setShowCreateForm(true);
+              setStatusMessage("Yeni mesaj konuşması bilgilerini doldurabilirsin.");
+            }}
+            disabled={showCreateForm}
+            style={styles.actionButton}
+          />
+          <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={loadMessagesData} style={styles.actionButton} />
+        </View>
 
-          {chatGroups.map((group) => {
-            const lastMessage = getLastMessage(group.id, messages);
-            const isMemberListOpen = openMemberListGroupId === group.id;
+        {showCreateForm ? (
+          <View style={styles.createSection}>
+            <Text style={styles.sectionTitle}>Yeni mesaj oluştur</Text>
+            <Text style={styles.sectionSubtitle}>Kulüp veya takım için yeni bir konuşma başlat.</Text>
 
-            return (
-              <View key={group.id}>
-                <View style={styles.groupCard}>
-                  <Pressable onPress={() => openGroupChat(group)} style={({ pressed }) => [styles.groupMainArea, pressed ? styles.pressed : null]}>
-                    <View style={styles.groupAvatar}>
-                      <Text style={styles.groupAvatarText}>{getInitials(group.teamName)}</Text>
-                    </View>
+            <Text style={styles.label}>Konuşma adı</Text>
+            <TextInput
+              value={newConversationName}
+              onChangeText={setNewConversationName}
+              placeholder="Örn. Maç hazırlığı"
+              placeholderTextColor={theme.colors.text.muted}
+              style={styles.input}
+            />
 
-                    <View style={styles.groupInfo}>
-                      <View style={styles.groupTopRow}>
-                        <Text style={styles.groupTitle}>{group.teamName} {group.name}</Text>
-                        <Text style={styles.groupArrow}>›</Text>
-                      </View>
-                      <Text style={styles.groupDescription}>{group.description}</Text>
-                      <Text style={styles.lastMessage} numberOfLines={1}>
-                        {lastMessage ? `${lastMessage.senderName}: ${lastMessage.text}` : "Henüz mesaj yok."}
-                      </Text>
-                    </View>
-                  </Pressable>
+            <Text style={styles.label}>Kime gönderilecek?</Text>
+            <View style={styles.targetGrid}>
+              {targetOptions.map((target) => {
+                const isSelected = newConversationTargetId === target.id;
 
+                return (
                   <Pressable
-                    onPress={() => setOpenMemberListGroupId(isMemberListOpen ? null : group.id)}
-                    style={({ pressed }) => [styles.memberCountButton, pressed ? styles.pressed : null]}
+                    key={target.id}
+                    onPress={() => setNewConversationTargetId(target.id)}
+                    style={({ pressed }) => [
+                      styles.targetButton,
+                      isSelected ? styles.targetButtonSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
                   >
-                    <Text style={styles.memberCountText}>{group.memberCount} üye</Text>
-                    <Text style={styles.memberCountHint}>Listeyi gör</Text>
+                    <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>{target.label}</Text>
                   </Pressable>
-                </View>
+                );
+              })}
+            </View>
 
-                {isMemberListOpen ? (
-                  <GroupMemberBubble
-                    title={`${group.teamName} üyeleri`}
-                    members={groupMembersById[group.id] ?? []}
-                    onClose={() => setOpenMemberListGroupId(null)}
-                    onQuickMessage={openDirectChat}
-                  />
-                ) : null}
-              </View>
-            );
-          })}
+            <Text style={styles.label}>İlk mesaj</Text>
+            <TextInput
+              value={newConversationMessage}
+              onChangeText={setNewConversationMessage}
+              placeholder="Mesajını yaz..."
+              placeholderTextColor={theme.colors.text.muted}
+              multiline
+              style={[styles.input, styles.textArea]}
+            />
+
+            <View style={styles.formActions}>
+              <AppButton title="Konuşmayı oluştur" onPress={createConversation} style={styles.actionButton} />
+              <AppButton
+                title="Vazgeç"
+                variant="ghost"
+                onPress={() => {
+                  clearCreateForm();
+                  setShowCreateForm(false);
+                  setStatusMessage("Yeni mesaj oluşturma iptal edildi.");
+                }}
+                style={styles.actionButton}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.groupsSection}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>Konuşmalar</Text>
+              <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+            </View>
+            <Text style={styles.statusPill}>{chatGroups.length} konuşma</Text>
+          </View>
+
+          {appData !== null && chatGroups.length > 0 ? (
+            chatGroups.map((group) => {
+              const lastMessage = getLastMessage(group.id, chatMessages);
+              const isMemberListOpen = openMemberListGroupId === group.id;
+              const members = toGroupMembers(group, appData);
+              const teamName = getGroupTeamName(group, appData);
+
+              return (
+                <View key={group.id}>
+                  <View style={styles.groupCard}>
+                    <Pressable onPress={() => openGroupChat(group)} style={({ pressed }) => [styles.groupMainArea, pressed ? styles.pressed : null]}>
+                      <View style={styles.groupAvatar}>
+                        <Text style={styles.groupAvatarText}>{getInitials(group.name)}</Text>
+                      </View>
+
+                      <View style={styles.groupInfo}>
+                        <View style={styles.groupTopRow}>
+                          <Text style={styles.groupTitle}>{group.name}</Text>
+                          <Text style={styles.groupArrow}>›</Text>
+                        </View>
+                        <Text style={styles.groupDescription}>{teamName}</Text>
+                        <Text style={styles.lastMessage} numberOfLines={1}>
+                          {lastMessage ? `${getSenderName(lastMessage.senderUserId, users)}: ${lastMessage.text}` : "Henüz mesaj yok."}
+                        </Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => setOpenMemberListGroupId(isMemberListOpen ? null : group.id)}
+                      style={({ pressed }) => [styles.memberCountButton, pressed ? styles.pressed : null]}
+                    >
+                      <Text style={styles.memberCountText}>{members.length} üye</Text>
+                      <Text style={styles.memberCountHint}>Listeyi gör</Text>
+                    </Pressable>
+                  </View>
+
+                  {isMemberListOpen ? (
+                    <GroupMemberBubble
+                      title={`${group.name} üyeleri`}
+                      members={members}
+                      onClose={() => setOpenMemberListGroupId(null)}
+                      onQuickMessage={() => setOpenMemberListGroupId(null)}
+                    />
+                  ) : null}
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>Henüz konuşma yok</Text>
+              <Text style={styles.emptyText}>Yeni mesaj oluştur butonuyla ilk konuşmayı başlatabilirsin.</Text>
+            </View>
+          )}
         </View>
       </View>
     </ScrollView>
@@ -348,45 +495,64 @@ const styles = StyleSheet.create({
   logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
   title: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"], marginBottom: theme.spacing.sm },
   subtitle: { color: theme.colors.text.inverse, opacity: 0.76, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
-  groupsSection: { gap: theme.spacing.lg },
-  sectionTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
-  groupCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, gap: theme.spacing.lg, ...theme.shadows.sm },
-  groupMainArea: { flexDirection: "row", gap: theme.spacing.lg },
-  groupAvatar: { width: 52, height: 52, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primarySoft, alignItems: "center", justifyContent: "center" },
-  groupAvatarText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  topActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
+  actionButton: { flexGrow: 1, minWidth: 170 },
+  createSection: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
+  groupsSection: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
+  sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  sectionHeaderText: { flex: 1 },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full },
+  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  input: { minHeight: 52, backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.lg },
+  textArea: { minHeight: 110, textAlignVertical: "top" },
+  targetGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.xl },
+  targetButton: { borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.subtle },
+  targetButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
+  targetButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  targetButtonTextSelected: { color: theme.colors.text.inverse },
+  formActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.sm },
+  groupCard: { flexDirection: "row", backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, marginBottom: theme.spacing.md, overflow: "hidden" },
+  groupMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
+  groupAvatar: { width: 48, height: 48, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  groupAvatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
   groupInfo: { flex: 1 },
-  groupTopRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
-  groupTitle: { flex: 1, color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
-  groupArrow: { color: theme.colors.text.brand, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black },
-  groupDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
-  lastMessage: { color: theme.colors.text.muted, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.md },
-  memberCountButton: { alignSelf: "flex-start", backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  memberCountText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
-  memberCountHint: { color: theme.colors.text.brand, fontSize: 10, fontWeight: theme.fontWeights.semibold, marginTop: 2 },
+  groupTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
+  groupTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
+  groupArrow: { color: theme.colors.text.secondary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black },
+  groupDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  lastMessage: { color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  memberCountButton: { minWidth: 112, alignItems: "center", justifyContent: "center", paddingHorizontal: theme.spacing.md, borderLeftWidth: 1, borderLeftColor: theme.colors.border.default, backgroundColor: theme.colors.background.surface },
+  memberCountText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  memberCountHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, marginTop: 2 },
+  emptyCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
+  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
   chatScreen: { flex: 1, backgroundColor: theme.colors.background.app },
-  chatHeaderWrapper: { paddingHorizontal: theme.spacing["2xl"], paddingBottom: theme.spacing.lg, borderBottomWidth: 1, borderBottomColor: theme.colors.border.default, flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
-  backButton: { width: 44, height: 44, borderRadius: theme.radius.full, backgroundColor: theme.colors.background.surface, borderWidth: 1, borderColor: theme.colors.border.default, alignItems: "center", justifyContent: "center", ...theme.shadows.sm },
-  backButtonText: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black, marginTop: -4 },
+  chatHeaderWrapper: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md, paddingHorizontal: theme.spacing["2xl"], paddingTop: theme.spacing["2xl"], paddingBottom: theme.spacing.lg, backgroundColor: theme.colors.background.app },
+  backButton: { width: 44, height: 44, borderRadius: theme.radius.full, backgroundColor: theme.colors.background.surface, alignItems: "center", justifyContent: "center" },
+  backButtonText: { color: theme.colors.text.primary, fontSize: 34, fontWeight: theme.fontWeights.black, lineHeight: 36 },
   chatTitleArea: { flex: 1 },
-  chatTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
-  chatSubtitle: { color: theme.colors.text.inverse, opacity: 0.72, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
-  chatSubtitleLink: { color: theme.colors.text.inverse, opacity: 0.9, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xs, textDecorationLine: "underline" },
-  chatMemberBubbleWrapper: { paddingHorizontal: theme.spacing.xl, paddingTop: theme.spacing.md },
+  chatTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black },
+  chatSubtitle: { color: theme.colors.text.inverse, opacity: 0.72, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  chatSubtitleLink: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xs },
+  chatMemberBubbleWrapper: { paddingHorizontal: theme.spacing["2xl"] },
   messagesScroll: { flex: 1 },
-  messagesContent: { padding: theme.spacing.xl, gap: theme.spacing.md },
-  messageBubble: { borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, ...theme.shadows.sm },
-  otherMessageBubble: { backgroundColor: theme.colors.background.surface, borderColor: theme.colors.border.default, alignSelf: "flex-start", maxWidth: "88%" },
-  myMessageBubble: { backgroundColor: theme.colors.brand.primarySoft, borderColor: theme.colors.brand.primarySoft, alignSelf: "flex-end", maxWidth: "88%" },
+  messagesContent: { paddingHorizontal: theme.spacing["2xl"], paddingBottom: theme.spacing["2xl"], gap: theme.spacing.md },
+  messageBubble: { maxWidth: "82%", borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
+  myMessageBubble: { alignSelf: "flex-end", backgroundColor: theme.colors.brand.primarySoft },
+  otherMessageBubble: { alignSelf: "flex-start", backgroundColor: theme.colors.background.surface },
   messageTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md, marginBottom: theme.spacing.xs },
-  messageSender: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
-  messageTime: { color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
-  messageRole: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm },
-  messageText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  emptyChatCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl },
-  emptyChatTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  messageSender: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  messageTime: { color: theme.colors.text.muted, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold },
+  messageRole: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  messageText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.lg },
+  emptyChatCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
+  emptyChatTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
   emptyChatText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
-  composer: { backgroundColor: theme.colors.background.surface, borderTopWidth: 1, borderTopColor: theme.colors.border.default, padding: theme.spacing.lg, flexDirection: "row", alignItems: "flex-end", gap: theme.spacing.md },
-  composerInput: { flex: 1, minHeight: 46, maxHeight: 110, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.xl, paddingVertical: theme.spacing.md, paddingHorizontal: theme.spacing.lg, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, textAlignVertical: "top" },
+  composer: { flexDirection: "row", alignItems: "flex-end", gap: theme.spacing.md, padding: theme.spacing.lg, backgroundColor: theme.colors.background.surface, borderTopWidth: 1, borderTopColor: theme.colors.border.default },
+  composerInput: { flex: 1, minHeight: 46, maxHeight: 120, borderRadius: theme.radius.xl, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   sendButton: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
   sendButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },

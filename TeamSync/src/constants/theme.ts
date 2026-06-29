@@ -14,12 +14,17 @@ const palette = {
   slate700: "#334155",
   slate800: "#1E293B",
   slate900: "#0F172A",
+  slate950: "#020617",
 
-  sky50: "#F0F9FF",
-  sky100: "#E0F2FE",
-  sky500: "#0EA5E9",
-  sky600: "#0284C7",
-  sky700: "#0369A1",
+  blue50: "#EFF6FF",
+  blue100: "#DBEAFE",
+  blue500: "#3B82F6",
+  blue600: "#2563EB",
+  blue700: "#1D4ED8",
+
+  cyan50: "#ECFEFF",
+  cyan500: "#06B6D4",
+  cyan600: "#0891B2",
 
   emerald50: "#ECFDF5",
   emerald500: "#10B981",
@@ -38,19 +43,19 @@ const palette = {
 export const theme = {
   colors: {
     brand: {
-      primary: palette.sky600,
-      primaryPressed: palette.sky700,
-      primarySoft: palette.sky50,
-      secondary: palette.emerald600,
-      secondaryPressed: palette.emerald700,
-      secondarySoft: palette.emerald50,
+      primary: palette.blue600,
+      primaryPressed: palette.blue700,
+      primarySoft: palette.blue50,
+      secondary: palette.cyan600,
+      secondaryPressed: palette.slate800,
+      secondarySoft: palette.cyan50,
     },
 
     background: {
-      app: palette.slate900,
+      app: palette.slate950,
       lightApp: palette.slate50,
       surface: palette.white,
-      subtle: palette.slate100,
+      subtle: palette.slate50,
       elevated: palette.white,
     },
 
@@ -59,7 +64,7 @@ export const theme = {
       secondary: palette.slate600,
       muted: palette.slate500,
       inverse: palette.white,
-      brand: palette.sky700,
+      brand: palette.blue700,
       success: palette.emerald700,
       warning: palette.amber600,
       danger: palette.rose600,
@@ -68,7 +73,7 @@ export const theme = {
     border: {
       default: palette.slate200,
       strong: palette.slate300,
-      focus: palette.sky500,
+      focus: palette.blue500,
     },
 
     state: {
@@ -78,11 +83,11 @@ export const theme = {
       warningSoft: palette.amber50,
       danger: palette.rose500,
       dangerSoft: palette.rose50,
-      info: palette.sky600,
-      infoSoft: palette.sky50,
+      info: palette.blue600,
+      infoSoft: palette.blue50,
     },
 
-    overlay: "rgba(15, 23, 42, 0.48)",
+    overlay: "rgba(2, 6, 23, 0.58)",
   },
 
   spacing: {
@@ -115,8 +120,8 @@ export const theme = {
     sm: 6,
     md: 8,
     lg: 12,
-    xl: 16,
-    "2xl": 24,
+    xl: 18,
+    "2xl": 28,
     full: 999,
   },
 
@@ -162,25 +167,25 @@ export const theme = {
       elevation: 0,
     },
     sm: {
-      shadowColor: palette.slate900,
-      shadowOffset: { width: 0, height: 1 },
+      shadowColor: palette.slate950,
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
-      shadowRadius: 2,
-      elevation: 1,
+      shadowRadius: 5,
+      elevation: 2,
     },
     md: {
-      shadowColor: palette.slate900,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 10,
-      elevation: 3,
-    },
-    lg: {
-      shadowColor: palette.slate900,
-      shadowOffset: { width: 0, height: 10 },
+      shadowColor: palette.slate950,
+      shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.1,
       shadowRadius: 18,
-      elevation: 5,
+      elevation: 4,
+    },
+    lg: {
+      shadowColor: palette.slate950,
+      shadowOffset: { width: 0, height: 16 },
+      shadowOpacity: 0.16,
+      shadowRadius: 30,
+      elevation: 8,
     },
   },
 } as const;

@@ -15,7 +15,7 @@ import { AppButton } from "@/components/AppButton";
 import { GroupMemberBubble, type GroupMember } from "@/components/GroupMemberBubble";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
+import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
 type ActiveChat = { type: "group"; groupId: string };
 
@@ -28,14 +28,6 @@ type TargetOption = {
 const EMPTY_CHAT_GROUPS: ChatGroup[] = [];
 const EMPTY_CHAT_MESSAGES: ChatMessage[] = [];
 const EMPTY_USERS: UserProfile[] = [];
-
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
-};
 
 function formatMessageTime(createdAt: string) {
   const date = new Date(createdAt);
@@ -69,16 +61,6 @@ function getSenderName(userId: string, users: UserProfile[]) {
   return users.find((user) => user.id === userId)?.fullName ?? "Bilinmeyen kullanıcı";
 }
 
-function getSenderRole(userId: string, users: UserProfile[]) {
-  const userRole = users.find((user) => user.id === userId)?.role;
-
-  if (userRole === undefined) {
-    return "Rol yok";
-  }
-
-  return roleDisplayNames[userRole];
-}
-
 function getGroupTeamName(group: ChatGroup, appData: TeamSyncAppData) {
   if (group.teamId === undefined) {
     return "Tüm Kulüp";
@@ -97,7 +79,7 @@ function toGroupMembers(group: ChatGroup, appData: TeamSyncAppData): GroupMember
   return getGroupMembers(group, appData.users).map((user) => ({
     id: user.id,
     name: user.fullName,
-    role: roleDisplayNames[user.role],
+    role: "",
     teamName,
   }));
 }
@@ -306,7 +288,6 @@ export default function MessagesScreen() {
                     <Text style={styles.messageSender}>{getSenderName(message.senderUserId, users)}</Text>
                     <Text style={styles.messageTime}>{formatMessageTime(message.createdAt)}</Text>
                   </View>
-                  <Text style={styles.messageRole}>{getSenderRole(message.senderUserId, users)}</Text>
                   <Text style={styles.messageText}>{message.text}</Text>
                 </View>
               );
@@ -546,7 +527,6 @@ const styles = StyleSheet.create({
   messageTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md, marginBottom: theme.spacing.xs },
   messageSender: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   messageTime: { color: theme.colors.text.muted, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold },
-  messageRole: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
   messageText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.lg },
   emptyChatCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
   emptyChatTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },

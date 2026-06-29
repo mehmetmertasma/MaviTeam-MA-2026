@@ -12,6 +12,8 @@ export type AttendanceStatus = "present" | "absent" | "late" | "excused";
 
 export type PaymentStatus = "paid" | "unpaid" | "late";
 
+export type ReplayType = "match" | "practice" | "drill";
+
 export type JoinRequestStatus = "pending" | "approved" | "rejected";
 
 export type TimestampString = string;
@@ -123,6 +125,20 @@ export type Payment = {
   updatedAt: TimestampString;
 };
 
+export type Replay = {
+  id: string;
+  clubId: string;
+  teamId?: string;
+  title: string;
+  description: string;
+  type: ReplayType;
+  videoUrl: string;
+  visibleUserIds: string[];
+  createdByUserId: string;
+  createdAt: TimestampString;
+  updatedAt: TimestampString;
+};
+
 export type JoinRequest = {
   id: string;
   clubId: string;
@@ -145,5 +161,6 @@ export type TeamSyncAppData = {
   chatGroups: ChatGroup[];
   chatMessages: ChatMessage[];
   payments: Payment[];
+  replays: Replay[];
   joinRequests: JoinRequest[];
 };

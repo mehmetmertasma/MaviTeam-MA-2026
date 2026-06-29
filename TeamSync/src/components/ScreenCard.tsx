@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { StyleProp, ViewStyle } from 'react-native';
+import type { ReactNode } from "react";
+import { StyleSheet, View } from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 
-import { ScreenMaxWidth, theme } from '@/constants/theme';
+import { ScreenMaxWidth, theme } from "@/constants/theme";
 
 type ScreenCardProps = {
   children: ReactNode;
@@ -11,25 +11,25 @@ type ScreenCardProps = {
 };
 
 export function ScreenCard({ children, centered = false, style }: ScreenCardProps) {
-  return <View style={[styles.card, centered && styles.centered, style]}>{children}</View>;
+  return <View style={[styles.card, centered ? styles.centered : null, style]}>{children}</View>;
 }
 
 export default ScreenCard;
 
 const styles = StyleSheet.create({
   card: {
-    width: '100%',
+    width: "100%",
     maxWidth: ScreenMaxWidth,
-    alignSelf: 'center',
+    alignSelf: "center",
     backgroundColor: theme.colors.background.surface,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing['2xl'],
-    ...theme.shadows.md,
+    borderRadius: theme.radius["2xl"],
+    padding: theme.spacing["3xl"],
+    ...theme.shadows.lg,
   },
   centered: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

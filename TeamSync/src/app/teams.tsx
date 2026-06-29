@@ -5,18 +5,10 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { Team as TeamRecord, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
+import type { Team as TeamRecord, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
 const EMPTY_TEAMS: TeamRecord[] = [];
 const EMPTY_USERS: UserProfile[] = [];
-
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
-};
 
 function getInitials(name: string) {
   const initials = name
@@ -145,7 +137,7 @@ export default function TeamsScreen() {
 
       const createdTeam = nextAppData.teams[0];
       setAppData(nextAppData);
-      setSelectedTeamId(createdTeam.id);
+      setSelectedTeamId(createdTeam?.id ?? "");
       clearForm();
       setShowCreateForm(false);
       setStatusMessage(
@@ -329,7 +321,7 @@ export default function TeamsScreen() {
                   </View>
                   <View style={styles.memberInfo}>
                     <Text style={styles.memberName}>{member.fullName}</Text>
-                    <Text style={styles.memberMeta}>{roleDisplayNames[member.role]} · {getUserStatusLabel(member.status)}</Text>
+                    <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
                   </View>
                   <AppButton
                     title="Mesaj yolla"
@@ -402,17 +394,8 @@ const styles = StyleSheet.create({
     lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
-  heroSubtitle: {
-    fontSize: theme.fontSizes.lg,
-    color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.xl,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
-  },
+  heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing["2xl"] },
   statCard: {
     flexGrow: 1,
     flexBasis: 145,
@@ -423,23 +406,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  statValue: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  statLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-  },
-  topActions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing["2xl"],
-  },
+  statValue: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold },
+  topActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
   actionButton: { minWidth: 170 },
   section: {
     backgroundColor: theme.colors.background.surface,
@@ -450,25 +419,9 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     ...theme.shadows.sm,
   },
-  sectionTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  sectionSubtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-    marginBottom: theme.spacing.xl,
-  },
-  label: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    marginBottom: theme.spacing.sm,
-  },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md, marginBottom: theme.spacing.xl },
+  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm },
   input: {
     minHeight: 52,
     borderWidth: 1,
@@ -481,122 +434,28 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.lg,
     marginBottom: theme.spacing.lg,
   },
-  formGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.lg,
-  },
+  formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
   formField: { flex: 1, minWidth: 220 },
-  emptyBox: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  emptyTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-  },
+  emptyBox: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
+  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
   teamList: { gap: theme.spacing.md },
-  teamCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  teamCardSelected: {
-    borderColor: theme.colors.brand.primary,
-    backgroundColor: theme.colors.brand.primarySoft,
-  },
-  teamTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
+  teamCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
+  teamCardSelected: { borderColor: theme.colors.brand.primary, backgroundColor: theme.colors.brand.primarySoft },
+  teamTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.sm },
   teamInfo: { flex: 1 },
-  teamName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  teamMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  teamBadge: {
-    backgroundColor: theme.colors.background.surface,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
-  },
-  teamHint: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  statusText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xl,
-    lineHeight: theme.lineHeights.md,
-  },
+  teamName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  teamMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  teamBadge: { backgroundColor: theme.colors.background.surface, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full },
+  teamHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  statusText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xl, lineHeight: theme.lineHeights.md },
   memberList: { gap: theme.spacing.md },
-  memberCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-  },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.brand.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
+  memberCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default, flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
+  avatar: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   memberInfo: { flex: 1 },
-  memberName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  memberMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-  },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   memberButton: { minWidth: 120 },
-  pressed: {
-    opacity: 0.86,
-    transform: [{ scale: 0.99 }],
-  },
+  pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
 });

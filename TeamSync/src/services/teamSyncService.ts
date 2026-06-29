@@ -34,10 +34,10 @@ type CreateJoinRequestInput = {
 type SaveAttendanceInput = {
   teamId?: string;
   sessionDate: string;
-  records: Array<{
+  records: {
     userId: string;
     status: AttendanceStatus;
-  }>;
+  }[];
 };
 
 function nowIso() {

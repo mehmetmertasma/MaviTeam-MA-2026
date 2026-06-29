@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { User } from "firebase/auth";
 
 import { authService } from "@/services/authService";
@@ -10,27 +10,26 @@ type AuthUserState = {
 };
 
 export function useAuthUser(): AuthUserState {
-  const [user, setUser] = useState<User | null>(() => authService.getCurrentUser());
-  const [isAuthReady, setIsAuthReady] = useState(!authService.isConfigured());
+  const isFirebaseAuthConfigured = useMemo(() => authService.isConfigured(), []);
+  const [user, setUser] = useState<User | null>(() => (
+    isFirebaseAuthConfigured ? authService.getCurrentUser() : null
+  ));
+  const [isAuthReady, setIsAuthReady] = useState(!isFirebaseAuthConfigured);
 
   useEffect(() => {
-    if (!authService.isConfigured()) {
-      setUser(null);
-      setIsAuthReady(true);
+    if (!isFirebaseAuthConfigured) {
       return;
     }
 
-    const unsubscribe = authService.onUserChanged((nextUser) => {
+    return authService.onUserChanged((nextUser) => {
       setUser(nextUser);
       setIsAuthReady(true);
     });
-
-    return unsubscribe;
-  }, []);
+  }, [isFirebaseAuthConfigured]);
 
   return {
     user,
     isAuthReady,
-    isFirebaseAuthConfigured: authService.isConfigured(),
+    isFirebaseAuthConfigured,
   };
 }

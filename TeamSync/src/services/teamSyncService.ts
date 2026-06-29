@@ -286,6 +286,29 @@ export const teamSyncService = {
     return saveAppData({ ...data, teams: [newTeam, ...data.teams] });
   },
 
+  async removeTeam(teamId: string) {
+    const data = await loadAppData();
+    const removedAt = nowIso();
+
+    const teams = data.teams.filter((team) => team.id !== teamId);
+    const users = data.users.map((user) => ({
+      ...user,
+      teamIds: user.teamIds.filter((userTeamId) => userTeamId !== teamId),
+      updatedAt: user.teamIds.includes(teamId) ? removedAt : user.updatedAt,
+    }));
+
+    return saveAppData({
+      ...data,
+      teams,
+      users,
+      currentUser: {
+        ...data.currentUser,
+        teamIds: data.currentUser.teamIds.filter((userTeamId) => userTeamId !== teamId),
+        updatedAt: data.currentUser.teamIds.includes(teamId) ? removedAt : data.currentUser.updatedAt,
+      },
+    });
+  },
+
   async createAnnouncement(input: Omit<Announcement, "id" | "createdAt" | "updatedAt">) {
     const data = await loadAppData();
     const newAnnouncement: Announcement = { ...input, id: `announcement-${Date.now()}`, createdAt: nowIso() };

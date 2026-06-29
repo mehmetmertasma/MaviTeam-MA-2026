@@ -7,8 +7,6 @@ import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Payment, PaymentStatus, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
-type PaymentView = "admin" | "parent";
-
 const EMPTY_PAYMENTS: Payment[] = [];
 const EMPTY_USERS: UserProfile[] = [];
 
@@ -18,38 +16,24 @@ const paymentStatusOptions: { label: string; status: PaymentStatus }[] = [
   { label: "Gecikti", status: "late" },
 ];
 
+function canManagePayments(appData: TeamSyncAppData | null) {
+  return appData?.currentUser.role === "superAdmin" || appData?.currentUser.role === "clubAdmin";
+}
+
 function getStatusLabel(status: PaymentStatus) {
-  if (status === "paid") {
-    return "Ödendi";
-  }
-
-  if (status === "unpaid") {
-    return "Ödenmedi";
-  }
-
+  if (status === "paid") return "Ödendi";
+  if (status === "unpaid") return "Ödenmedi";
   return "Gecikti";
 }
 
 function formatAmount(amountCents: number) {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    maximumFractionDigits: 0,
-  }).format(amountCents / 100);
+  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(amountCents / 100);
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value || "Tarih yok";
-  }
-
-  return date.toLocaleDateString("tr-TR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  if (Number.isNaN(date.getTime())) return value || "Tarih yok";
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 function getUserName(userId: string, users: UserProfile[]) {
@@ -59,44 +43,26 @@ function getUserName(userId: string, users: UserProfile[]) {
 function getPrimaryTeamName(userId: string, appData: TeamSyncAppData) {
   const user = appData.users.find((currentUser) => currentUser.id === userId);
   const teamId = user?.teamIds[0];
-
-  if (teamId === undefined) {
-    return "Takım seçilmedi";
-  }
-
+  if (teamId === undefined) return "Takım seçilmedi";
   return appData.teams.find((team) => team.id === teamId)?.name ?? "Takım bulunamadı";
 }
 
 function buildDueAt(dateText: string) {
   const cleanDateText = dateText.trim();
-
-  if (cleanDateText.length === 0) {
-    return new Date().toISOString();
-  }
-
+  if (cleanDateText.length === 0) return new Date().toISOString();
   const parsedDate = new Date(cleanDateText);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return new Date().toISOString();
-  }
-
-  return parsedDate.toISOString();
+  return Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
 }
 
 function parseAmountToCents(amountText: string) {
   const normalizedAmount = amountText.replace(/[^0-9.,]/g, "").replace(",", ".");
   const amount = Number(normalizedAmount);
-
-  if (Number.isNaN(amount) || amount <= 0) {
-    return 0;
-  }
-
+  if (Number.isNaN(amount) || amount <= 0) return 0;
   return Math.round(amount * 100);
 }
 
 export default function PaymentsScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
-  const [activeView, setActiveView] = useState<PaymentView>("admin");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [paymentTitle, setPaymentTitle] = useState("");
@@ -118,40 +84,19 @@ export default function PaymentsScreen() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadPaymentsData();
-    }, [loadPaymentsData])
-  );
+  useFocusEffect(useCallback(() => { loadPaymentsData(); }, [loadPaymentsData]));
 
   const payments = appData?.payments ?? EMPTY_PAYMENTS;
   const users = appData?.users ?? EMPTY_USERS;
   const activeUsers = users.filter((user) => user.status !== "removed");
+  const userCanManagePayments = canManagePayments(appData);
+  const visiblePayments = userCanManagePayments || appData === null ? payments : payments.filter((payment) => payment.userId === appData.currentUser.id);
 
-  const summary = useMemo(() => {
-    const paidCount = payments.filter((payment) => payment.status === "paid").length;
-    const unpaidCount = payments.filter((payment) => payment.status === "unpaid").length;
-    const lateCount = payments.filter((payment) => payment.status === "late").length;
-
-    return {
-      paidCount,
-      unpaidCount,
-      lateCount,
-      totalCount: payments.length,
-    };
-  }, [payments]);
-
-  const visiblePayments = useMemo(() => {
-    if (appData === null) {
-      return EMPTY_PAYMENTS;
-    }
-
-    if (activeView === "admin") {
-      return payments;
-    }
-
-    return payments.filter((payment) => payment.userId === appData.currentUser.id);
-  }, [activeView, appData, payments]);
+  const summary = useMemo(() => ({
+    paidCount: payments.filter((payment) => payment.status === "paid").length,
+    unpaidCount: payments.filter((payment) => payment.status === "unpaid").length,
+    lateCount: payments.filter((payment) => payment.status === "late").length,
+  }), [payments]);
 
   const canCreatePayment = selectedUserId.length > 0 && paymentTitle.trim().length > 0 && parseAmountToCents(amountText) > 0;
 
@@ -167,8 +112,6 @@ export default function PaymentsScreen() {
       return;
     }
 
-    const amountCents = parseAmountToCents(amountText);
-
     if (!canCreatePayment) {
       setStatusMessage("Kullanıcı, başlık ve geçerli tutar gerekli.");
       return;
@@ -179,7 +122,7 @@ export default function PaymentsScreen() {
         clubId: appData.club.id,
         userId: selectedUserId,
         title: paymentTitle.trim(),
-        amountCents,
+        amountCents: parseAmountToCents(amountText),
         status: "unpaid",
         dueAt: buildDueAt(dueDateText),
       });
@@ -209,27 +152,13 @@ export default function PaymentsScreen() {
         <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.pageTitle}>Ödemeler</Text>
-          <Text style={styles.pageSubtitle}>
-            Kulüp aidatlarını takip et, ödeme durumlarını düzenle ve velilere güncel ödeme bilgisini göster.
-          </Text>
+          <Text style={styles.pageSubtitle}>Kulüp aidatlarını takip et, ödeme durumlarını düzenle ve velilere güncel ödeme bilgisini göster.</Text>
         </View>
 
         <View style={styles.heroCard}>
           <Text style={styles.heroLabel}>Kulüp finans merkezi</Text>
           <Text style={styles.heroTitle}>Aidat ve ödeme takibi</Text>
-          <Text style={styles.heroSubtitle}>
-            Ödemeler TeamSync service layer içindeki appData.payments üzerinden gelir ve güncellenir.
-          </Text>
-        </View>
-
-        <View style={styles.viewSwitcher}>
-          <Pressable onPress={() => setActiveView("admin")} style={({ pressed }) => [styles.viewButton, activeView === "admin" ? styles.viewButtonActive : null, pressed ? styles.pressed : null]}>
-            <Text style={[styles.viewButtonText, activeView === "admin" ? styles.viewButtonTextActive : null]}>Admin görünümü</Text>
-          </Pressable>
-
-          <Pressable onPress={() => setActiveView("parent")} style={({ pressed }) => [styles.viewButton, activeView === "parent" ? styles.viewButtonActive : null, pressed ? styles.pressed : null]}>
-            <Text style={[styles.viewButtonText, activeView === "parent" ? styles.viewButtonTextActive : null]}>Veli görünümü</Text>
-          </Pressable>
+          <Text style={styles.heroSubtitle}>Ödemeler TeamSync service layer içindeki appData.payments üzerinden gelir ve güncellenir.</Text>
         </View>
 
         <View style={styles.statsGrid}>
@@ -238,14 +167,14 @@ export default function PaymentsScreen() {
           <View style={styles.statCard}><Text style={styles.statValue}>{summary.lateCount}</Text><Text style={styles.statLabel}>Geciken</Text></View>
         </View>
 
-        {activeView === "admin" ? (
+        {userCanManagePayments ? (
           <View style={styles.topActions}>
             <AppButton title={showCreateForm ? "Form açık" : "Yeni ödeme oluştur"} onPress={() => { setShowCreateForm(true); setStatusMessage("Yeni ödeme bilgilerini doldurabilirsin."); }} disabled={showCreateForm} style={styles.actionButton} />
             <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={loadPaymentsData} style={styles.actionButton} />
           </View>
         ) : null}
 
-        {showCreateForm && activeView === "admin" ? (
+        {showCreateForm && userCanManagePayments ? (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>Yeni ödeme oluştur</Text><Text style={styles.sectionSubtitle}>Bir üyeye aidat veya ödeme kaydı ekle.</Text></View><Text style={styles.statusPill}>Yeni</Text></View>
             <Text style={styles.label}>Kullanıcı</Text>
@@ -264,7 +193,7 @@ export default function PaymentsScreen() {
         ) : null}
 
         <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>{activeView === "admin" ? "Kulüp ödeme listesi" : "Benim ödeme durumum"}</Text><Text style={styles.sectionSubtitle}>{statusMessage}</Text></View><Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text></View>
+          <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>Ödeme listesi</Text><Text style={styles.sectionSubtitle}>{statusMessage}</Text></View><Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text></View>
 
           {appData !== null && visiblePayments.length > 0 ? (
             <View style={styles.paymentList}>
@@ -280,7 +209,7 @@ export default function PaymentsScreen() {
                       <View style={styles.infoBox}><Text style={styles.infoLabel}>Son tarih</Text><Text style={styles.infoValue}>{formatDate(payment.dueAt)}</Text></View>
                       <View style={styles.infoBox}><Text style={styles.infoLabel}>Ödendi</Text><Text style={styles.infoValue}>{payment.paidAt ? formatDate(payment.paidAt) : "Bekleniyor"}</Text></View>
                     </View>
-                    {activeView === "admin" ? (<View style={styles.statusActions}>{paymentStatusOptions.map((option) => { const isSelected = payment.status === option.status; return (<Pressable key={option.status} onPress={() => handleChangePaymentStatus(payment.id, option.status)} style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>) : null}
+                    {userCanManagePayments ? (<View style={styles.statusActions}>{paymentStatusOptions.map((option) => { const isSelected = payment.status === option.status; return (<Pressable key={option.status} onPress={() => handleChangePaymentStatus(payment.id, option.status)} style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>) : null}
                   </View>
                 );
               })}
@@ -306,11 +235,6 @@ const styles = StyleSheet.create({
   heroLabel: { alignSelf: "flex-start", backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full, marginBottom: theme.spacing.lg },
   heroTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, color: theme.colors.text.primary, lineHeight: theme.lineHeights["4xl"], marginBottom: theme.spacing.md },
   heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl },
-  viewSwitcher: { flexDirection: "row", backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, padding: theme.spacing.sm, marginBottom: theme.spacing["2xl"], ...theme.shadows.sm },
-  viewButton: { flex: 1, borderRadius: theme.radius.lg, paddingVertical: theme.spacing.md, alignItems: "center" },
-  viewButtonActive: { backgroundColor: theme.colors.brand.primary },
-  viewButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
-  viewButtonTextActive: { color: theme.colors.text.inverse },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing["2xl"] },
   statCard: { flexGrow: 1, flexBasis: 145, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
   statValue: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, color: theme.colors.brand.primary, marginBottom: theme.spacing.xs },

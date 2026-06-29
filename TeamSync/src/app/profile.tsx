@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-nat
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
+import type { TeamSyncAppData } from "@/types/teamSync";
 
 type ProfileFormData = {
   fullName: string;
@@ -23,14 +23,6 @@ const emptyFormData: ProfileFormData = {
   clubSport: "",
   clubCity: "",
   clubCode: "",
-};
-
-const roleDisplayNames: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
 };
 
 function getInitials(name: string) {
@@ -172,7 +164,6 @@ export default function ProfileScreen() {
   const currentClub = appData.club;
   const primaryTeam = appData.teams.find((team) => currentUser.teamIds.includes(team.id));
   const displayData = isEditing ? draftProfileData : getFormDataFromAppData(appData);
-  const displayRole = roleDisplayNames[currentUser.role];
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
@@ -254,8 +245,6 @@ export default function ProfileScreen() {
               </Text>
               <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
             </View>
-
-            <Text style={styles.statusPill}>{displayRole}</Text>
           </View>
 
           {isEditing ? (
@@ -302,7 +291,6 @@ export default function ProfileScreen() {
               <View style={styles.infoRow}><Text style={styles.infoLabel}>E-posta</Text><Text style={styles.infoValue}>{currentUser.email || "E-posta yok"}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Kulüp</Text><Text style={styles.infoValue}>{currentClub.name}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Takım</Text><Text style={styles.infoValue}>{primaryTeam?.name ?? "Takım seçilmedi"}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>Rol</Text><Text style={styles.infoValue}>{displayRole}</Text></View>
               <View style={styles.infoRow}><Text style={styles.infoLabel}>Kulüp kodu</Text><Text style={styles.infoValue}>{currentClub.code}</Text></View>
               <View style={styles.infoRowLast}><Text style={styles.infoLabel}>Data modu</Text><Text style={styles.infoValue}>TeamSync service layer</Text></View>
             </View>

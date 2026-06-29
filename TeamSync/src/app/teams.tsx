@@ -7,6 +7,9 @@ import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Team as TeamRecord, TeamSyncAppData, UserProfile, UserRole } from "@/types/teamSync";
 
+const EMPTY_TEAMS: TeamRecord[] = [];
+const EMPTY_USERS: UserProfile[] = [];
+
 const roleDisplayNames: Record<UserRole, string> = {
   superAdmin: "Platform yöneticisi",
   clubAdmin: "Kulüp yöneticisi",
@@ -87,8 +90,8 @@ export default function TeamsScreen() {
     }, [loadTeamsData])
   );
 
-  const teams = appData?.teams ?? [];
-  const users = appData?.users ?? [];
+  const teams = appData?.teams ?? EMPTY_TEAMS;
+  const users = appData?.users ?? EMPTY_USERS;
 
   const selectedTeam = useMemo(() => {
     return teams.find((team) => team.id === selectedTeamId) ?? teams[0];
@@ -173,7 +176,7 @@ export default function TeamsScreen() {
           <Text style={styles.heroLabel}>Kulüp organizasyonu</Text>
           <Text style={styles.heroTitle}>Takım yönetim merkezi</Text>
           <Text style={styles.heroSubtitle}>
-            Bu sayfa artık demo array kullanmıyor. Takımlar, üyeler ve koçlar TeamSync service layer içindeki appData üzerinden geliyor.
+            Takımlar, üyeler ve koçlar TeamSync service layer içindeki appData üzerinden geliyor.
           </Text>
         </View>
 

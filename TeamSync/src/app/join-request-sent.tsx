@@ -5,15 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
-
-const roleLabels: Record<UserRole, string> = {
-  superAdmin: "Platform yöneticisi",
-  clubAdmin: "Kulüp yöneticisi",
-  coach: "Koç",
-  parent: "Veli",
-  athlete: "Sporcu",
-};
+import type { TeamSyncAppData } from "@/types/teamSync";
 
 export default function JoinRequestSentScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
@@ -61,7 +53,7 @@ export default function JoinRequestSentScreen() {
           <Text style={styles.title}>Admin onayı bekleniyor</Text>
 
           <Text style={styles.subtitle}>
-            Katılma isteğin merkezi TeamSync datasına pending olarak kaydedildi. Kulüp yöneticisi onayladıktan sonra kendi rolüne göre dashboard erişimi açılacak.
+            Katılma isteğin merkezi TeamSync datasına pending olarak kaydedildi. Kulüp yöneticisi onayladıktan sonra dashboard erişimi açılacak.
           </Text>
 
           <View style={styles.requestBox}>
@@ -69,9 +61,6 @@ export default function JoinRequestSentScreen() {
             <Text style={styles.requestValue}>{currentUser?.fullName ?? "Kullanıcı bilgisi yükleniyor"}</Text>
             <Text style={styles.requestText}>{currentUser?.email ?? "E-posta yükleniyor"}</Text>
             <Text style={styles.requestText}>{currentClub?.name ?? "Kulüp bilgisi yükleniyor"}</Text>
-            <Text style={styles.requestText}>
-              Rol: {currentRequest ? roleLabels[currentRequest.requestedRole] : "Onay bekliyor"}
-            </Text>
           </View>
 
           <View style={styles.stepsBox}>
@@ -113,10 +102,7 @@ export default function JoinRequestSentScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -124,10 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: theme.spacing["2xl"],
   },
-  container: {
-    width: "100%",
-    maxWidth: 560,
-  },
+  container: { width: "100%", maxWidth: 560 },
   card: {
     width: "100%",
     backgroundColor: theme.colors.background.surface,
@@ -239,11 +222,6 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.warning,
   },
-  buttonGroup: {
-    width: "100%",
-    gap: theme.spacing.md,
-  },
-  button: {
-    width: "100%",
-  },
+  buttonGroup: { width: "100%", gap: theme.spacing.md },
+  button: { width: "100%" },
 });

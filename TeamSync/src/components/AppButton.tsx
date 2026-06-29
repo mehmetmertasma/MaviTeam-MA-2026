@@ -19,6 +19,7 @@ const variantStyles: Record<
   AppButtonVariant,
   {
     button: ViewStyle;
+    pressed: ViewStyle;
     text: TextStyle;
   }
 > = {
@@ -26,6 +27,11 @@ const variantStyles: Record<
     button: {
       backgroundColor: theme.colors.brand.primary,
       borderColor: theme.colors.brand.primary,
+      ...theme.shadows.sm,
+    },
+    pressed: {
+      backgroundColor: theme.colors.brand.primaryPressed,
+      borderColor: theme.colors.brand.primaryPressed,
     },
     text: {
       color: theme.colors.text.inverse,
@@ -36,6 +42,10 @@ const variantStyles: Record<
       backgroundColor: theme.colors.brand.primarySoft,
       borderColor: theme.colors.brand.primarySoft,
     },
+    pressed: {
+      backgroundColor: theme.colors.brand.secondarySoft,
+      borderColor: theme.colors.brand.secondarySoft,
+    },
     text: {
       color: theme.colors.text.brand,
     },
@@ -44,6 +54,10 @@ const variantStyles: Record<
     button: {
       backgroundColor: theme.colors.background.surface,
       borderColor: theme.colors.border.default,
+    },
+    pressed: {
+      backgroundColor: theme.colors.background.subtle,
+      borderColor: theme.colors.border.strong,
     },
     text: {
       color: theme.colors.text.brand,
@@ -72,8 +86,8 @@ export function AppButton({
       style={({ pressed }) => [
         styles.button,
         selectedVariant.button,
-        pressed && !disabled && styles.pressed,
-        disabled && styles.disabled,
+        pressed && !disabled ? [styles.pressed, selectedVariant.pressed] : null,
+        disabled ? styles.disabled : null,
         style,
       ]}
     >
@@ -81,7 +95,7 @@ export function AppButton({
         style={[
           styles.text,
           selectedVariant.text,
-          disabled && styles.disabledText,
+          disabled ? styles.disabledText : null,
           textStyle,
         ]}
       >
@@ -95,29 +109,31 @@ export default AppButton;
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
+    minHeight: 54,
     minWidth: 48,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: theme.radius.lg,
+    borderRadius: theme.radius.xl,
     paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
   },
   text: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.extrabold,
     lineHeight: theme.lineHeights.lg,
+    letterSpacing: 0.1,
     textAlign: "center",
   },
   pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
+    opacity: 0.92,
+    transform: [{ scale: 0.985 }],
   },
   disabled: {
     backgroundColor: theme.colors.border.strong,
     borderColor: theme.colors.border.strong,
-    opacity: 0.72,
+    opacity: 0.7,
+    ...theme.shadows.none,
   },
   disabledText: {
     color: theme.colors.text.muted,

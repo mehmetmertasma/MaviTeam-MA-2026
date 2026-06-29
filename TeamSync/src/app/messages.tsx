@@ -100,7 +100,8 @@ export default function MessagesScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [draftText, setDraftText] = useState("");
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showDirectPicker, setShowDirectPicker] = useState(false);
+  const [showCreateGroupForm, setShowCreateGroupForm] = useState(false);
   const [newConversationName, setNewConversationName] = useState("");
   const [newConversationTargetId, setNewConversationTargetId] = useState("all-club");
   const [newConversationMessage, setNewConversationMessage] = useState("");
@@ -199,6 +200,7 @@ export default function MessagesScreen() {
   function openDirectChat(user: UserProfile) {
     setActiveChat({ type: "direct", userId: user.id });
     setOpenMemberListGroupId(null);
+    setShowDirectPicker(false);
     setDraftText("");
     setStatusMessage(`${user.fullName} ile bireysel mesaj açıldı.`);
   }
@@ -254,10 +256,10 @@ export default function MessagesScreen() {
 
       setActiveChat({ type: "group", groupId: createdGroup.id });
       clearCreateForm();
-      setShowCreateForm(false);
-      setStatusMessage("Yeni mesaj konuşması oluşturuldu.");
+      setShowCreateGroupForm(false);
+      setStatusMessage("Yeni grup konuşması oluşturuldu.");
     } catch {
-      setStatusMessage("Yeni mesaj oluşturulurken bir sorun oluştu.");
+      setStatusMessage("Yeni grup oluşturulurken bir sorun oluştu.");
     }
   }
 
@@ -373,91 +375,33 @@ export default function MessagesScreen() {
         <View style={styles.pageHeader}>
           <Text style={styles.logo}>TeamSync</Text>
           <Text style={styles.title}>Mesajlar</Text>
-          <Text style={styles.subtitle}>Takım, kulüp ve bireysel mesajlar.</Text>
+          <Text style={styles.subtitle}>Bireysel mesajlar ve grup konuşmaları.</Text>
         </View>
-
-        <View style={styles.topActions}>
-          <AppButton
-            title={showCreateForm ? "Form açık" : "Yeni grup mesajı"}
-            onPress={() => {
-              setShowCreateForm(true);
-              setStatusMessage("Yeni grup konuşması bilgilerini doldurabilirsin.");
-            }}
-            disabled={showCreateForm}
-            style={styles.actionButton}
-          />
-          <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={loadMessagesData} style={styles.actionButton} />
-        </View>
-
-        {showCreateForm ? (
-          <View style={styles.createSection}>
-            <Text style={styles.sectionTitle}>Yeni grup mesajı oluştur</Text>
-            <Text style={styles.sectionSubtitle}>Kulüp veya takım için yeni bir konuşma başlat.</Text>
-
-            <Text style={styles.label}>Konuşma adı</Text>
-            <TextInput
-              value={newConversationName}
-              onChangeText={setNewConversationName}
-              placeholder="Örn. Maç hazırlığı"
-              placeholderTextColor={theme.colors.text.muted}
-              style={styles.input}
-            />
-
-            <Text style={styles.label}>Kime gönderilecek?</Text>
-            <View style={styles.targetGrid}>
-              {targetOptions.map((target) => {
-                const isSelected = newConversationTargetId === target.id;
-
-                return (
-                  <Pressable
-                    key={target.id}
-                    onPress={() => setNewConversationTargetId(target.id)}
-                    style={({ pressed }) => [
-                      styles.targetButton,
-                      isSelected ? styles.targetButtonSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>{target.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <Text style={styles.label}>İlk mesaj</Text>
-            <TextInput
-              value={newConversationMessage}
-              onChangeText={setNewConversationMessage}
-              placeholder="Mesajını yaz..."
-              placeholderTextColor={theme.colors.text.muted}
-              multiline
-              style={[styles.input, styles.textArea]}
-            />
-
-            <View style={styles.formActions}>
-              <AppButton title="Konuşmayı oluştur" onPress={createConversation} style={styles.actionButton} />
-              <AppButton
-                title="Vazgeç"
-                variant="ghost"
-                onPress={() => {
-                  clearCreateForm();
-                  setShowCreateForm(false);
-                  setStatusMessage("Yeni mesaj oluşturma iptal edildi.");
-                }}
-                style={styles.actionButton}
-              />
-            </View>
-          </View>
-        ) : null}
 
         <View style={styles.directSection}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
               <Text style={styles.sectionTitle}>Bireysel mesajlar</Text>
-              <Text style={styles.sectionSubtitle}>Bir kişiye tıkla ve direkt mesaj başlat.</Text>
+              <Text style={styles.sectionSubtitle}>Yeni mesaj oluştur veya mevcut kişiye mesaj aç.</Text>
             </View>
-            <Text style={styles.statusPill}>{directUsers.length} kişi</Text>
+
+            <Pressable
+              onPress={() => {
+                setShowDirectPicker((currentValue) => !currentValue);
+                setStatusMessage("Bireysel mesaj için kişi seçebilirsin.");
+              }}
+              style={({ pressed }) => [styles.smallActionButton, pressed ? styles.pressed : null]}
+            >
+              <Text style={styles.smallActionButtonText}>{showDirectPicker ? "Kapat" : "Yeni mesaj oluştur"}</Text>
+            </Pressable>
           </View>
+
+          {showDirectPicker ? (
+            <View style={styles.inlineCreateBox}>
+              <Text style={styles.inlineCreateTitle}>Kişi seç</Text>
+              <Text style={styles.inlineCreateSubtitle}>Bireysel mesaj başlatmak için aşağıdaki kişilerden birini seç.</Text>
+            </View>
+          ) : null}
 
           {appData !== null && directUsers.length > 0 ? (
             <View style={styles.directList}>
@@ -465,23 +409,24 @@ export default function MessagesScreen() {
                 const lastMessage = getLastDirectMessage(appData.currentUser.id, user.id, chatMessages);
 
                 return (
-                  <Pressable
-                    key={user.id}
-                    onPress={() => openDirectChat(user)}
-                    style={({ pressed }) => [styles.directCard, pressed ? styles.pressed : null]}
-                  >
-                    <View style={styles.directAvatar}>
-                      <Text style={styles.directAvatarText}>{getInitials(user.fullName)}</Text>
-                    </View>
-                    <View style={styles.directInfo}>
-                      <Text style={styles.directName}>{user.fullName}</Text>
-                      <Text style={styles.directMeta}>{user.email}</Text>
-                      <Text style={styles.lastMessage} numberOfLines={1}>
-                        {lastMessage ? `${getSenderName(lastMessage.senderUserId, users)}: ${lastMessage.text}` : "Bireysel mesaj başlat."}
-                      </Text>
-                    </View>
-                    <Text style={styles.groupArrow}>›</Text>
-                  </Pressable>
+                  <View key={user.id} style={styles.directCard}>
+                    <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.directMainArea, pressed ? styles.pressed : null]}>
+                      <View style={styles.directAvatar}>
+                        <Text style={styles.directAvatarText}>{getInitials(user.fullName)}</Text>
+                      </View>
+                      <View style={styles.directInfo}>
+                        <Text style={styles.directName}>{user.fullName}</Text>
+                        <Text style={styles.directMeta}>{user.email}</Text>
+                        <Text style={styles.lastMessage} numberOfLines={1}>
+                          {lastMessage ? `${getSenderName(lastMessage.senderUserId, users)}: ${lastMessage.text}` : "Henüz bireysel mesaj yok."}
+                        </Text>
+                      </View>
+                    </Pressable>
+
+                    <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.openMessageButton, pressed ? styles.pressed : null]}>
+                      <Text style={styles.openMessageButtonText}>Mesaj aç</Text>
+                    </Pressable>
+                  </View>
                 );
               })}
             </View>
@@ -499,8 +444,78 @@ export default function MessagesScreen() {
               <Text style={styles.sectionTitle}>Grup konuşmaları</Text>
               <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
             </View>
-            <Text style={styles.statusPill}>{chatGroups.length} konuşma</Text>
+
+            <Pressable
+              onPress={() => {
+                setShowCreateGroupForm((currentValue) => !currentValue);
+                setStatusMessage("Yeni grup konuşmasını bu bölümde oluşturabilirsin.");
+              }}
+              style={({ pressed }) => [styles.smallActionButton, pressed ? styles.pressed : null]}
+            >
+              <Text style={styles.smallActionButtonText}>{showCreateGroupForm ? "Kapat" : "Yeni grup oluştur"}</Text>
+            </Pressable>
           </View>
+
+          {showCreateGroupForm ? (
+            <View style={styles.inlineCreateBox}>
+              <Text style={styles.inlineCreateTitle}>Yeni grup oluştur</Text>
+              <Text style={styles.inlineCreateSubtitle}>Kulüp veya takım için yeni bir grup konuşması başlat.</Text>
+
+              <Text style={styles.label}>Konuşma adı</Text>
+              <TextInput
+                value={newConversationName}
+                onChangeText={setNewConversationName}
+                placeholder="Örn. Maç hazırlığı"
+                placeholderTextColor={theme.colors.text.muted}
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>Kime gönderilecek?</Text>
+              <View style={styles.targetGrid}>
+                {targetOptions.map((target) => {
+                  const isSelected = newConversationTargetId === target.id;
+
+                  return (
+                    <Pressable
+                      key={target.id}
+                      onPress={() => setNewConversationTargetId(target.id)}
+                      style={({ pressed }) => [
+                        styles.targetButton,
+                        isSelected ? styles.targetButtonSelected : null,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>{target.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.label}>İlk mesaj</Text>
+              <TextInput
+                value={newConversationMessage}
+                onChangeText={setNewConversationMessage}
+                placeholder="Mesajını yaz..."
+                placeholderTextColor={theme.colors.text.muted}
+                multiline
+                style={[styles.input, styles.textArea]}
+              />
+
+              <View style={styles.formActions}>
+                <AppButton title="Grubu oluştur" onPress={createConversation} style={styles.actionButton} />
+                <AppButton
+                  title="Vazgeç"
+                  variant="ghost"
+                  onPress={() => {
+                    clearCreateForm();
+                    setShowCreateGroupForm(false);
+                    setStatusMessage("Yeni grup oluşturma iptal edildi.");
+                  }}
+                  style={styles.actionButton}
+                />
+              </View>
+            </View>
+          ) : null}
 
           {appData !== null && chatGroups.length > 0 ? (
             chatGroups.map((group) => {
@@ -552,7 +567,7 @@ export default function MessagesScreen() {
           ) : (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>Henüz grup konuşması yok</Text>
-              <Text style={styles.emptyText}>Yeni grup mesajı butonuyla kulüp veya takım konuşması başlatabilirsin.</Text>
+              <Text style={styles.emptyText}>Yeni grup oluştur butonuyla kulüp veya takım konuşması başlatabilirsin.</Text>
             </View>
           )}
         </View>
@@ -569,32 +584,37 @@ const styles = StyleSheet.create({
   logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
   title: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"], marginBottom: theme.spacing.sm },
   subtitle: { color: theme.colors.text.inverse, opacity: 0.76, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
-  topActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
-  actionButton: { flexGrow: 1, minWidth: 170 },
-  createSection: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
+  actionButton: { flexGrow: 1, minWidth: 150 },
   directSection: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
   groupsSection: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, ...theme.shadows.sm },
   sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
   sectionHeaderText: { flex: 1 },
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full, overflow: "hidden" },
+  smallActionButton: { borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, minHeight: 38, alignItems: "center", justifyContent: "center" },
+  smallActionButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
   input: { minHeight: 52, backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.lg },
   textArea: { minHeight: 110, textAlignVertical: "top" },
+  inlineCreateBox: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  inlineCreateTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  inlineCreateSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md, marginBottom: theme.spacing.lg },
   targetGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.xl },
-  targetButton: { borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.subtle },
+  targetButton: { borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.surface },
   targetButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   targetButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
   formActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.sm },
   directList: { gap: theme.spacing.md },
-  directCard: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md, backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg },
+  directCard: { flexDirection: "row", alignItems: "stretch", backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, overflow: "hidden" },
+  directMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
   directAvatar: { width: 48, height: 48, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.secondary, alignItems: "center", justifyContent: "center" },
   directAvatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
   directInfo: { flex: 1 },
   directName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
   directMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  openMessageButton: { minWidth: 104, alignItems: "center", justifyContent: "center", paddingHorizontal: theme.spacing.md, borderLeftWidth: 1, borderLeftColor: theme.colors.border.default, backgroundColor: theme.colors.background.surface },
+  openMessageButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   groupCard: { flexDirection: "row", backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, marginBottom: theme.spacing.md, overflow: "hidden" },
   groupMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
   groupAvatar: { width: 48, height: 48, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },

@@ -47,7 +47,7 @@ service cloud.firestore {
     }
 
     function belongsToCurrentUsersClub(clubId) {
-      return currentUserHasProfile() && currentUserClubId() == clubId;
+      return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId;
     }
 
     match /users/{userId} {
@@ -64,6 +64,7 @@ service cloud.firestore {
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
         && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
         && request.resource.data.clubId == resource.data.clubId;
 
       allow update: if verifiedEmail()
@@ -78,6 +79,19 @@ service cloud.firestore {
         && request.resource.data.emailVerified == true
         && request.resource.data.role == 'clubAdmin'
         && request.resource.data.status == 'active'
+        && request.resource.data.clubId is string;
+
+      allow update: if verifiedEmail()
+        && isSelf(userId)
+        && resource.data.uid == request.auth.uid
+        && resource.data.email == request.auth.token.email
+        && resource.data.emailVerified == true
+        && (resource.data.status == 'emailVerified' || resource.data.status == 'pending')
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.emailVerified == true
+        && (request.resource.data.role == 'coach' || request.resource.data.role == 'parent' || request.resource.data.role == 'athlete')
+        && request.resource.data.status == 'pending'
         && request.resource.data.clubId is string;
 
       allow update: if currentUserIsClubAdmin()
@@ -99,6 +113,17 @@ service cloud.firestore {
       allow update: if currentUserIsClubAdmin()
         && belongsToCurrentUsersClub(clubId)
         && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if false;
+    }
+
+    match /clubCodes/{clubCode} {
+      allow read: if verifiedEmail();
+
+      allow create, update: if verifiedEmail()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.clubId is string
+        && request.resource.data.code == clubCode;
 
       allow delete: if false;
     }
@@ -146,11 +171,19 @@ service cloud.firestore {
 
     match /joinRequests/{joinRequestId} {
       allow create: if verifiedEmail()
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.clubId is string
+        && (request.resource.data.requestedRole == 'coach' || request.resource.data.requestedRole == 'parent' || request.resource.data.requestedRole == 'athlete')
+        && request.resource.data.status == 'pending';
+
       allow read: if isSelf(resource.data.userId)
         || (currentUserIsClubAdmin() && resource.data.clubId == currentUserClubId());
+
       allow update: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+        && resource.data.clubId == currentUserClubId()
+        && request.resource.data.clubId == resource.data.clubId
+        && request.resource.data.userId == resource.data.userId;
+
       allow delete: if false;
     }
 

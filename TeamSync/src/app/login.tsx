@@ -7,6 +7,7 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 
 function isValidEmail(value: string) {
@@ -71,6 +72,12 @@ export default function LoginScreen() {
       }
 
       const displayName = user.displayName?.trim();
+
+      await firestoreTeamSyncService.ensureUserProfile({
+        user: refreshedUser,
+        role: "clubAdmin",
+        status: "emailVerified",
+      });
 
       await teamSyncService.updateCurrentUser({
         email: user.email ?? trimmedEmail,

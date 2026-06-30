@@ -6,6 +6,7 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -27,23 +28,38 @@ function isValidEmail(value: string) {
 export default function RegisterScreen() {
   const router = useRouter();
   const { next } = useLocalSearchParams();
+  const firebaseIsReady = authService.isConfigured();
 
   const [fullName, setFullName] = useState("");
-  const [contactInfo, setContactInfo] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Bilgilerini girip devam edebilirsin.");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(
+    firebaseIsReady
+      ? "Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin."
+      : "Firebase ayarları eksik. Gerçek kayıt için önce .env bilgileri eklenmeli."
+  );
 
-  function handleContinue() {
+  function clearStatusOnChange() {
+    if (statusMessage !== "Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin." && firebaseIsReady) {
+      setStatusMessage("Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin.");
+    }
+  }
+
+  async function handleContinue() {
     const trimmedName = fullName.trim();
-    const trimmedEmail = contactInfo.trim().toLowerCase();
+    const trimmedEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
     const nextRoute = getNextRoute(next);
 
-    if (trimmedName === "") {
-      setStatusMessage("Lütfen ad soyad bilgisini giriniz.");
+    if (!firebaseIsReady) {
+      setStatusMessage("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
       return;
     }
 
-    if (trimmedEmail === "") {
-      setStatusMessage("Lütfen e-posta adresini giriniz.");
+    if (trimmedName === "") {
+      setStatusMessage("Lütfen ad soyad bilgisini giriniz.");
       return;
     }
 
@@ -52,15 +68,40 @@ export default function RegisterScreen() {
       return;
     }
 
-    setStatusMessage("Bilgiler alındı. Sonraki adıma geçiliyor.");
+    if (cleanPassword.length < 6) {
+      setStatusMessage("Şifre en az 6 karakter olmalıdır.");
+      return;
+    }
 
-    router.replace({
-      pathname: nextRoute,
-      params: {
+    if (cleanPassword !== confirmPassword.trim()) {
+      setStatusMessage("Şifreler aynı olmalıdır.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setStatusMessage("Firebase hesabı oluşturuluyor...");
+
+      const user = await authService.registerWithEmail({
         fullName: trimmedName,
         email: trimmedEmail,
-      },
-    } as never);
+        password: cleanPassword,
+      });
+
+      setStatusMessage("Hesap oluşturuldu. Sonraki adıma geçiliyor.");
+
+      router.replace({
+        pathname: nextRoute,
+        params: {
+          fullName: user.displayName ?? trimmedName,
+          email: user.email ?? trimmedEmail,
+        },
+      } as never);
+    } catch (registerError) {
+      setStatusMessage(getAuthErrorMessage(registerError));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -69,10 +110,10 @@ export default function RegisterScreen() {
         <AppBackButton fallbackHref="/" />
 
         <Text style={styles.logo}>TeamSync</Text>
-        <Text style={styles.badge}>Kullanıcı bilgileri</Text>
+        <Text style={styles.badge}>Güvenli hesap oluşturma</Text>
         <Text style={styles.title}>Hesap oluştur</Text>
         <Text style={styles.subtitle}>
-          Önce kendi bilgilerini gir. Sonra kulüp oluşturabilir veya takım kodu ile katılabilirsin.
+          Önce gerçek TeamSync hesabını oluştur. Sonra kulüp kurabilir veya takım kodu ile kulübe katılabilirsin.
         </Text>
 
         <View style={styles.form}>
@@ -80,10 +121,15 @@ export default function RegisterScreen() {
             <Text style={styles.label}>Ad Soyad</Text>
             <TextInput
               value={fullName}
-              onChangeText={setFullName}
+              onChangeText={(value) => {
+                setFullName(value);
+                clearStatusOnChange();
+              }}
               placeholder="Örn. Mert Asma"
               placeholderTextColor={theme.colors.text.muted}
               style={styles.input}
+              autoComplete="name"
+              textContentType="name"
               accessibilityLabel="Ad soyad"
             />
           </View>
@@ -91,14 +137,55 @@ export default function RegisterScreen() {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>E-posta</Text>
             <TextInput
-              value={contactInfo}
-              onChangeText={setContactInfo}
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearStatusOnChange();
+              }}
               placeholder="ornek@email.com"
               placeholderTextColor={theme.colors.text.muted}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
               style={styles.input}
               accessibilityLabel="E-posta adresi"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Şifre</Text>
+            <TextInput
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearStatusOnChange();
+              }}
+              placeholder="En az 6 karakter"
+              placeholderTextColor={theme.colors.text.muted}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              style={styles.input}
+              accessibilityLabel="Şifre"
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Şifre tekrar</Text>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                clearStatusOnChange();
+              }}
+              placeholder="Şifrenizi tekrar giriniz"
+              placeholderTextColor={theme.colors.text.muted}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              style={styles.input}
+              accessibilityLabel="Şifre tekrar"
             />
           </View>
         </View>
@@ -106,17 +193,18 @@ export default function RegisterScreen() {
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Sonraki adım</Text>
           <Text style={styles.infoText}>
-            Bu bilgiler şimdilik create/join ekranına taşınır. Firebase Auth bağlanınca aynı akış gerçek hesap oluşturacak.
+            Hesap oluşturulduktan sonra seçtiğin akışa göre kulüp oluşturma veya takım kodu ile katılma ekranına geçeceksin.
           </Text>
         </View>
 
-        <Text style={styles.statusText}>{statusMessage}</Text>
+        <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title="Devam et"
+            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve devam et"}
             onPress={handleContinue}
-            accessibilityLabel="Bilgilerle devam et"
+            disabled={isSubmitting || !firebaseIsReady}
+            accessibilityLabel="Firebase hesabı oluştur ve sonraki adıma geç"
             style={styles.button}
           />
 
@@ -225,6 +313,9 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
     lineHeight: theme.lineHeights.md,
+  },
+  warningText: {
+    color: theme.colors.text.danger,
   },
   buttonGroup: {
     width: "100%",

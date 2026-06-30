@@ -4,8 +4,10 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { Announcement, TeamSyncAppData } from "@/types/teamSync";
+import type { Announcement, TeamSyncAppData, UserRole } from "@/types/teamSync";
 
 type TargetOption = {
   id: string;
@@ -37,21 +39,46 @@ function getAnnouncementTargetLabel(announcement: Announcement, appData: TeamSyn
   return appData.teams.find((team) => team.id === announcement.targetTeamId)?.name ?? "Takım bulunamadı";
 }
 
+function canPublishAnnouncements(role: UserRole) {
+  return role === "clubAdmin" || role === "coach";
+}
+
 export default function AnnouncementsScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklenecek.");
 
   const loadAnnouncementsData = useCallback(async () => {
     try {
       const loadedAppData = await teamSyncService.getAppData();
+
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setAppData(loadedAppData);
+          setStatusMessage("Duyuruları görmek için giriş yapmalısın.");
+          return;
+        }
+
+        const firestoreAnnouncements = await firestoreTeamSyncService.listAnnouncementsForCurrentClub(firebaseUser);
+
+        setAppData({
+          ...loadedAppData,
+          announcements: firestoreAnnouncements,
+        });
+        setStatusMessage("Duyurular Firestore kulüp datasından yüklendi.");
+        return;
+      }
+
       setAppData(loadedAppData);
-      setStatusMessage("Duyurular merkezi TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Duyurular yüklenirken bir sorun oluştu.");
+      setStatusMessage("Duyurular local TeamSync datasından yüklendi.");
+    } catch (loadError) {
+      setStatusMessage(getAuthErrorMessage(loadError));
     }
   }, []);
 
@@ -84,7 +111,9 @@ export default function AnnouncementsScreen() {
   }, [appData]);
 
   const announcements = appData?.announcements ?? [];
-  const canPublish = title.trim().length > 0 && message.trim().length > 0;
+  const userCanPublish = appData !== null && canPublishAnnouncements(appData.currentUser.role);
+  const userCanDelete = appData?.currentUser.role === "clubAdmin";
+  const canPublish = title.trim().length > 0 && message.trim().length > 0 && userCanPublish && !isSubmitting;
 
   function clearForm() {
     setTitle("");
@@ -98,6 +127,11 @@ export default function AnnouncementsScreen() {
       return;
     }
 
+    if (!userCanPublish) {
+      setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
+      return;
+    }
+
     if (!canPublish) {
       setStatusMessage("Başlık ve mesaj alanı boş bırakılamaz.");
       return;
@@ -107,6 +141,30 @@ export default function AnnouncementsScreen() {
       targetOptions.find((target) => target.id === selectedTargetId) ?? targetOptions[0];
 
     try {
+      setIsSubmitting(true);
+
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setStatusMessage("Duyuru yayınlamak için giriş yapmalısın.");
+          return;
+        }
+
+        await firestoreTeamSyncService.createAnnouncement(firebaseUser, {
+          title: title.trim(),
+          message: message.trim(),
+          targetType: selectedTarget.targetType,
+          targetTeamId: selectedTarget.targetTeamId,
+        });
+
+        await loadAnnouncementsData();
+        clearForm();
+        setShowCreateForm(false);
+        setStatusMessage("Duyuru Firestore kulüp datasına yayınlandı.");
+        return;
+      }
+
       const nextAppData = await teamSyncService.createAnnouncement({
         clubId: appData.club.id,
         title: title.trim(),
@@ -119,19 +177,40 @@ export default function AnnouncementsScreen() {
       setAppData(nextAppData);
       clearForm();
       setShowCreateForm(false);
-      setStatusMessage("Duyuru merkezi data service içine yayınlandı.");
-    } catch {
-      setStatusMessage("Duyuru yayınlanırken bir sorun oluştu.");
+      setStatusMessage("Duyuru local data service içine yayınlandı.");
+    } catch (publishError) {
+      setStatusMessage(getAuthErrorMessage(publishError));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function deleteAnnouncement(announcementId: string) {
+    if (!userCanDelete) {
+      setStatusMessage("Sadece kulüp yöneticisi duyuru silebilir.");
+      return;
+    }
+
     try {
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setStatusMessage("Duyuru silmek için giriş yapmalısın.");
+          return;
+        }
+
+        await firestoreTeamSyncService.removeAnnouncement(firebaseUser, announcementId);
+        await loadAnnouncementsData();
+        setStatusMessage("Duyuru Firestore kulüp datasından silindi.");
+        return;
+      }
+
       const nextAppData = await teamSyncService.removeAnnouncement(announcementId);
       setAppData(nextAppData);
-      setStatusMessage("Duyuru merkezi datadan silindi.");
-    } catch {
-      setStatusMessage("Duyuru silinirken bir sorun oluştu.");
+      setStatusMessage("Duyuru local datadan silindi.");
+    } catch (deleteError) {
+      setStatusMessage(getAuthErrorMessage(deleteError));
     }
   }
 
@@ -148,7 +227,7 @@ export default function AnnouncementsScreen() {
           <Text style={styles.heroLabel}>Kulüp iletişim merkezi</Text>
           <Text style={styles.heroTitle}>Duyuru yönetimi</Text>
           <Text style={styles.heroSubtitle}>
-            Bu sayfa artık ayrı local storage kullanmıyor. Duyurular `appData.announcements` içinden gelir ve service layer üzerinden kaydedilir.
+            Duyurular artık Firebase varsa Firestore kulüp datasından gelir. Her kullanıcı sadece kendi kulübünün duyurularını görür.
           </Text>
         </View>
 
@@ -156,10 +235,15 @@ export default function AnnouncementsScreen() {
           <AppButton
             title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
             onPress={() => {
+              if (!userCanPublish) {
+                setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
+                return;
+              }
+
               setShowCreateForm(true);
               setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
             }}
-            disabled={showCreateForm}
+            disabled={showCreateForm || !userCanPublish}
             style={styles.actionButton}
           />
 
@@ -225,7 +309,7 @@ export default function AnnouncementsScreen() {
 
             <View style={styles.publishRow}>
               <AppButton
-                title="Duyuruyu yayınla"
+                title={isSubmitting ? "Yayınlanıyor..." : "Duyuruyu yayınla"}
                 onPress={publishAnnouncement}
                 disabled={!canPublish}
                 style={styles.actionButton}
@@ -266,12 +350,14 @@ export default function AnnouncementsScreen() {
                       <Text style={styles.announcementDate}>Paylaşıldı: {formatDate(announcement.createdAt)}</Text>
                     </View>
 
-                    <Pressable
-                      onPress={() => deleteAnnouncement(announcement.id)}
-                      style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
-                    >
-                      <Text style={styles.deleteButtonText}>Sil</Text>
-                    </Pressable>
+                    {userCanDelete ? (
+                      <Pressable
+                        onPress={() => deleteAnnouncement(announcement.id)}
+                        style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
+                      >
+                        <Text style={styles.deleteButtonText}>Sil</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
 
                   <Text style={styles.announcementMessage}>{announcement.message}</Text>

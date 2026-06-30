@@ -2,6 +2,7 @@ import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { teamSyncService } from "@/services/teamSyncService";
@@ -46,6 +47,8 @@ export default function JoinRequestSentScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.card}>
+          <AppBackButton fallbackHref="/" />
+
           <Text style={styles.logo}>TeamSync</Text>
 
           <Text style={styles.badge}>İstek gönderildi</Text>

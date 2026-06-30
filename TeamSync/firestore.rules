@@ -1,0 +1,172 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function userDoc(userId) {
+      return get(/databases/$(database)/documents/users/$(userId));
+    }
+
+    function currentUserProfile() {
+      return userDoc(request.auth.uid);
+    }
+
+    function currentUserHasProfile() {
+      return verifiedEmail() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserClubId() {
+      return currentUserProfile().data.clubId;
+    }
+
+    function currentUserRole() {
+      return currentUserProfile().data.role;
+    }
+
+    function currentUserIsActive() {
+      return currentUserProfile().data.status == 'active';
+    }
+
+    function currentUserIsClubAdmin() {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserRole() == 'clubAdmin';
+    }
+
+    function currentUserIsClubStaff() {
+      return currentUserHasProfile() && currentUserIsActive() && (currentUserRole() == 'clubAdmin' || currentUserRole() == 'coach');
+    }
+
+    function belongsToCurrentUsersClub(clubId) {
+      return currentUserHasProfile() && currentUserClubId() == clubId;
+    }
+
+    match /users/{userId} {
+      allow create: if verifiedEmail()
+        && isSelf(userId)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.emailVerified == true;
+
+      allow read: if isSelf(userId)
+        || (currentUserIsClubStaff() && resource.data.clubId == currentUserClubId());
+
+      allow update: if isSelf(userId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.clubId == resource.data.clubId;
+
+      allow update: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId()
+        && request.resource.data.clubId == resource.data.clubId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email;
+
+      allow delete: if false;
+    }
+
+    match /clubs/{clubId} {
+      allow create: if verifiedEmail()
+        && request.resource.data.ownerId == request.auth.uid;
+
+      allow read: if belongsToCurrentUsersClub(clubId)
+        || (verifiedEmail() && resource.data.ownerId == request.auth.uid);
+
+      allow update: if currentUserIsClubAdmin()
+        && belongsToCurrentUsersClub(clubId)
+        && request.resource.data.ownerId == resource.data.ownerId;
+
+      allow delete: if false;
+    }
+
+    match /teams/{teamId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /scheduleEvents/{scheduleEventId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /attendanceRecords/{attendanceRecordId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
+        && (currentUserIsClubStaff() || resource.data.userId == request.auth.uid);
+      allow create, update: if currentUserIsClubAdmin()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /joinRequests/{joinRequestId} {
+      allow create: if verifiedEmail()
+        && request.resource.data.userId == request.auth.uid;
+      allow read: if isSelf(resource.data.userId)
+        || (currentUserIsClubAdmin() && resource.data.clubId == currentUserClubId());
+      allow update: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+      allow delete: if false;
+    }
+
+    match /chatGroups/{chatGroupId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /chatMessages/{chatMessageId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create: if currentUserHasProfile()
+        && currentUserIsActive()
+        && request.resource.data.clubId == currentUserClubId()
+        && request.resource.data.senderUserId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /replays/{replayId} {
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
+      allow create, update: if currentUserIsClubStaff()
+        && request.resource.data.clubId == currentUserClubId();
+      allow delete: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

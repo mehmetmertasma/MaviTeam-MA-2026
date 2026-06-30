@@ -7,6 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -28,6 +29,7 @@ const routesWithoutGlobalNavigation = [
 ];
 
 const publicAuthRoutes = ["/", "/login", "/register", "/verify-email"];
+const workspaceSetupRoutes = ["/", "/create-club", "/join-club", "/join-request-sent"];
 
 function AppProviders({ children }: PropsWithChildren) {
   return (
@@ -72,6 +74,60 @@ function AppContent() {
       router.replace("/dashboard" as never);
     }
   }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, user]);
+
+  useEffect(() => {
+    if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null || !user.emailVerified) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function guardWorkspaceAccess() {
+      try {
+        const workspace = await firestoreTeamSyncService.getCurrentWorkspace(user);
+
+        if (!isActive) {
+          return;
+        }
+
+        if (workspace === null) {
+          if (!workspaceSetupRoutes.includes(pathname)) {
+            router.replace("/" as never);
+          }
+
+          return;
+        }
+
+        const userHasClub = workspace.currentUser.clubId !== "";
+        const userIsPendingApproval = workspace.currentUser.status === "pending" && userHasClub;
+        const userWasRemoved = workspace.currentUser.status === "removed";
+
+        if (userWasRemoved && pathname !== "/") {
+          router.replace("/" as never);
+          return;
+        }
+
+        if (userIsPendingApproval && pathname !== "/join-request-sent" && pathname !== "/join-club") {
+          router.replace("/join-request-sent" as never);
+          return;
+        }
+
+        if (workspace.club === null && !workspaceSetupRoutes.includes(pathname)) {
+          router.replace("/" as never);
+        }
+      } catch {
+        if (isActive && !workspaceSetupRoutes.includes(pathname)) {
+          router.replace("/" as never);
+        }
+      }
+    }
+
+    guardWorkspaceAccess();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, user]);
 
   if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
     return (

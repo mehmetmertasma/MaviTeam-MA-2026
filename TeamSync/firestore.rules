@@ -66,6 +66,20 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role
         && request.resource.data.clubId == resource.data.clubId;
 
+      allow update: if verifiedEmail()
+        && isSelf(userId)
+        && resource.data.uid == request.auth.uid
+        && resource.data.email == request.auth.token.email
+        && resource.data.emailVerified == true
+        && resource.data.status == 'emailVerified'
+        && resource.data.clubId == null
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.emailVerified == true
+        && request.resource.data.role == 'clubAdmin'
+        && request.resource.data.status == 'active'
+        && request.resource.data.clubId is string;
+
       allow update: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId()
         && request.resource.data.clubId == resource.data.clubId

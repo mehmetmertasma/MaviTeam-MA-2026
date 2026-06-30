@@ -55,7 +55,10 @@ service cloud.firestore {
         && isSelf(userId)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.emailVerified == true;
+        && request.resource.data.emailVerified == true
+        && request.resource.data.status == 'emailVerified'
+        && request.resource.data.clubId == null
+        && (request.resource.data.role == 'clubAdmin' || request.resource.data.role == 'coach' || request.resource.data.role == 'parent' || request.resource.data.role == 'athlete');
 
       allow read: if isSelf(userId)
         || (currentUserIsClubStaff() && resource.data.clubId == currentUserClubId());

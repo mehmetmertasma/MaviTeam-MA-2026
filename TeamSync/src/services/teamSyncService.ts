@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { initialTeamSyncData } from "@/data/initialTeamSyncData";
+import { authService } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import type {
   Announcement,
   AttendanceRecord,
@@ -47,6 +49,8 @@ type StoredAppData = TeamSyncAppData & {
   replays?: Replay[];
 };
 
+type FirestoreWorkspace = NonNullable<Awaited<ReturnType<typeof firestoreTeamSyncService.getCurrentWorkspace>>>;
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -68,7 +72,39 @@ function ensureAppDataShape(data: StoredAppData) {
   } satisfies TeamSyncAppData;
 }
 
-async function loadAppData(): Promise<TeamSyncAppData> {
+function mergeFirestoreWorkspaceIntoAppData(appData: TeamSyncAppData, workspace: FirestoreWorkspace) {
+  if (workspace.club === null) {
+    return {
+      ...appData,
+      currentUser: workspace.currentUser,
+      users: [workspace.currentUser, ...appData.users.filter((user) => user.id !== workspace.currentUser.id)],
+    } satisfies TeamSyncAppData;
+  }
+
+  const workspaceClub = workspace.club;
+  const currentUser: UserProfile = {
+    ...workspace.currentUser,
+    clubId: workspaceClub.id,
+  };
+
+  return {
+    ...appData,
+    club: workspaceClub,
+    currentUser,
+    users: [currentUser, ...appData.users.filter((user) => user.id !== currentUser.id)],
+    teams: appData.teams.map((team) => ({ ...team, clubId: workspaceClub.id })),
+    announcements: appData.announcements.map((announcement) => ({ ...announcement, clubId: workspaceClub.id })),
+    scheduleEvents: appData.scheduleEvents.map((event) => ({ ...event, clubId: workspaceClub.id })),
+    attendanceRecords: appData.attendanceRecords.map((record) => ({ ...record, clubId: workspaceClub.id })),
+    chatGroups: appData.chatGroups.map((group) => ({ ...group, clubId: workspaceClub.id })),
+    chatMessages: appData.chatMessages.map((message) => ({ ...message, clubId: workspaceClub.id })),
+    payments: appData.payments.map((payment) => ({ ...payment, clubId: workspaceClub.id })),
+    replays: appData.replays.map((replay) => ({ ...replay, clubId: workspaceClub.id })),
+    joinRequests: appData.joinRequests.map((request) => ({ ...request, clubId: workspaceClub.id })),
+  } satisfies TeamSyncAppData;
+}
+
+async function loadLocalAppData(): Promise<TeamSyncAppData> {
   const savedData = await AsyncStorage.getItem(TEAMSYNC_APP_DATA_KEY);
 
   if (savedData === null) {
@@ -79,9 +115,52 @@ async function loadAppData(): Promise<TeamSyncAppData> {
   return ensureAppDataShape(JSON.parse(savedData) as StoredAppData);
 }
 
+async function loadAppData(): Promise<TeamSyncAppData> {
+  const localAppData = await loadLocalAppData();
+
+  if (!authService.isConfigured()) {
+    return localAppData;
+  }
+
+  const firebaseUser = authService.getCurrentUser();
+
+  if (firebaseUser === null || !firebaseUser.emailVerified) {
+    return localAppData;
+  }
+
+  const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
+
+  if (workspace === null) {
+    return localAppData;
+  }
+
+  return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace);
+}
+
 async function saveAppData(data: TeamSyncAppData) {
   await AsyncStorage.setItem(TEAMSYNC_APP_DATA_KEY, JSON.stringify(data));
   return data;
+}
+
+async function syncCurrentWorkspaceToFirestore(data: TeamSyncAppData) {
+  if (!authService.isConfigured()) {
+    return;
+  }
+
+  const firebaseUser = authService.getCurrentUser();
+
+  if (firebaseUser === null || !firebaseUser.emailVerified) {
+    return;
+  }
+
+  await firestoreTeamSyncService.updateCurrentWorkspace({
+    firebaseUser,
+    fullName: data.currentUser.fullName,
+    clubName: data.club.name,
+    clubSport: data.club.sport,
+    clubCity: data.club.city,
+    clubCode: data.club.code,
+  });
 }
 
 export const teamSyncService = {
@@ -246,17 +325,24 @@ export const teamSyncService = {
   async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
     const data = await loadAppData();
     const nextCurrentUser: UserProfile = { ...data.currentUser, ...updates, updatedAt: nowIso() };
-
-    return saveAppData({
+    const nextAppData = await saveAppData({
       ...data,
       currentUser: nextCurrentUser,
       users: data.users.map((user) => (user.id === nextCurrentUser.id ? nextCurrentUser : user)),
     });
+
+    await syncCurrentWorkspaceToFirestore(nextAppData);
+
+    return nextAppData;
   },
 
   async updateCurrentClub(updates: Partial<Pick<Club, "name" | "sport" | "city" | "code" | "logoUrl" | "primaryColor">>) {
     const data = await loadAppData();
-    return saveAppData({ ...data, club: { ...data.club, ...updates, updatedAt: nowIso() } });
+    const nextAppData = await saveAppData({ ...data, club: { ...data.club, ...updates, updatedAt: nowIso() } });
+
+    await syncCurrentWorkspaceToFirestore(nextAppData);
+
+    return nextAppData;
   },
 
   async listUsersByClub(clubId: string) {

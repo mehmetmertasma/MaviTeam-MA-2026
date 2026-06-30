@@ -1,8 +1,10 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
+  limit as firestoreLimit,
   query,
   serverTimestamp,
   setDoc,
@@ -13,7 +15,7 @@ import type { User } from "firebase/auth";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 import { requireFirebaseServices } from "@/lib/firebase";
-import type { Club, JoinRequest, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import type { Announcement, Club, JoinRequest, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
 
 type FirestoreUserStatus = "emailVerified" | "active" | "pending" | "pendingApproval" | "removed";
 
@@ -45,6 +47,13 @@ type RequestJoinClubInput = {
   firebaseUser: User;
   inviteCode: string;
   requestedRole: UserRole;
+};
+
+type CreateAnnouncementInput = {
+  title: string;
+  message: string;
+  targetType: Announcement["targetType"];
+  targetTeamId?: string;
 };
 
 type FirestoreWorkspace = {
@@ -84,6 +93,18 @@ function readOptionalString(value: unknown) {
   return result === "" ? undefined : result;
 }
 
+function readTimestampString(value: unknown, fallback = nowIso()) {
+  if (typeof value === "string" && value.trim() !== "") {
+    return value;
+  }
+
+  if (typeof value === "object" && value !== null && "toDate" in value && typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+
+  return fallback;
+}
+
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
@@ -108,6 +129,14 @@ function readUserStatus(value: unknown): UserStatus {
   return "active";
 }
 
+function readAnnouncementTarget(value: unknown): Announcement["targetType"] {
+  if (value === "team") {
+    return "team";
+  }
+
+  return "allClub";
+}
+
 function readJoinRequestStatus(value: unknown): JoinRequest["status"] {
   if (value === "approved" || value === "rejected") {
     return value;
@@ -125,8 +154,8 @@ function getUserProfileFromFirestore(userId: string, data: Record<string, unknow
     status: readUserStatus(data.status),
     clubId: readString(data.clubId),
     teamIds: readStringArray(data.teamIds),
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readTimestampString(data.updatedAt),
   };
 }
 
@@ -140,8 +169,26 @@ function getClubFromFirestore(clubId: string, data: Record<string, unknown>): Cl
     ownerId: readString(data.ownerId),
     logoUrl: readString(data.logoUrl),
     primaryColor: readString(data.primaryColor, "#2563eb"),
-    createdAt: nowIso(),
-    updatedAt: nowIso(),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readTimestampString(data.updatedAt),
+  };
+}
+
+function getAnnouncementFromFirestore(snapshot: QueryDocumentSnapshot): Announcement {
+  const data = snapshot.data();
+  const targetType = readAnnouncementTarget(data.targetType);
+  const targetTeamId = targetType === "team" ? readOptionalString(data.targetTeamId) : undefined;
+
+  return {
+    id: snapshot.id,
+    clubId: readString(data.clubId),
+    title: readString(data.title, "Duyuru"),
+    message: readString(data.message),
+    targetType,
+    targetTeamId,
+    createdByUserId: readString(data.createdByUserId),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readOptionalString(readTimestampString(data.updatedAt, "")),
   };
 }
 
@@ -154,9 +201,9 @@ function getJoinRequestFromFirestore(snapshot: QueryDocumentSnapshot): JoinReque
     userId: readString(data.userId),
     requestedRole: readUserRole(data.requestedRole),
     status: readJoinRequestStatus(data.status),
-    createdAt: nowIso(),
+    createdAt: readTimestampString(data.createdAt),
     reviewedByUserId: readOptionalString(data.reviewedByUserId),
-    reviewedAt: readOptionalString(data.reviewedAt),
+    reviewedAt: readOptionalString(readTimestampString(data.reviewedAt, "")),
   };
 }
 
@@ -172,6 +219,10 @@ function getUserProfileFromJoinRequest(request: JoinRequest, data: Record<string
     createdAt: request.createdAt,
     updatedAt: nowIso(),
   };
+}
+
+function userCanPublishAnnouncements(role: UserRole) {
+  return role === "clubAdmin" || role === "coach";
 }
 
 async function getClubLookupByCode(inviteCode: string) {
@@ -464,6 +515,81 @@ export const firestoreTeamSyncService = {
     );
 
     await batch.commit();
+  },
+
+  async listAnnouncementsForCurrentClub(firebaseUser: User, maxResults = 30): Promise<Announcement[]> {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      return [];
+    }
+
+    const announcementsQuery = query(
+      collection(db, "announcements"),
+      where("clubId", "==", workspace.club.id),
+      firestoreLimit(maxResults)
+    );
+    const announcementSnapshots = await getDocs(announcementsQuery);
+
+    return announcementSnapshots.docs
+      .map(getAnnouncementFromFirestore)
+      .sort((firstAnnouncement, secondAnnouncement) => secondAnnouncement.createdAt.localeCompare(firstAnnouncement.createdAt));
+  },
+
+  async createAnnouncement(firebaseUser: User, input: CreateAnnouncementInput) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanPublishAnnouncements(workspace.currentUser.role)) {
+      throw new Error("ANNOUNCEMENT_PERMISSION_DENIED");
+    }
+
+    const createdAt = nowIso();
+    const announcementId = `announcement-${Date.now()}`;
+    const announcementRef = doc(db, "announcements", announcementId);
+    const announcementData = {
+      id: announcementId,
+      clubId: workspace.club.id,
+      title: input.title.trim(),
+      message: input.message.trim(),
+      targetType: input.targetType,
+      createdByUserId: firebaseUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      ...(input.targetType === "team" && input.targetTeamId ? { targetTeamId: input.targetTeamId } : {}),
+    };
+
+    await setDoc(announcementRef, announcementData);
+
+    return {
+      id: announcementId,
+      clubId: workspace.club.id,
+      title: input.title.trim(),
+      message: input.message.trim(),
+      targetType: input.targetType,
+      targetTeamId: input.targetType === "team" ? input.targetTeamId : undefined,
+      createdByUserId: firebaseUser.uid,
+      createdAt,
+      updatedAt: createdAt,
+    } satisfies Announcement;
+  },
+
+  async removeAnnouncement(firebaseUser: User, announcementId: string) {
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null || workspace.currentUser.role !== "clubAdmin") {
+      throw new Error("ANNOUNCEMENT_PERMISSION_DENIED");
+    }
+
+    const { db } = requireFirebaseServices();
+    const announcementRef = doc(db, "announcements", announcementId);
+
+    await deleteDoc(announcementRef);
   },
 
   async updateCurrentWorkspace(input: UpdateCurrentWorkspaceInput) {

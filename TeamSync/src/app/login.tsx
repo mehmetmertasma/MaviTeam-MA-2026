@@ -25,7 +25,7 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
     firebaseIsReady
-      ? "Firebase Auth hazır. E-posta ve şifre ile giriş yapabilirsin."
+      ? "Firebase Auth hazır. E-posta doğrulanmış hesap ile giriş yapabilirsin."
       : "Firebase ayarları eksik. Gerçek giriş için önce .env bilgileri eklenmeli."
   );
   const [error, setError] = useState("");
@@ -60,6 +60,16 @@ export default function LoginScreen() {
       setStatusMessage("Giriş yapılıyor...");
 
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
+      const refreshedUser = await authService.refreshCurrentUser();
+
+      if (!refreshedUser.emailVerified) {
+        await authService.sendVerificationEmail(refreshedUser);
+        await authService.logout();
+        setError("E-posta adresin doğrulanmamış. Doğrulama linkini tekrar gönderdik; mailini doğrulayıp yeniden giriş yap.");
+        setStatusMessage("E-posta doğrulaması gerekli.");
+        return;
+      }
+
       const displayName = user.displayName?.trim();
 
       await teamSyncService.updateCurrentUser({
@@ -114,7 +124,7 @@ export default function LoginScreen() {
         <Text style={styles.title}>Giriş yap</Text>
 
         <Text style={styles.subtitle}>
-          Kulübünüzü, takımlarınızı ve antrenman planlarınızı gerçek TeamSync hesabınızla yönetmeye devam edin.
+          Kulübünüzü, takımlarınızı ve antrenman planlarınızı doğrulanmış TeamSync hesabınızla yönetmeye devam edin.
         </Text>
 
         <View style={styles.infoBox}>

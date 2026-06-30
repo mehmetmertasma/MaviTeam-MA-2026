@@ -1,9 +1,10 @@
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
 
@@ -53,6 +54,7 @@ export default function ProfileScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Profil merkezi TeamSync datasından yüklenecek.");
@@ -136,6 +138,26 @@ export default function ProfileScreen() {
       setStatusMessage("Merkezi başlangıç datasına dönüldü.");
     } catch {
       setStatusMessage("Profil sıfırlanırken bir sorun oluştu.");
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      setIsSigningOut(true);
+      setIsEditing(false);
+      setStatusMessage("Güvenli çıkış yapılıyor...");
+
+      if (authService.isConfigured()) {
+        await authService.logout();
+      }
+
+      setAppData(null);
+      setDraftProfileData(emptyFormData);
+      router.replace((authService.isConfigured() ? "/login" : "/") as never);
+    } catch (logoutError) {
+      setStatusMessage(getAuthErrorMessage(logoutError));
+    } finally {
+      setIsSigningOut(false);
     }
   }
 
@@ -320,9 +342,17 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.actionRowBottom}>
-          {!isEditing ? <AppButton title="Profili düzenle" onPress={startEditing} style={styles.actionButton} /> : null}
-          <AppButton title="Başlangıç datasına dön" variant="secondary" accessibilityLabel="Başlangıç datasına dön" style={styles.actionButton} onPress={resetProfile} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Hesap işlemleri</Text>
+          <Text style={styles.sectionSubtitle}>
+            Oturumu güvenli şekilde kapatabilir veya demo verisini sıfırlayabilirsin.
+          </Text>
+
+          <View style={styles.actionRowBottom}>
+            {!isEditing ? <AppButton title="Profili düzenle" onPress={startEditing} style={styles.actionButton} /> : null}
+            <AppButton title="Başlangıç datasına dön" variant="secondary" accessibilityLabel="Başlangıç datasına dön" style={styles.actionButton} onPress={resetProfile} />
+            <AppButton title={isSigningOut ? "Çıkış yapılıyor..." : "Çıkış yap"} variant="ghost" accessibilityLabel="TeamSync hesabından çıkış yap" style={styles.actionButton} onPress={handleLogout} disabled={isSigningOut} />
+          </View>
         </View>
       </View>
     </ScrollView>
@@ -373,5 +403,5 @@ const styles = StyleSheet.create({
   preferenceTextArea: { flex: 1 },
   preferenceTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
   preferenceSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  actionRowBottom: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
+  actionRowBottom: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.xl },
 });

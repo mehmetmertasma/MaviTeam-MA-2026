@@ -6,17 +6,46 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { teamSyncService } from "@/services/teamSyncService";
+
+function isValidEmail(value: string) {
+  const trimmedValue = value.trim();
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  return emailPattern.test(trimmedValue);
+}
 
 export default function LoginScreen() {
   const router = useRouter();
+  const firebaseIsReady = authService.isConfigured();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(
+    firebaseIsReady
+      ? "Firebase Auth hazır. E-posta ve şifre ile giriş yapabilirsin."
+      : "Firebase ayarları eksik. Gerçek giriş için önce .env bilgileri eklenmeli."
+  );
   const [error, setError] = useState("");
 
-  function handleLogin() {
-    if (email.trim() === "") {
-      setError("Lütfen e-mail adresinizi giriniz.");
+  function clearErrorOnChange() {
+    if (error !== "") {
+      setError("");
+    }
+  }
+
+  async function handleLogin() {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!firebaseIsReady) {
+      setError("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError("Lütfen geçerli bir e-posta adresi giriniz.");
       return;
     }
 
@@ -25,36 +54,91 @@ export default function LoginScreen() {
       return;
     }
 
-    setError("");
-    router.push("/dashboard");
+    try {
+      setIsSubmitting(true);
+      setError("");
+      setStatusMessage("Giriş yapılıyor...");
+
+      const user = await authService.loginWithEmail({ email: trimmedEmail, password });
+      const displayName = user.displayName?.trim();
+
+      await teamSyncService.updateCurrentUser({
+        email: user.email ?? trimmedEmail,
+        status: "active",
+        ...(displayName ? { fullName: displayName } : {}),
+      });
+
+      setStatusMessage("Giriş başarılı. Dashboard açılıyor.");
+      router.replace("/dashboard");
+    } catch (loginError) {
+      setError(getAuthErrorMessage(loginError));
+      setStatusMessage("Giriş tamamlanamadı.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handlePasswordReset() {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!firebaseIsReady) {
+      setError("Firebase ayarları eksik. Şifre yenileme için önce Firebase bağlantısı kurulmalı.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setError("Şifre yenileme linki için geçerli e-posta adresini giriniz.");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError("");
+      await authService.sendPasswordReset(trimmedEmail);
+      setStatusMessage("Şifre yenileme linki e-posta adresine gönderildi.");
+    } catch (resetError) {
+      setError(getAuthErrorMessage(resetError));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/" />
 
         <Text style={styles.logo}>TeamSync</Text>
+        <Text style={styles.badge}>Güvenli hesap girişi</Text>
 
         <Text style={styles.title}>Giriş yap</Text>
 
         <Text style={styles.subtitle}>
-          Kulübünüzü, takımlarınızı ve antrenman planlarınızı yönetmeye devam
-          edin.
+          Kulübünüzü, takımlarınızı ve antrenman planlarınızı gerçek TeamSync hesabınızla yönetmeye devam edin.
         </Text>
+
+        <View style={styles.infoBox}>
+          <Text style={styles.infoTitle}>Firebase Auth durumu</Text>
+          <Text style={styles.infoText}>{statusMessage}</Text>
+        </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-mail</Text>
+            <Text style={styles.label}>E-posta</Text>
             <TextInput
               style={styles.input}
               placeholder="ornek@email.com"
               placeholderTextColor={theme.colors.text.muted}
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearErrorOnChange();
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
-              accessibilityLabel="E-mail adresi"
+              autoComplete="email"
+              textContentType="emailAddress"
+              accessibilityLabel="E-posta adresi"
             />
           </View>
 
@@ -65,8 +149,13 @@ export default function LoginScreen() {
               placeholder="Şifrenizi giriniz"
               placeholderTextColor={theme.colors.text.muted}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearErrorOnChange();
+              }}
               secureTextEntry
+              autoComplete="password"
+              textContentType="password"
               accessibilityLabel="Şifre"
             />
           </View>
@@ -76,9 +165,19 @@ export default function LoginScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title="Giriş yap"
+            title={isSubmitting ? "Giriş yapılıyor..." : "Giriş yap"}
             onPress={handleLogin}
+            disabled={isSubmitting || !firebaseIsReady}
             accessibilityLabel="TeamSync hesabına giriş yap"
+            style={styles.button}
+          />
+
+          <AppButton
+            title="Şifremi unuttum"
+            variant="secondary"
+            onPress={handlePasswordReset}
+            disabled={isSubmitting || !firebaseIsReady}
+            accessibilityLabel="Şifre yenileme e-postası gönder"
             style={styles.button}
           />
 
@@ -97,6 +196,10 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: theme.colors.background.app,
+  },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -114,6 +217,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
+  badge: {
+    alignSelf: "center",
+    backgroundColor: theme.colors.brand.primarySoft,
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.radius.full,
+    marginBottom: theme.spacing["2xl"],
+    textAlign: "center",
+  },
   title: {
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
@@ -128,6 +243,27 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
+  },
+  infoBox: {
+    width: "100%",
+    backgroundColor: theme.colors.background.subtle,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  infoTitle: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  infoText: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
   form: {
     width: "100%",

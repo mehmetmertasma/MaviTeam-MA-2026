@@ -26,7 +26,7 @@ export function AppBackButton({ label = "Geri dön", fallbackHref = "/dashboard"
 
   return (
     <Pressable onPress={handlePress} style={({ pressed }) => [styles.button, pressed ? styles.pressed : null]}>
-      <Text style={styles.icon}>‹</Text>
+      <Text style={styles.icon}>←</Text>
       <Text style={styles.label}>{label}</Text>
     </Pressable>
   );
@@ -48,14 +48,17 @@ const styles = StyleSheet.create({
   },
   icon: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["2xl"],
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["2xl"],
+    lineHeight: theme.lineHeights.md,
+    textAlignVertical: "center",
   },
   label: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
+    lineHeight: theme.lineHeights.md,
+    textAlignVertical: "center",
   },
   pressed: {
     opacity: 0.84,

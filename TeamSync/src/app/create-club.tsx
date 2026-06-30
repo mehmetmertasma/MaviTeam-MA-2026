@@ -4,9 +4,10 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
-import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 
 const t = translations[defaultLanguage];
@@ -40,6 +41,7 @@ export default function CreateClubScreen() {
   const [sport, setSport] = useState("");
   const [city, setCity] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const previewCode = generatePreviewCode(clubName);
 
@@ -63,19 +65,46 @@ export default function CreateClubScreen() {
       return;
     }
 
+    const firebaseUser = authService.getCurrentUser();
+
+    if (authService.isConfigured() && firebaseUser === null) {
+      setError("Kulüp oluşturmak için önce giriş yapmalısın.");
+      return;
+    }
+
+    if (authService.isConfigured() && firebaseUser !== null && !firebaseUser.emailVerified) {
+      setError("Kulüp oluşturmadan önce e-posta adresini doğrulamalısın.");
+      return;
+    }
+
     try {
-      await teamSyncService.createClubWorkspace({
-        ownerFullName: ownerFullName || "Kulüp Yöneticisi",
-        ownerEmail: ownerEmail || "demo@teamsync.app",
+      setIsSubmitting(true);
+      setError("");
+
+      const nextData = await teamSyncService.createClubWorkspace({
+        ownerFullName: ownerFullName || firebaseUser?.displayName || "Kulüp Yöneticisi",
+        ownerEmail: ownerEmail || firebaseUser?.email || "demo@teamsync.app",
         clubName: trimmedClubName,
         sport: trimmedSport,
         city: trimmedCity,
       });
 
-      setError("");
+      if (authService.isConfigured() && firebaseUser !== null) {
+        await firestoreTeamSyncService.createClubWorkspace({
+          firebaseUser,
+          clubId: nextData.club.id,
+          clubName: nextData.club.name,
+          sport: nextData.club.sport,
+          city: nextData.club.city,
+          clubCode: nextData.club.code,
+        });
+      }
+
       router.replace("/dashboard");
-    } catch {
-      setError("Kulüp bilgileri merkezi data service içine kaydedilirken bir sorun oluştu.");
+    } catch (createClubError) {
+      setError(getAuthErrorMessage(createClubError));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -146,7 +175,7 @@ export default function CreateClubScreen() {
           <Text style={styles.codePreviewLabel}>Oluşacak örnek kulüp kodu</Text>
           <Text style={styles.codePreviewValue}>{previewCode}</Text>
           <Text style={styles.codePreviewHint}>
-            Bu kod merkezi TeamSync datasına kaydedilecek. İleride oyuncu, veli ve koçlar kulübe katılmak için kullanacak.
+            Bu kod hem cihazdaki geçici dataya hem de Firestore merkezi dataya kaydedilecek. İleride oyuncu, veli ve koçlar kulübe katılmak için kullanacak.
           </Text>
         </View>
 
@@ -154,8 +183,9 @@ export default function CreateClubScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title="Kulübü oluştur"
+            title={isSubmitting ? "Kulüp oluşturuluyor..." : "Kulübü oluştur"}
             onPress={handleCreateClub}
+            disabled={isSubmitting}
             accessibilityLabel="Kulübü oluştur ve kontrol paneline git"
             style={styles.button}
           />

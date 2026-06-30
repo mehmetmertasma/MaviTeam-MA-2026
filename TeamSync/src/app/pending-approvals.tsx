@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { JoinRequest, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
@@ -41,17 +43,35 @@ function formatDate(value: string) {
 
 export default function PendingApprovalsScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [firestoreRows, setFirestoreRows] = useState<RequestRow[] | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet."
   );
 
   const loadApprovalData = useCallback(async () => {
     try {
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setFirestoreRows([]);
+          setStatusMessage("Bekleyen istekleri görmek için giriş yapmalısın.");
+          return;
+        }
+
+        const rows = await firestoreTeamSyncService.listJoinRequestRowsForCurrentClub(firebaseUser);
+        setFirestoreRows(rows);
+        setAppData(null);
+        setStatusMessage("Bekleyen istekler Firestore kulüp datasından yüklendi.");
+        return;
+      }
+
       const loadedAppData = await teamSyncService.getAppData();
       setAppData(loadedAppData);
-      setStatusMessage("Bekleyen istekler merkezi TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Bekleyen istekler yüklenirken bir sorun oluştu.");
+      setFirestoreRows(null);
+      setStatusMessage("Bekleyen istekler local TeamSync datasından yüklendi.");
+    } catch (approvalError) {
+      setStatusMessage(getAuthErrorMessage(approvalError));
     }
   }, []);
 
@@ -62,6 +82,10 @@ export default function PendingApprovalsScreen() {
   );
 
   const requestRows = useMemo<RequestRow[]>(() => {
+    if (firestoreRows !== null) {
+      return firestoreRows;
+    }
+
     if (appData === null) {
       return [];
     }
@@ -70,7 +94,7 @@ export default function PendingApprovalsScreen() {
       request,
       user: appData.users.find((user) => user.id === request.userId),
     }));
-  }, [appData]);
+  }, [appData, firestoreRows]);
 
   const summary = useMemo(() => {
     const pendingCount = requestRows.filter((row) => row.request.status === "pending").length;
@@ -87,21 +111,49 @@ export default function PendingApprovalsScreen() {
 
   async function handleApprove(requestId: string) {
     try {
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setStatusMessage("Onaylamak için giriş yapmalısın.");
+          return;
+        }
+
+        await firestoreTeamSyncService.approveJoinRequest(firebaseUser, requestId);
+        await loadApprovalData();
+        setStatusMessage("Üye Firestore içinde onaylandı ve active yapıldı.");
+        return;
+      }
+
       const nextAppData = await teamSyncService.approveJoinRequest(requestId);
       setAppData(nextAppData);
       setStatusMessage("Üye onaylandı ve kullanıcı active yapıldı.");
-    } catch {
-      setStatusMessage("Üye onaylanırken bir sorun oluştu.");
+    } catch (approvalError) {
+      setStatusMessage(getAuthErrorMessage(approvalError));
     }
   }
 
   async function handleReject(requestId: string) {
     try {
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setStatusMessage("Reddetmek için giriş yapmalısın.");
+          return;
+        }
+
+        await firestoreTeamSyncService.rejectJoinRequest(firebaseUser, requestId);
+        await loadApprovalData();
+        setStatusMessage("Üye Firestore içinde reddedildi ve removed yapıldı.");
+        return;
+      }
+
       const nextAppData = await teamSyncService.rejectJoinRequest(requestId);
       setAppData(nextAppData);
       setStatusMessage("Üye reddedildi ve kullanıcı removed yapıldı.");
-    } catch {
-      setStatusMessage("Üye reddedilirken bir sorun oluştu.");
+    } catch (rejectError) {
+      setStatusMessage(getAuthErrorMessage(rejectError));
     }
   }
 
@@ -120,7 +172,7 @@ export default function PendingApprovalsScreen() {
           <Text style={styles.heroLabel}>Üye onay sistemi</Text>
           <Text style={styles.heroTitle}>Kulübe giriş kontrolü</Text>
           <Text style={styles.heroSubtitle}>
-            Onaylanan kullanıcılar merkezi data içinde active olur. Reddedilen kullanıcılar removed durumuna alınır.
+            Onaylanan kullanıcılar active olur. Reddedilen kullanıcılar removed durumuna alınır.
           </Text>
         </View>
 

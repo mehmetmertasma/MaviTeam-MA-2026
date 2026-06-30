@@ -7,6 +7,7 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function getFirstParam(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -52,6 +53,14 @@ export default function VerifyEmailScreen() {
         setStatusMessage("E-posta henüz doğrulanmamış. Mail kutundaki linke tıkla, sonra tekrar kontrol et.");
         return;
       }
+
+      setStatusMessage("E-posta doğrulandı. Firestore kullanıcı profili hazırlanıyor...");
+
+      await firestoreTeamSyncService.ensureUserProfile({
+        user,
+        role: nextRoute === "/create-club" ? "clubAdmin" : "athlete",
+        status: "emailVerified",
+      });
 
       setStatusMessage("E-posta doğrulandı. Sonraki adıma geçiliyor...");
 

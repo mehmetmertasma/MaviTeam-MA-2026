@@ -1,6 +1,8 @@
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  reload,
+  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -35,9 +37,23 @@ function getAuthOrThrow() {
   return services.auth;
 }
 
+function getCurrentUserOrThrow() {
+  const auth = getAuthOrThrow();
+
+  if (auth.currentUser === null) {
+    throw new Error("AUTH_USER_MISSING");
+  }
+
+  return auth.currentUser;
+}
+
 function getErrorCode(error: unknown) {
   if (error instanceof Error && error.message === "FIREBASE_CONFIG_MISSING") {
     return "FIREBASE_CONFIG_MISSING";
+  }
+
+  if (error instanceof Error && error.message === "AUTH_USER_MISSING") {
+    return "AUTH_USER_MISSING";
   }
 
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -57,6 +73,8 @@ export function getAuthErrorMessage(error: unknown) {
   switch (code) {
     case "FIREBASE_CONFIG_MISSING":
       return "Firebase ayarları eksik. Gerçek giriş için .env dosyasına Firebase bilgilerini ekleyip uygulamayı yeniden başlat.";
+    case "AUTH_USER_MISSING":
+      return "Oturum bulunamadı. Lütfen tekrar giriş yap.";
     case "auth/invalid-email":
       return "Lütfen geçerli bir e-posta adresi gir.";
     case "auth/user-disabled":
@@ -113,6 +131,8 @@ export const authService = {
       await updateProfile(credential.user, { displayName: cleanName });
     }
 
+    await sendEmailVerification(credential.user);
+
     return credential.user;
   },
 
@@ -120,6 +140,17 @@ export const authService = {
     const auth = getAuthOrThrow();
     const credential = await signInWithEmailAndPassword(auth, normalizeEmail(input.email), input.password);
     return credential.user;
+  },
+
+  async refreshCurrentUser() {
+    const user = getCurrentUserOrThrow();
+    await reload(user);
+    return getCurrentUserOrThrow();
+  },
+
+  async sendVerificationEmail(user?: User) {
+    const targetUser = user ?? getCurrentUserOrThrow();
+    await sendEmailVerification(targetUser);
   },
 
   async logout() {

@@ -54,10 +54,19 @@ export default function HomeScreen() {
               style={styles.button}
             />
           </Link>
+
+          <Link href="/login" asChild>
+            <AppButton
+              title="Giriş yap"
+              variant="ghost"
+              accessibilityLabel="TeamSync hesabı ile giriş yap"
+              style={styles.button}
+            />
+          </Link>
         </View>
 
         <Text style={styles.footerText}>
-          Önce kullanıcı bilgileri alınır. Sonra kulüp oluşturma veya takım kodu ile katılma adımına geçilir.
+          Yeni kullanıcılar hesap oluşturur. Mevcut kullanıcılar giriş yapabilir.
         </Text>
       </ScreenCard>
     </ScrollView>

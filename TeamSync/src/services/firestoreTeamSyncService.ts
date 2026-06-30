@@ -79,6 +79,11 @@ function readString(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() !== "" ? value : fallback;
 }
 
+function readOptionalString(value: unknown) {
+  const result = readString(value);
+  return result === "" ? undefined : result;
+}
+
 function readStringArray(value: unknown) {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
@@ -150,8 +155,8 @@ function getJoinRequestFromFirestore(snapshot: QueryDocumentSnapshot): JoinReque
     requestedRole: readUserRole(data.requestedRole),
     status: readJoinRequestStatus(data.status),
     createdAt: nowIso(),
-    reviewedByUserId: readString(data.reviewedByUserId, undefined as unknown as string),
-    reviewedAt: readString(data.reviewedAt, undefined as unknown as string),
+    reviewedByUserId: readOptionalString(data.reviewedByUserId),
+    reviewedAt: readOptionalString(data.reviewedAt),
   };
 }
 
@@ -245,7 +250,7 @@ export const firestoreTeamSyncService = {
 
     const currentUser = getUserProfileFromFirestore(firebaseUser.uid, userSnapshot.data());
 
-    if (currentUser.clubId === "") {
+    if (currentUser.clubId === "" || currentUser.status !== "active") {
       return { currentUser, club: null };
     }
 

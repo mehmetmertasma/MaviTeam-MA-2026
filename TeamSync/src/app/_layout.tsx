@@ -21,12 +21,13 @@ const routesWithoutGlobalNavigation = [
   "/",
   "/login",
   "/register",
+  "/verify-email",
   "/create-club",
   "/join-club",
   "/join-request-sent",
 ];
 
-const publicAuthRoutes = ["/", "/login", "/register"];
+const publicAuthRoutes = ["/", "/login", "/register", "/verify-email"];
 
 function AppProviders({ children }: PropsWithChildren) {
   return (
@@ -39,7 +40,7 @@ function AppProviders({ children }: PropsWithChildren) {
 function AppContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
+  const { user, isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
   const routeIsPublic = publicAuthRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
   const globalNavigationTopSpace = showGlobalNavigation
@@ -56,10 +57,21 @@ function AppContent() {
       return;
     }
 
-    if (isSignedIn && pathname === "/login") {
+    if (isSignedIn && user !== null && !user.emailVerified && !routeIsPublic) {
+      router.replace({
+        pathname: "/verify-email",
+        params: {
+          email: user.email ?? "",
+          fullName: user.displayName ?? "",
+        },
+      } as never);
+      return;
+    }
+
+    if (isSignedIn && user?.emailVerified && pathname === "/login") {
       router.replace("/dashboard" as never);
     }
-  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic]);
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, user]);
 
   if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
     return (
@@ -90,6 +102,7 @@ function AppContent() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="register" />
+        <Stack.Screen name="verify-email" />
         <Stack.Screen name="create-club" />
         <Stack.Screen name="join-club" />
         <Stack.Screen name="join-request-sent" />

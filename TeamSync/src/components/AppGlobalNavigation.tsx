@@ -63,16 +63,41 @@ export function AppGlobalNavigation() {
 
   const showProfileButton = pathname !== "/profile";
 
+  function handleBackPress() {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    if (pathname === "/dashboard") {
+      router.replace("/" as never);
+      return;
+    }
+
+    router.replace("/dashboard" as never);
+  }
+
   return (
     <View pointerEvents="box-none" style={styles.root}>
       <View pointerEvents="box-none" style={styles.topControls}>
-        <Pressable
-          onPress={() => setDrawerIsOpen(true)}
-          style={({ pressed }) => [styles.menuButton, pressed ? styles.pressed : null]}
-          accessibilityLabel="Ana menüyü aç"
-        >
-          <Text style={styles.menuIcon}>☰</Text>
-        </Pressable>
+        <View pointerEvents="box-none" style={styles.leftControls}>
+          <Pressable
+            onPress={() => setDrawerIsOpen(true)}
+            style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
+            accessibilityLabel="Ana menüyü aç"
+          >
+            <Text style={styles.menuIcon}>☰</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleBackPress}
+            style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
+            accessibilityLabel="Geri dön"
+          >
+            <Text style={styles.backIcon}>‹</Text>
+            <Text style={styles.backText}>Geri</Text>
+          </Pressable>
+        </View>
 
         {showProfileButton ? (
           <Pressable
@@ -113,7 +138,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  menuButton: {
+  leftControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+  },
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: theme.radius.full,
@@ -129,6 +159,31 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
     marginTop: -2,
+  },
+  backButton: {
+    minWidth: 72,
+    height: 44,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    paddingHorizontal: theme.spacing.md,
+    ...theme.shadows.sm,
+  },
+  backIcon: {
+    color: theme.colors.text.primary,
+    fontSize: 28,
+    fontWeight: theme.fontWeights.black,
+    lineHeight: 30,
+  },
+  backText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
   },
   profileButton: {
     width: 44,

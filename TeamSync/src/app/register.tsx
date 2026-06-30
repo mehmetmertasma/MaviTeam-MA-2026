@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
@@ -65,6 +66,8 @@ export default function RegisterScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
+        <AppBackButton fallbackHref="/" />
+
         <Text style={styles.logo}>TeamSync</Text>
         <Text style={styles.badge}>Kullanıcı bilgileri</Text>
         <Text style={styles.title}>Hesap oluştur</Text>

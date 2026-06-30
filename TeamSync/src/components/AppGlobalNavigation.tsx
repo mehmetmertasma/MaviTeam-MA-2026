@@ -98,7 +98,7 @@ export function AppGlobalNavigation() {
             style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
             accessibilityLabel="Geri dön"
           >
-            <Text style={styles.backIcon}>‹</Text>
+            <Text style={styles.backIcon}>←</Text>
             <Text style={styles.backText}>Geri</Text>
           </Pressable>
         </View>
@@ -173,20 +173,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
+    gap: theme.spacing.xs,
     paddingHorizontal: theme.spacing.md,
     ...theme.shadows.sm,
   },
   backIcon: {
     color: theme.colors.text.primary,
-    fontSize: 28,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    lineHeight: 30,
+    lineHeight: theme.lineHeights.md,
+    textAlignVertical: "center",
   },
   backText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
+    lineHeight: theme.lineHeights.md,
+    textAlignVertical: "center",
   },
   profileButton: {
     width: 44,

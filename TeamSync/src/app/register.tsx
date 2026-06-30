@@ -12,10 +12,10 @@ function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
 
   if (firstValue === "join-club") {
-    return "/join-club";
+    return "join-club";
   }
 
-  return "/create-club";
+  return "create-club";
 }
 
 function isValidEmail(value: string) {
@@ -80,7 +80,7 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Firebase hesabı oluşturuluyor...");
+      setStatusMessage("Firebase hesabı oluşturuluyor ve doğrulama e-postası gönderiliyor...");
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -88,13 +88,14 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage("Hesap oluşturuldu. Sonraki adıma geçiliyor.");
+      setStatusMessage("Doğrulama e-postası gönderildi. Mail kutunu kontrol et.");
 
       router.replace({
-        pathname: nextRoute,
+        pathname: "/verify-email",
         params: {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
+          next: nextRoute,
         },
       } as never);
     } catch (registerError) {
@@ -113,7 +114,7 @@ export default function RegisterScreen() {
         <Text style={styles.badge}>Güvenli hesap oluşturma</Text>
         <Text style={styles.title}>Hesap oluştur</Text>
         <Text style={styles.subtitle}>
-          Önce gerçek TeamSync hesabını oluştur. Sonra kulüp kurabilir veya takım kodu ile kulübe katılabilirsin.
+          Önce gerçek TeamSync hesabını oluştur. Sonra e-posta adresini doğrulayıp kulüp kurabilir veya takım kodu ile katılabilirsin.
         </Text>
 
         <View style={styles.form}>
@@ -191,9 +192,9 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Sonraki adım</Text>
+          <Text style={styles.infoTitle}>E-posta doğrulama gerekli</Text>
           <Text style={styles.infoText}>
-            Hesap oluşturulduktan sonra seçtiğin akışa göre kulüp oluşturma veya takım kodu ile katılma ekranına geçeceksin.
+            Hesap oluşturulduktan sonra doğrulama linki e-postana gönderilir. E-postanı doğrulamadan uygulama içine geçemezsin.
           </Text>
         </View>
 
@@ -201,10 +202,10 @@ export default function RegisterScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve devam et"}
+            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve doğrula"}
             onPress={handleContinue}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="Firebase hesabı oluştur ve sonraki adıma geç"
+            accessibilityLabel="Firebase hesabı oluştur ve e-posta doğrulama ekranına geç"
             style={styles.button}
           />
 

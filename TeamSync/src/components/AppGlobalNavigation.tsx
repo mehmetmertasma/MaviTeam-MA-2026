@@ -1,6 +1,7 @@
 import { router, usePathname } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppDataDrawer } from "@/components/AppDataDrawer";
 import { theme } from "@/constants/theme";
@@ -14,6 +15,8 @@ const routesWithoutTopControls = [
   "/join-club",
   "/join-request-sent",
 ];
+
+const TOP_CONTROL_OFFSET = 10;
 
 function getInitials(name: string) {
   const initials = name
@@ -30,6 +33,7 @@ function getInitials(name: string) {
 
 export function AppGlobalNavigation() {
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const [profileInitials, setProfileInitials] = useState("TS");
 
@@ -79,7 +83,7 @@ export function AppGlobalNavigation() {
 
   return (
     <View pointerEvents="box-none" style={styles.root}>
-      <View pointerEvents="box-none" style={styles.topControls}>
+      <View pointerEvents="box-none" style={[styles.topControls, { top: insets.top + TOP_CONTROL_OFFSET }]}>
         <View pointerEvents="box-none" style={styles.leftControls}>
           <Pressable
             onPress={() => setDrawerIsOpen(true)}
@@ -130,7 +134,6 @@ const styles = StyleSheet.create({
   },
   topControls: {
     position: "absolute",
-    top: 10,
     left: 18,
     right: 18,
     zIndex: 901,

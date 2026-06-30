@@ -1,11 +1,12 @@
+import { useEffect } from "react";
 import type { PropsWithChildren } from "react";
-import { Stack, usePathname } from "expo-router";
+import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
-import { AuthProvider } from "@/providers/AuthProvider";
+import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -25,6 +26,8 @@ const routesWithoutGlobalNavigation = [
   "/join-request-sent",
 ];
 
+const publicAuthRoutes = ["/", "/login", "/register"];
+
 function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
@@ -36,10 +39,39 @@ function AppProviders({ children }: PropsWithChildren) {
 function AppContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
+  const routeIsPublic = publicAuthRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
   const globalNavigationTopSpace = showGlobalNavigation
     ? insets.top + GLOBAL_NAV_TOP_OFFSET + GLOBAL_NAV_HEIGHT + GLOBAL_NAV_BOTTOM_GAP
     : 0;
+
+  useEffect(() => {
+    if (!isFirebaseAuthConfigured || !isAuthReady) {
+      return;
+    }
+
+    if (!isSignedIn && !routeIsPublic) {
+      router.replace("/login" as never);
+      return;
+    }
+
+    if (isSignedIn && pathname === "/login") {
+      router.replace("/dashboard" as never);
+    }
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic]);
+
+  if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
+    return (
+      <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR, alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <StatusBar style="light" />
+        <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>TeamSync</Text>
+        <Text style={{ color: "#cbd5e1", fontSize: 15, fontWeight: "700", textAlign: "center" }}>
+          Hesap oturumu kontrol ediliyor...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR }}>

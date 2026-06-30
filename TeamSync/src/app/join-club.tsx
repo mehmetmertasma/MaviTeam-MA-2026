@@ -2,6 +2,7 @@ import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
@@ -69,6 +70,7 @@ export default function JoinClubScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
+        <AppBackButton fallbackHref="/" />
         <Text style={styles.logo}>{t.common.appName}</Text>
 
         <Text style={styles.badge}>Takım kodu ile giriş</Text>

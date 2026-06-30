@@ -7,6 +7,8 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 
 const t = translations[defaultLanguage];
@@ -28,6 +30,7 @@ export default function JoinClubScreen() {
 
   const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleInviteCodeChange(text: string) {
     const formattedCode = text.toUpperCase().replace(/\s/g, "");
@@ -53,17 +56,45 @@ export default function JoinClubScreen() {
     }
 
     try {
-      await teamSyncService.createJoinRequest({
-        fullName: requestFullName || "Yeni Kullanıcı",
-        email: requestEmail || "pending@teamsync.app",
-        inviteCode: cleanedCode,
-        requestedRole: "athlete",
-      });
-
+      setIsSubmitting(true);
       setError("");
+
+      if (authService.isConfigured()) {
+        const firebaseUser = authService.getCurrentUser();
+
+        if (firebaseUser === null) {
+          setError("Kulübe katılmak için önce giriş yapmalısın.");
+          return;
+        }
+
+        if (!firebaseUser.emailVerified) {
+          setError("Kulübe katılmadan önce e-posta adresini doğrulamalısın.");
+          return;
+        }
+
+        await firestoreTeamSyncService.requestJoinClub({
+          firebaseUser,
+          inviteCode: cleanedCode,
+          requestedRole: "athlete",
+        });
+      } else {
+        await teamSyncService.createJoinRequest({
+          fullName: requestFullName || "Yeni Kullanıcı",
+          email: requestEmail || "pending@teamsync.app",
+          inviteCode: cleanedCode,
+          requestedRole: "athlete",
+        });
+      }
+
       router.replace("/join-request-sent");
-    } catch {
-      setError("Bu kulüp kodu bulunamadı. Lütfen kodu kontrol edip tekrar deneyiniz.");
+    } catch (joinError) {
+      const message = joinError instanceof Error && joinError.message === "INVALID_CLUB_CODE"
+        ? "Bu kulüp kodu bulunamadı. Lütfen kodu kontrol edip tekrar deneyiniz."
+        : getAuthErrorMessage(joinError);
+
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -84,13 +115,13 @@ export default function JoinClubScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Kayıt bilgileri</Text>
-          <Text style={styles.infoText}>{requestFullName || "İsim register ekranından gelecek"}</Text>
-          <Text style={styles.infoText}>{requestEmail || "E-posta register ekranından gelecek"}</Text>
+          <Text style={styles.infoText}>{requestFullName || "Firebase hesabındaki ad kullanılacak"}</Text>
+          <Text style={styles.infoText}>{requestEmail || "Firebase hesabındaki e-posta kullanılacak"}</Text>
         </View>
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Kod örneği</Text>
-          <Text style={styles.infoText}>TS2026 veya kulübün oluşturduğu kod</Text>
+          <Text style={styles.infoText}>Kulüp yöneticisinin dashboard üzerinde gördüğü kulüp kodu.</Text>
         </View>
 
         <View style={styles.form}>
@@ -113,8 +144,9 @@ export default function JoinClubScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title="Katılma isteği gönder"
+            title={isSubmitting ? "İstek gönderiliyor..." : "Katılma isteği gönder"}
             onPress={handleJoinClub}
+            disabled={isSubmitting}
             accessibilityLabel="Takım kodu ile katılma isteği gönder"
             style={styles.button}
           />

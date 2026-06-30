@@ -2,6 +2,7 @@ import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
+import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
@@ -31,6 +32,8 @@ export default function LoginScreen() {
   return (
     <ScrollView contentContainerStyle={styles.screen}>
       <ScreenCard style={styles.card}>
+        <AppBackButton fallbackHref="/" />
+
         <Text style={styles.logo}>TeamSync</Text>
 
         <Text style={styles.title}>Giriş yap</Text>

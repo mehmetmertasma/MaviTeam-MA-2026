@@ -17,7 +17,17 @@ import type { User } from "firebase/auth";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 import { requireFirebaseServices } from "@/lib/firebase";
-import type { Announcement, Club, JoinRequest, Team, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import type {
+  Announcement,
+  Club,
+  JoinRequest,
+  ScheduleEvent,
+  ScheduleEventType,
+  Team,
+  UserProfile,
+  UserRole,
+  UserStatus,
+} from "@/types/teamSync";
 
 type FirestoreUserStatus = "emailVerified" | "active" | "pending" | "pendingApproval" | "removed";
 
@@ -64,6 +74,18 @@ type CreateTeamInput = {
   coachIds?: string[];
   memberIds?: string[];
 };
+
+type CreateScheduleEventInput = {
+  teamId?: string;
+  title: string;
+  type: ScheduleEventType;
+  startsAt: string;
+  endsAt?: string;
+  location: string;
+  note?: string;
+};
+
+type UpdateScheduleEventInput = Partial<Pick<ScheduleEvent, "title" | "type" | "startsAt" | "endsAt" | "location" | "note" | "teamId">>;
 
 type FirestoreWorkspace = {
   currentUser: UserProfile;
@@ -146,6 +168,14 @@ function readAnnouncementTarget(value: unknown): Announcement["targetType"] {
   return "allClub";
 }
 
+function readScheduleEventType(value: unknown): ScheduleEventType {
+  if (value === "match" || value === "meeting") {
+    return value;
+  }
+
+  return "practice";
+}
+
 function readJoinRequestStatus(value: unknown): JoinRequest["status"] {
   if (value === "approved" || value === "rejected") {
     return value;
@@ -216,6 +246,25 @@ function getTeamFromFirestore(snapshot: QueryDocumentSnapshot): Team {
   };
 }
 
+function getScheduleEventFromFirestore(snapshot: QueryDocumentSnapshot): ScheduleEvent {
+  const data = snapshot.data();
+
+  return {
+    id: snapshot.id,
+    clubId: readString(data.clubId),
+    teamId: readOptionalString(data.teamId),
+    title: readString(data.title, "Etkinlik"),
+    type: readScheduleEventType(data.type),
+    startsAt: readTimestampString(data.startsAt),
+    endsAt: readOptionalString(readTimestampString(data.endsAt, "")),
+    location: readString(data.location, "Konum yok"),
+    note: readOptionalString(data.note),
+    createdByUserId: readString(data.createdByUserId),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readOptionalString(readTimestampString(data.updatedAt, "")),
+  };
+}
+
 function getJoinRequestFromFirestore(snapshot: QueryDocumentSnapshot): JoinRequest {
   const data = snapshot.data();
 
@@ -251,6 +300,10 @@ function userCanPublishAnnouncements(role: UserRole) {
 
 function userCanManageTeams(role: UserRole) {
   return role === "clubAdmin";
+}
+
+function userCanManageSchedule(role: UserRole) {
+  return role === "clubAdmin" || role === "coach";
 }
 
 async function getClubLookupByCode(inviteCode: string) {
@@ -668,6 +721,114 @@ export const firestoreTeamSyncService = {
     });
 
     await batch.commit();
+  },
+
+  async listScheduleEventsForClub(clubId: string, maxResults = 150): Promise<ScheduleEvent[]> {
+    const { db } = requireFirebaseServices();
+
+    if (clubId.trim() === "") {
+      return [];
+    }
+
+    const scheduleQuery = query(
+      collection(db, "scheduleEvents"),
+      where("clubId", "==", clubId),
+      firestoreLimit(maxResults)
+    );
+    const scheduleSnapshots = await getDocs(scheduleQuery);
+
+    return scheduleSnapshots.docs
+      .map(getScheduleEventFromFirestore)
+      .sort((firstEvent, secondEvent) => new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime());
+  },
+
+  async createScheduleEvent(firebaseUser: User, input: CreateScheduleEventInput) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanManageSchedule(workspace.currentUser.role)) {
+      throw new Error("SCHEDULE_PERMISSION_DENIED");
+    }
+
+    const cleanTitle = input.title.trim();
+    const cleanLocation = input.location.trim();
+
+    if (cleanTitle === "" || cleanLocation === "" || input.startsAt.trim() === "") {
+      throw new Error("SCHEDULE_REQUIRED_FIELDS_MISSING");
+    }
+
+    const createdAt = nowIso();
+    const now = serverTimestamp();
+    const eventId = `event-${Date.now()}`;
+    const eventRef = doc(db, "scheduleEvents", eventId);
+
+    await setDoc(eventRef, {
+      id: eventId,
+      clubId: workspace.club.id,
+      teamId: input.teamId ?? null,
+      title: cleanTitle,
+      type: input.type,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt ?? null,
+      location: cleanLocation,
+      note: input.note?.trim() || "Ek not yok.",
+      createdByUserId: firebaseUser.uid,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return {
+      id: eventId,
+      clubId: workspace.club.id,
+      teamId: input.teamId,
+      title: cleanTitle,
+      type: input.type,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      location: cleanLocation,
+      note: input.note?.trim() || "Ek not yok.",
+      createdByUserId: firebaseUser.uid,
+      createdAt,
+      updatedAt: createdAt,
+    } satisfies ScheduleEvent;
+  },
+
+  async updateScheduleEvent(firebaseUser: User, eventId: string, updates: UpdateScheduleEventInput) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanManageSchedule(workspace.currentUser.role)) {
+      throw new Error("SCHEDULE_PERMISSION_DENIED");
+    }
+
+    const eventRef = doc(db, "scheduleEvents", eventId);
+    const eventSnapshot = await getDoc(eventRef);
+
+    if (!eventSnapshot.exists() || readString(eventSnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("SCHEDULE_EVENT_MISSING");
+    }
+
+    const updateData: Record<string, unknown> = {
+      updatedAt: serverTimestamp(),
+    };
+
+    if (updates.title !== undefined) updateData.title = updates.title.trim();
+    if (updates.type !== undefined) updateData.type = updates.type;
+    if (updates.startsAt !== undefined) updateData.startsAt = updates.startsAt;
+    if (updates.endsAt !== undefined) updateData.endsAt = updates.endsAt;
+    if (updates.location !== undefined) updateData.location = updates.location.trim();
+    if (updates.note !== undefined) updateData.note = updates.note.trim();
+    if (updates.teamId !== undefined) updateData.teamId = updates.teamId;
+
+    await setDoc(eventRef, updateData, { merge: true });
   },
 
   async listAnnouncementsForCurrentClub(firebaseUser: User, maxResults = 30): Promise<Announcement[]> {

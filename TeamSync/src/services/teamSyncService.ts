@@ -51,6 +51,10 @@ type StoredAppData = TeamSyncAppData & {
 
 type FirestoreWorkspace = NonNullable<Awaited<ReturnType<typeof firestoreTeamSyncService.getCurrentWorkspace>>>;
 
+type FirestoreDataOverrides = {
+  teams?: Team[];
+};
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -72,7 +76,11 @@ function ensureAppDataShape(data: StoredAppData) {
   } satisfies TeamSyncAppData;
 }
 
-function mergeFirestoreWorkspaceIntoAppData(appData: TeamSyncAppData, workspace: FirestoreWorkspace) {
+function mergeFirestoreWorkspaceIntoAppData(
+  appData: TeamSyncAppData,
+  workspace: FirestoreWorkspace,
+  overrides: FirestoreDataOverrides = {}
+) {
   if (workspace.club === null) {
     return {
       ...appData,
@@ -86,13 +94,14 @@ function mergeFirestoreWorkspaceIntoAppData(appData: TeamSyncAppData, workspace:
     ...workspace.currentUser,
     clubId: workspaceClub.id,
   };
+  const teams = overrides.teams ?? appData.teams.map((team) => ({ ...team, clubId: workspaceClub.id }));
 
   return {
     ...appData,
     club: workspaceClub,
     currentUser,
     users: [currentUser, ...appData.users.filter((user) => user.id !== currentUser.id)],
-    teams: appData.teams.map((team) => ({ ...team, clubId: workspaceClub.id })),
+    teams,
     announcements: appData.announcements.map((announcement) => ({ ...announcement, clubId: workspaceClub.id })),
     scheduleEvents: appData.scheduleEvents.map((event) => ({ ...event, clubId: workspaceClub.id })),
     attendanceRecords: appData.attendanceRecords.map((record) => ({ ...record, clubId: workspaceClub.id })),
@@ -134,7 +143,13 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     return localAppData;
   }
 
-  return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace);
+  const firestoreTeams = workspace.club === null
+    ? []
+    : await firestoreTeamSyncService.listTeamsForClub(workspace.club.id);
+
+  return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {
+    teams: firestoreTeams,
+  });
 }
 
 async function saveAppData(data: TeamSyncAppData) {
@@ -161,6 +176,16 @@ async function syncCurrentWorkspaceToFirestore(data: TeamSyncAppData) {
     clubCity: data.club.city,
     clubCode: data.club.code,
   });
+}
+
+function getVerifiedFirebaseUserOrThrow() {
+  const firebaseUser = authService.getCurrentUser();
+
+  if (firebaseUser === null || !firebaseUser.emailVerified) {
+    throw new Error("AUTH_USER_MISSING");
+  }
+
+  return firebaseUser;
 }
 
 export const teamSyncService = {
@@ -366,6 +391,18 @@ export const teamSyncService = {
   },
 
   async createTeam(input: Omit<Team, "id" | "createdAt" | "updatedAt">) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      await firestoreTeamSyncService.createTeam(firebaseUser, {
+        name: input.name,
+        ageGroup: input.ageGroup,
+        coachIds: input.coachIds,
+        memberIds: input.memberIds,
+      });
+
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const createdAt = nowIso();
     const newTeam: Team = { ...input, id: `team-${Date.now()}`, createdAt, updatedAt: createdAt };
@@ -373,6 +410,13 @@ export const teamSyncService = {
   },
 
   async removeTeam(teamId: string) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      await firestoreTeamSyncService.removeTeam(firebaseUser, teamId);
+
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const removedAt = nowIso();
 

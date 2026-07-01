@@ -53,6 +53,7 @@ type FirestoreWorkspace = NonNullable<Awaited<ReturnType<typeof firestoreTeamSyn
 
 type FirestoreDataOverrides = {
   teams?: Team[];
+  scheduleEvents?: ScheduleEvent[];
 };
 
 function nowIso() {
@@ -95,6 +96,7 @@ function mergeFirestoreWorkspaceIntoAppData(
     clubId: workspaceClub.id,
   };
   const teams = overrides.teams ?? appData.teams.map((team) => ({ ...team, clubId: workspaceClub.id }));
+  const scheduleEvents = overrides.scheduleEvents ?? appData.scheduleEvents.map((event) => ({ ...event, clubId: workspaceClub.id }));
 
   return {
     ...appData,
@@ -103,7 +105,7 @@ function mergeFirestoreWorkspaceIntoAppData(
     users: [currentUser, ...appData.users.filter((user) => user.id !== currentUser.id)],
     teams,
     announcements: appData.announcements.map((announcement) => ({ ...announcement, clubId: workspaceClub.id })),
-    scheduleEvents: appData.scheduleEvents.map((event) => ({ ...event, clubId: workspaceClub.id })),
+    scheduleEvents,
     attendanceRecords: appData.attendanceRecords.map((record) => ({ ...record, clubId: workspaceClub.id })),
     chatGroups: appData.chatGroups.map((group) => ({ ...group, clubId: workspaceClub.id })),
     chatMessages: appData.chatMessages.map((message) => ({ ...message, clubId: workspaceClub.id })),
@@ -146,9 +148,13 @@ async function loadAppData(): Promise<TeamSyncAppData> {
   const firestoreTeams = workspace.club === null
     ? []
     : await firestoreTeamSyncService.listTeamsForClub(workspace.club.id);
+  const firestoreScheduleEvents = workspace.club === null
+    ? []
+    : await firestoreTeamSyncService.listScheduleEventsForClub(workspace.club.id);
 
   return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {
     teams: firestoreTeams,
+    scheduleEvents: firestoreScheduleEvents,
   });
 }
 
@@ -461,12 +467,34 @@ export const teamSyncService = {
   },
 
   async createScheduleEvent(input: Omit<ScheduleEvent, "id" | "createdAt" | "updatedAt">) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      await firestoreTeamSyncService.createScheduleEvent(firebaseUser, {
+        teamId: input.teamId,
+        title: input.title,
+        type: input.type,
+        startsAt: input.startsAt,
+        endsAt: input.endsAt,
+        location: input.location,
+        note: input.note,
+      });
+
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const newEvent: ScheduleEvent = { ...input, id: `event-${Date.now()}`, createdAt: nowIso() };
     return saveAppData({ ...data, scheduleEvents: [newEvent, ...data.scheduleEvents] });
   },
 
   async updateScheduleEvent(eventId: string, updates: Partial<Pick<ScheduleEvent, "title" | "type" | "startsAt" | "endsAt" | "location" | "note" | "teamId">>) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      await firestoreTeamSyncService.updateScheduleEvent(firebaseUser, eventId, updates);
+
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     return saveAppData({
       ...data,

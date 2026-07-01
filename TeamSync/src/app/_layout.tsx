@@ -80,11 +80,12 @@ function AppContent() {
       return;
     }
 
+    const firebaseUser = user;
     let isActive = true;
 
     async function guardWorkspaceAccess() {
       try {
-        const workspace = await firestoreTeamSyncService.getCurrentWorkspace(user);
+        const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
         if (!isActive) {
           return;

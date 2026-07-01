@@ -1,4 +1,6 @@
 import {
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -15,7 +17,7 @@ import type { User } from "firebase/auth";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 import { requireFirebaseServices } from "@/lib/firebase";
-import type { Announcement, Club, JoinRequest, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import type { Announcement, Club, JoinRequest, Team, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
 
 type FirestoreUserStatus = "emailVerified" | "active" | "pending" | "pendingApproval" | "removed";
 
@@ -54,6 +56,13 @@ type CreateAnnouncementInput = {
   message: string;
   targetType: Announcement["targetType"];
   targetTeamId?: string;
+};
+
+type CreateTeamInput = {
+  name: string;
+  ageGroup: string;
+  coachIds?: string[];
+  memberIds?: string[];
 };
 
 type FirestoreWorkspace = {
@@ -192,6 +201,21 @@ function getAnnouncementFromFirestore(snapshot: QueryDocumentSnapshot): Announce
   };
 }
 
+function getTeamFromFirestore(snapshot: QueryDocumentSnapshot): Team {
+  const data = snapshot.data();
+
+  return {
+    id: snapshot.id,
+    clubId: readString(data.clubId),
+    name: readString(data.name, "Takım"),
+    ageGroup: readString(data.ageGroup, "Genel"),
+    coachIds: readStringArray(data.coachIds),
+    memberIds: readStringArray(data.memberIds),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readTimestampString(data.updatedAt),
+  };
+}
+
 function getJoinRequestFromFirestore(snapshot: QueryDocumentSnapshot): JoinRequest {
   const data = snapshot.data();
 
@@ -223,6 +247,10 @@ function getUserProfileFromJoinRequest(request: JoinRequest, data: Record<string
 
 function userCanPublishAnnouncements(role: UserRole) {
   return role === "clubAdmin" || role === "coach";
+}
+
+function userCanManageTeams(role: UserRole) {
+  return role === "clubAdmin";
 }
 
 async function getClubLookupByCode(inviteCode: string) {
@@ -513,6 +541,131 @@ export const firestoreTeamSyncService = {
       },
       { merge: true }
     );
+
+    await batch.commit();
+  },
+
+  async listTeamsForClub(clubId: string, maxResults = 100): Promise<Team[]> {
+    const { db } = requireFirebaseServices();
+
+    if (clubId.trim() === "") {
+      return [];
+    }
+
+    const teamsQuery = query(
+      collection(db, "teams"),
+      where("clubId", "==", clubId),
+      firestoreLimit(maxResults)
+    );
+    const teamSnapshots = await getDocs(teamsQuery);
+
+    return teamSnapshots.docs
+      .map(getTeamFromFirestore)
+      .sort((firstTeam, secondTeam) => secondTeam.createdAt.localeCompare(firstTeam.createdAt));
+  },
+
+  async createTeam(firebaseUser: User, input: CreateTeamInput) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanManageTeams(workspace.currentUser.role)) {
+      throw new Error("TEAM_PERMISSION_DENIED");
+    }
+
+    const cleanName = input.name.trim();
+    const cleanAgeGroup = input.ageGroup.trim();
+
+    if (cleanName === "" || cleanAgeGroup === "") {
+      throw new Error("TEAM_REQUIRED_FIELDS_MISSING");
+    }
+
+    const createdAt = nowIso();
+    const now = serverTimestamp();
+    const teamId = `team-${Date.now()}`;
+    const coachIds = input.coachIds ?? [];
+    const memberIds = input.memberIds ?? [];
+    const relatedUserIds = [...new Set([...coachIds, ...memberIds])];
+    const teamRef = doc(db, "teams", teamId);
+    const batch = writeBatch(db);
+
+    batch.set(teamRef, {
+      id: teamId,
+      clubId: workspace.club.id,
+      name: cleanName,
+      ageGroup: cleanAgeGroup,
+      coachIds,
+      memberIds,
+      createdByUserId: firebaseUser.uid,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    relatedUserIds.forEach((userId) => {
+      const userRef = doc(db, "users", userId);
+      batch.set(
+        userRef,
+        {
+          teamIds: arrayUnion(teamId),
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    });
+
+    await batch.commit();
+
+    return {
+      id: teamId,
+      clubId: workspace.club.id,
+      name: cleanName,
+      ageGroup: cleanAgeGroup,
+      coachIds,
+      memberIds,
+      createdAt,
+      updatedAt: createdAt,
+    } satisfies Team;
+  },
+
+  async removeTeam(firebaseUser: User, teamId: string) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanManageTeams(workspace.currentUser.role)) {
+      throw new Error("TEAM_PERMISSION_DENIED");
+    }
+
+    const teamRef = doc(db, "teams", teamId);
+    const teamSnapshot = await getDoc(teamRef);
+
+    if (teamSnapshot.exists() && readString(teamSnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("TEAM_PERMISSION_DENIED");
+    }
+
+    const usersWithTeamQuery = query(collection(db, "users"), where("teamIds", "array-contains", teamId));
+    const usersWithTeamSnapshots = await getDocs(usersWithTeamQuery);
+    const now = serverTimestamp();
+    const batch = writeBatch(db);
+
+    batch.delete(teamRef);
+
+    usersWithTeamSnapshots.docs.forEach((userSnapshot) => {
+      batch.set(
+        doc(db, "users", userSnapshot.id),
+        {
+          teamIds: arrayRemove(teamId),
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    });
 
     await batch.commit();
   },

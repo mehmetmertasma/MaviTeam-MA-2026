@@ -6,6 +6,7 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { getFirebaseConfigStatusMessage } from "@/lib/firebase";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 
 function getNextRoute(value: string | string[] | undefined) {
@@ -38,7 +39,7 @@ export default function RegisterScreen() {
   const [statusMessage, setStatusMessage] = useState(
     firebaseIsReady
       ? "Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin."
-      : "Firebase ayarları eksik. Gerçek kayıt için önce .env bilgileri eklenmeli."
+      : getFirebaseConfigStatusMessage()
   );
 
   function clearStatusOnChange() {
@@ -54,7 +55,7 @@ export default function RegisterScreen() {
     const nextRoute = getNextRoute(next);
 
     if (!firebaseIsReady) {
-      setStatusMessage("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
+      setStatusMessage(getFirebaseConfigStatusMessage());
       return;
     }
 

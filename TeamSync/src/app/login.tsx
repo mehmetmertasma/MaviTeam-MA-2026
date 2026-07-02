@@ -8,7 +8,6 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
-import { teamSyncService } from "@/services/teamSyncService";
 
 function isValidEmail(value: string) {
   const trimmedValue = value.trim();
@@ -60,7 +59,7 @@ export default function LoginScreen() {
       setError("");
       setStatusMessage("Giriş yapılıyor...");
 
-      const user = await authService.loginWithEmail({ email: trimmedEmail, password });
+      await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
 
       if (!refreshedUser.emailVerified) {
@@ -71,21 +70,13 @@ export default function LoginScreen() {
         return;
       }
 
-      const displayName = user.displayName?.trim();
-
       await firestoreTeamSyncService.ensureUserProfile({
         user: refreshedUser,
         role: "clubAdmin",
         status: "emailVerified",
       });
 
-      await teamSyncService.updateCurrentUser({
-        email: user.email ?? trimmedEmail,
-        status: "active",
-        ...(displayName ? { fullName: displayName } : {}),
-      });
-
-      setStatusMessage("Giriş başarılı. Dashboard açılıyor.");
+      setStatusMessage("Giriş başarılı. Workspace kontrol ediliyor.");
       router.replace("/dashboard");
     } catch (loginError) {
       setError(getAuthErrorMessage(loginError));

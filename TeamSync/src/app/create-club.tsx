@@ -8,7 +8,6 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
-import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 
 const t = translations[defaultLanguage];
@@ -28,7 +27,7 @@ function generatePreviewCode(clubName: string) {
     .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "")
     .slice(0, 3);
 
-  return `${prefix || "TS"}${new Date().getFullYear()}`;
+  return `${prefix || "MT"}${new Date().getFullYear()}`;
 }
 
 export default function CreateClubScreen() {
@@ -66,14 +65,19 @@ export default function CreateClubScreen() {
       return;
     }
 
+    if (!authService.isConfigured()) {
+      setError("Firebase ayarları eksik. Kulüp oluşturmak için önce .env dosyasını eklemelisin.");
+      return;
+    }
+
     const firebaseUser = authService.getCurrentUser();
 
-    if (authService.isConfigured() && firebaseUser === null) {
+    if (firebaseUser === null) {
       setError("Kulüp oluşturmak için önce giriş yapmalısın.");
       return;
     }
 
-    if (authService.isConfigured() && firebaseUser !== null && !firebaseUser.emailVerified) {
+    if (!firebaseUser.emailVerified) {
       setError("Kulüp oluşturmadan önce e-posta adresini doğrulamalısın.");
       return;
     }
@@ -82,24 +86,13 @@ export default function CreateClubScreen() {
       setIsSubmitting(true);
       setError("");
 
-      const nextData = await teamSyncService.createClubWorkspace({
-        ownerFullName: ownerFullName || firebaseUser?.displayName || "Kulüp Yöneticisi",
-        ownerEmail: ownerEmail || firebaseUser?.email || "demo@teamsync.app",
+      await teamSyncService.createClubWorkspace({
+        ownerFullName: ownerFullName || firebaseUser.displayName || "Kulüp Yöneticisi",
+        ownerEmail: ownerEmail || firebaseUser.email || "",
         clubName: trimmedClubName,
         sport: trimmedSport,
         city: trimmedCity,
       });
-
-      if (authService.isConfigured() && firebaseUser !== null) {
-        await firestoreTeamSyncService.createClubWorkspace({
-          firebaseUser,
-          clubId: nextData.club.id,
-          clubName: nextData.club.name,
-          sport: nextData.club.sport,
-          city: nextData.club.city,
-          clubCode: nextData.club.code,
-        });
-      }
 
       router.replace("/dashboard");
     } catch (createClubError) {
@@ -121,14 +114,14 @@ export default function CreateClubScreen() {
         <Text style={styles.title}>Yeni kulüp oluştur</Text>
 
         <Text style={styles.subtitle}>
-          Kulübünüz için TeamSync çalışma alanını hazırlayın. Oyuncular,
+          Kulübünüz için MaviTeam çalışma alanını hazırlayın. Oyuncular,
           veliler ve koçlar daha sonra kulüp kodu ile katılabilecek.
         </Text>
 
         <View style={styles.ownerBox}>
           <Text style={styles.ownerLabel}>Kayıt bilgileri</Text>
-          <Text style={styles.ownerText}>{ownerFullName || "İsim register ekranından gelecek"}</Text>
-          <Text style={styles.ownerText}>{ownerEmail || "E-posta register ekranından gelecek"}</Text>
+          <Text style={styles.ownerText}>{ownerFullName || "Firebase hesabındaki ad kullanılacak"}</Text>
+          <Text style={styles.ownerText}>{ownerEmail || "Firebase hesabındaki e-posta kullanılacak"}</Text>
         </View>
 
         <View style={styles.form}>
@@ -176,7 +169,7 @@ export default function CreateClubScreen() {
           <Text style={styles.codePreviewLabel}>Oluşacak örnek kulüp kodu</Text>
           <Text style={styles.codePreviewValue}>{previewCode}</Text>
           <Text style={styles.codePreviewHint}>
-            Bu kod hem cihazdaki geçici dataya hem de Firestore merkezi dataya kaydedilecek. İleride oyuncu, veli ve koçlar kulübe katılmak için kullanacak.
+            Bu kod Firestore merkezi datasına kaydedilecek. Oyuncu, veli ve koçlar kulübe katılmak için bu kodu kullanacak.
           </Text>
         </View>
 
@@ -217,9 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: theme.spacing["2xl"],
   },
-  card: {
-    padding: theme.spacing["3xl"],
-  },
+  card: { padding: theme.spacing["3xl"] },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,

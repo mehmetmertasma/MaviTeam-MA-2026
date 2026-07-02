@@ -125,13 +125,13 @@ export default function LoginScreen() {
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>TeamSync</Text>
+        <Text style={styles.logo}>MaviTeam</Text>
         <Text style={styles.badge}>Güvenli hesap girişi</Text>
 
         <Text style={styles.title}>Giriş yap</Text>
 
         <Text style={styles.subtitle}>
-          Kulübünüzü, takımlarınızı ve antrenman planlarınızı doğrulanmış TeamSync hesabınızla yönetmeye devam edin.
+          Kulübünüzü, takımlarınızı ve antrenman planlarınızı doğrulanmış MaviTeam hesabınızla yönetmeye devam edin.
         </Text>
 
         <View style={styles.infoBox}>
@@ -185,7 +185,7 @@ export default function LoginScreen() {
             title={isSubmitting ? "Giriş yapılıyor..." : "Giriş yap"}
             onPress={handleLogin}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="TeamSync hesabına giriş yap"
+            accessibilityLabel="MaviTeam hesabına giriş yap"
             style={styles.button}
           />
 

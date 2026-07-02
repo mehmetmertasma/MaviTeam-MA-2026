@@ -1,6 +1,8 @@
 import {
   collection,
+  deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit as firestoreLimit,
   query,
@@ -54,6 +56,8 @@ type SaveAttendanceInput = {
   sessionDate: string;
   records: { userId: string; status: AttendanceStatus }[];
 };
+
+type UpdateMyProfileInput = Partial<Pick<UserProfile, "fullName" | "email">>;
 
 type FirestoreWorkspace = NonNullable<Awaited<ReturnType<typeof firestoreTeamSyncService.getCurrentWorkspace>>>;
 
@@ -114,11 +118,6 @@ function readAttendanceStatus(value: unknown): AttendanceStatus {
   return "present";
 }
 
-function readScheduleType(value: unknown): ScheduleEvent["type"] {
-  if (value === "match" || value === "meeting") return value;
-  return "practice";
-}
-
 function readReplayType(value: unknown): Replay["type"] {
   if (value === "practice" || value === "drill") return value;
   return "match";
@@ -127,10 +126,6 @@ function readReplayType(value: unknown): Replay["type"] {
 function readJoinRequestStatus(value: unknown): JoinRequest["status"] {
   if (value === "approved" || value === "rejected") return value;
   return "pending";
-}
-
-function readAnnouncementTarget(value: unknown): Announcement["targetType"] {
-  return value === "team" ? "team" : "allClub";
 }
 
 function getData(snapshot: QueryDocumentSnapshot): FirestoreRow {
@@ -259,6 +254,38 @@ function mapJoinRequest(snapshot: QueryDocumentSnapshot): JoinRequest {
   };
 }
 
+function canManage(role: UserRole) {
+  return role === "superAdmin" || role === "clubAdmin";
+}
+
+function canManageSchedule(role: UserRole) {
+  return canManage(role) || role === "coach";
+}
+
+function canPublishContent(role: UserRole) {
+  return canManage(role) || role === "coach";
+}
+
+async function assertUserBelongsToClub(userId: string, clubId: string) {
+  const { db } = requireFirebaseServices();
+  const userSnapshot = await getDoc(doc(db, "users", userId));
+
+  if (!userSnapshot.exists() || readString(userSnapshot.data().clubId) !== clubId) {
+    throw new Error("USER_NOT_IN_CLUB");
+  }
+}
+
+async function assertTeamBelongsToClub(teamId: string | undefined, clubId: string) {
+  if (teamId === undefined) return;
+
+  const { db } = requireFirebaseServices();
+  const teamSnapshot = await getDoc(doc(db, "teams", teamId));
+
+  if (!teamSnapshot.exists() || readString(teamSnapshot.data().clubId) !== clubId) {
+    throw new Error("TEAM_NOT_IN_CLUB");
+  }
+}
+
 async function buildAppData(workspace: FirestoreWorkspace): Promise<TeamSyncAppData> {
   if (workspace.club === null) throw new Error("FIRESTORE_WORKSPACE_MISSING");
   const firebaseUser = getVerifiedFirebaseUserOrThrow();
@@ -294,14 +321,6 @@ async function buildAppData(workspace: FirestoreWorkspace): Promise<TeamSyncAppD
 
 async function reloadCurrentAppData() {
   return buildAppData(await getWorkspaceOrThrow());
-}
-
-function canManage(role: UserRole) {
-  return role === "superAdmin" || role === "clubAdmin";
-}
-
-function canManageSchedule(role: UserRole) {
-  return canManage(role) || role === "coach";
 }
 
 export const teamSyncService = {
@@ -360,10 +379,17 @@ export const teamSyncService = {
     return reloadCurrentAppData();
   },
 
-  async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
+  async updateCurrentUser(updates: UpdateMyProfileInput) {
     const firebaseUser = getVerifiedFirebaseUserOrThrow();
+    const updateData: Record<string, unknown> = {
+      updatedAt: serverTimestamp(),
+    };
+
+    if (updates.fullName !== undefined) updateData.fullName = updates.fullName.trim() || firebaseUser.displayName || "MaviTeam User";
+    if (updates.email !== undefined) updateData.email = updates.email.trim().toLowerCase() || firebaseUser.email ?? "";
+
     const { db } = requireFirebaseServices();
-    await setDoc(doc(db, "users", firebaseUser.uid), { ...updates, updatedAt: serverTimestamp() }, { merge: true });
+    await setDoc(doc(db, "users", firebaseUser.uid), updateData, { merge: true });
     return reloadCurrentAppData();
   },
 
@@ -399,7 +425,12 @@ export const teamSyncService = {
   },
 
   async createTeam(input: Omit<Team, "id" | "createdAt" | "updatedAt">) {
-    await firestoreTeamSyncService.createTeam(getVerifiedFirebaseUserOrThrow(), input);
+    await firestoreTeamSyncService.createTeam(getVerifiedFirebaseUserOrThrow(), {
+      name: input.name,
+      ageGroup: input.ageGroup,
+      coachIds: input.coachIds,
+      memberIds: input.memberIds,
+    });
     return reloadCurrentAppData();
   },
 
@@ -409,13 +440,27 @@ export const teamSyncService = {
   },
 
   async createAnnouncement(input: Omit<Announcement, "id" | "createdAt" | "updatedAt">) {
-    await firestoreTeamSyncService.createAnnouncement(getVerifiedFirebaseUserOrThrow(), input);
+    await firestoreTeamSyncService.createAnnouncement(getVerifiedFirebaseUserOrThrow(), {
+      title: input.title,
+      message: input.message,
+      targetType: input.targetType,
+      targetTeamId: input.targetTeamId,
+    });
     return reloadCurrentAppData();
   },
 
   async updateAnnouncement(announcementId: string, updates: Partial<Pick<Announcement, "title" | "message" | "targetType" | "targetTeamId">>) {
+    const workspace = await getWorkspaceOrThrow();
+    if (!canPublishContent(workspace.currentUser.role)) throw new Error("ANNOUNCEMENT_PERMISSION_DENIED");
     const { db } = requireFirebaseServices();
-    await setDoc(doc(db, "announcements", announcementId), { ...updates, updatedAt: serverTimestamp() }, { merge: true });
+    const announcementRef = doc(db, "announcements", announcementId);
+    const announcementSnapshot = await getDoc(announcementRef);
+
+    if (!announcementSnapshot.exists() || readString(announcementSnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("ANNOUNCEMENT_MISSING");
+    }
+
+    await setDoc(announcementRef, { ...updates, updatedAt: serverTimestamp() }, { merge: true });
     return reloadCurrentAppData();
   },
 
@@ -425,7 +470,15 @@ export const teamSyncService = {
   },
 
   async createScheduleEvent(input: Omit<ScheduleEvent, "id" | "createdAt" | "updatedAt">) {
-    await firestoreTeamSyncService.createScheduleEvent(getVerifiedFirebaseUserOrThrow(), input);
+    await firestoreTeamSyncService.createScheduleEvent(getVerifiedFirebaseUserOrThrow(), {
+      teamId: input.teamId,
+      title: input.title,
+      type: input.type,
+      startsAt: input.startsAt,
+      endsAt: input.endsAt,
+      location: input.location,
+      note: input.note,
+    });
     return reloadCurrentAppData();
   },
 
@@ -435,25 +488,91 @@ export const teamSyncService = {
   },
 
   async createChatGroup(input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {
+    const firebaseUser = getVerifiedFirebaseUserOrThrow();
+    const workspace = await getWorkspaceOrThrow();
+    await assertTeamBelongsToClub(input.teamId, workspace.club.id);
+
+    const visibleUserIds = Array.from(new Set([firebaseUser.uid, ...input.visibleUserIds]));
+    await Promise.all(visibleUserIds.map((userId) => assertUserBelongsToClub(userId, workspace.club.id)));
+
     const { db } = requireFirebaseServices();
     const groupId = `chat-${Date.now()}`;
-    await setDoc(doc(db, "chatGroups", groupId), { ...input, id: groupId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await setDoc(doc(db, "chatGroups", groupId), {
+      id: groupId,
+      clubId: workspace.club.id,
+      teamId: input.teamId ?? null,
+      name: input.name.trim() || "Yeni konuşma",
+      visibleUserIds,
+      createdByUserId: firebaseUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
     return reloadCurrentAppData();
   },
 
   async createChatMessage(input: Omit<ChatMessage, "id" | "createdAt">) {
+    const firebaseUser = getVerifiedFirebaseUserOrThrow();
+    const workspace = await getWorkspaceOrThrow();
+    const text = input.text.trim();
+
+    if (text === "") throw new Error("MESSAGE_TEXT_REQUIRED");
+
     const { db } = requireFirebaseServices();
     const messageId = `message-${Date.now()}`;
-    await setDoc(doc(db, "chatMessages", messageId), { ...input, id: messageId, createdAt: serverTimestamp() });
+    const messageData: Record<string, unknown> = {
+      id: messageId,
+      clubId: workspace.club.id,
+      senderUserId: firebaseUser.uid,
+      text,
+      createdAt: serverTimestamp(),
+    };
+
+    if (input.groupId !== undefined) {
+      const groupRef = doc(db, "chatGroups", input.groupId);
+      const groupSnapshot = await getDoc(groupRef);
+
+      if (!groupSnapshot.exists() || readString(groupSnapshot.data().clubId) !== workspace.club.id) {
+        throw new Error("CHAT_GROUP_MISSING");
+      }
+
+      const visibleUserIds = readStringArray(groupSnapshot.data().visibleUserIds);
+      if (!visibleUserIds.includes(firebaseUser.uid)) throw new Error("CHAT_GROUP_PERMISSION_DENIED");
+
+      messageData.groupId = input.groupId;
+      await setDoc(groupRef, { updatedAt: serverTimestamp() }, { merge: true });
+    } else {
+      const targetUserIds = (input.directUserIds ?? []).filter((userId) => userId !== firebaseUser.uid);
+      const targetUserId = targetUserIds[0];
+
+      if (targetUserId === undefined) throw new Error("DIRECT_MESSAGE_TARGET_REQUIRED");
+      await assertUserBelongsToClub(targetUserId, workspace.club.id);
+      messageData.directUserIds = [firebaseUser.uid, targetUserId];
+    }
+
+    await setDoc(doc(db, "chatMessages", messageId), messageData);
     return reloadCurrentAppData();
   },
 
   async createPayment(input: Omit<Payment, "id" | "updatedAt">) {
     const workspace = await getWorkspaceOrThrow();
     if (!canManage(workspace.currentUser.role)) throw new Error("PAYMENT_PERMISSION_DENIED");
+    await assertUserBelongsToClub(input.userId, workspace.club.id);
+
     const { db } = requireFirebaseServices();
     const paymentId = `payment-${Date.now()}`;
-    await setDoc(doc(db, "payments", paymentId), { ...input, id: paymentId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await setDoc(doc(db, "payments", paymentId), {
+      id: paymentId,
+      clubId: workspace.club.id,
+      userId: input.userId,
+      title: input.title.trim(),
+      amountCents: input.amountCents,
+      status: input.status,
+      dueAt: input.dueAt,
+      paidAt: input.paidAt ?? null,
+      createdByUserId: workspace.currentUser.id,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
     return reloadCurrentAppData();
   },
 
@@ -461,28 +580,68 @@ export const teamSyncService = {
     const workspace = await getWorkspaceOrThrow();
     if (!canManage(workspace.currentUser.role)) throw new Error("PAYMENT_PERMISSION_DENIED");
     const { db } = requireFirebaseServices();
-    await setDoc(doc(db, "payments", paymentId), { status, paidAt: status === "paid" ? serverTimestamp() : null, updatedAt: serverTimestamp() }, { merge: true });
+    const paymentRef = doc(db, "payments", paymentId);
+    const paymentSnapshot = await getDoc(paymentRef);
+
+    if (!paymentSnapshot.exists() || readString(paymentSnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("PAYMENT_MISSING");
+    }
+
+    await setDoc(paymentRef, { status, paidAt: status === "paid" ? serverTimestamp() : null, updatedAt: serverTimestamp() }, { merge: true });
     return reloadCurrentAppData();
   },
 
   async createReplay(input: Omit<Replay, "id" | "createdAt" | "updatedAt">) {
+    const firebaseUser = getVerifiedFirebaseUserOrThrow();
+    const workspace = await getWorkspaceOrThrow();
+    if (!canPublishContent(workspace.currentUser.role)) throw new Error("REPLAY_PERMISSION_DENIED");
+    await assertTeamBelongsToClub(input.teamId, workspace.club.id);
+
+    const visibleUserIds = Array.from(new Set([firebaseUser.uid, ...input.visibleUserIds]));
+    await Promise.all(visibleUserIds.map((userId) => assertUserBelongsToClub(userId, workspace.club.id)));
+
     const { db } = requireFirebaseServices();
     const replayId = `replay-${Date.now()}`;
-    await setDoc(doc(db, "replays", replayId), { ...input, id: replayId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    await setDoc(doc(db, "replays", replayId), {
+      id: replayId,
+      clubId: workspace.club.id,
+      teamId: input.teamId ?? null,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      type: input.type,
+      videoUrl: input.videoUrl.trim(),
+      visibleUserIds,
+      createdByUserId: firebaseUser.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
     return reloadCurrentAppData();
   },
 
   async removeReplay(replayId: string) {
+    const workspace = await getWorkspaceOrThrow();
+    if (!canPublishContent(workspace.currentUser.role)) throw new Error("REPLAY_PERMISSION_DENIED");
     const { db } = requireFirebaseServices();
-    await setDoc(doc(db, "replays", replayId), { removedAt: serverTimestamp() }, { merge: true });
+    const replayRef = doc(db, "replays", replayId);
+    const replaySnapshot = await getDoc(replayRef);
+
+    if (!replaySnapshot.exists() || readString(replaySnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("REPLAY_MISSING");
+    }
+
+    await deleteDoc(replayRef);
     return reloadCurrentAppData();
   },
 
   async saveAttendance(input: SaveAttendanceInput) {
     const workspace = await getWorkspaceOrThrow();
     if (!canManageSchedule(workspace.currentUser.role)) throw new Error("ATTENDANCE_PERMISSION_DENIED");
+    await assertTeamBelongsToClub(input.teamId, workspace.club.id);
+
     const { db } = requireFirebaseServices();
     const batch = writeBatch(db);
+    await Promise.all(input.records.map((record) => assertUserBelongsToClub(record.userId, workspace.club.id)));
+
     input.records.forEach((record) => {
       const recordId = `attendance-${input.teamId ?? "club"}-${record.userId}-${input.sessionDate}`;
       batch.set(doc(db, "attendanceRecords", recordId), {
@@ -502,6 +661,9 @@ export const teamSyncService = {
   },
 
   async removeUserFromClub(userId: string) {
+    const workspace = await getWorkspaceOrThrow();
+    if (!canManage(workspace.currentUser.role)) throw new Error("USER_PERMISSION_DENIED");
+    await assertUserBelongsToClub(userId, workspace.club.id);
     const { db } = requireFirebaseServices();
     await setDoc(doc(db, "users", userId), { status: "removed", teamIds: [], updatedAt: serverTimestamp() }, { merge: true });
     return reloadCurrentAppData();

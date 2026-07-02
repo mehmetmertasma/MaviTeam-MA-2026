@@ -28,14 +28,14 @@ function getInitials(name: string) {
     .slice(0, 2)
     .toUpperCase();
 
-  return initials || "TS";
+  return initials || "MT";
 }
 
 export function AppGlobalNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
-  const [profileInitials, setProfileInitials] = useState("TS");
+  const [profileInitials, setProfileInitials] = useState("MT");
 
   useEffect(() => {
     let isActive = true;
@@ -49,7 +49,7 @@ export function AppGlobalNavigation() {
         }
       } catch {
         if (isActive) {
-          setProfileInitials("TS");
+          setProfileInitials("MT");
         }
       }
     }

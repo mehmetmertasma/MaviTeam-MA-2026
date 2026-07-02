@@ -37,13 +37,13 @@ export default function RegisterScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
     firebaseIsReady
-      ? "Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin."
+      ? "Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin."
       : "Firebase ayarları eksik. Gerçek kayıt için önce .env bilgileri eklenmeli."
   );
 
   function clearStatusOnChange() {
-    if (statusMessage !== "Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin." && firebaseIsReady) {
-      setStatusMessage("Bilgilerini girerek gerçek TeamSync hesabını oluşturabilirsin.");
+    if (statusMessage !== "Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin." && firebaseIsReady) {
+      setStatusMessage("Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin.");
     }
   }
 
@@ -110,11 +110,11 @@ export default function RegisterScreen() {
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>TeamSync</Text>
+        <Text style={styles.logo}>MaviTeam</Text>
         <Text style={styles.badge}>Güvenli hesap oluşturma</Text>
         <Text style={styles.title}>Hesap oluştur</Text>
         <Text style={styles.subtitle}>
-          Önce gerçek TeamSync hesabını oluştur. Sonra e-posta adresini doğrulayıp kulüp kurabilir veya takım kodu ile katılabilirsin.
+          Önce gerçek MaviTeam hesabını oluştur. Sonra e-posta adresini doğrulayıp kulüp kurabilir veya takım kodu ile katılabilirsin.
         </Text>
 
         <View style={styles.form}>

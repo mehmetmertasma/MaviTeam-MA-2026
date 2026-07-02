@@ -16,19 +16,19 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard centered style={styles.card}>
-        <Text style={styles.logo}>TeamSync</Text>
+        <Text style={styles.logo}>MaviTeam</Text>
 
         <Text style={styles.badge}>Spor kulüpleri için yönetim platformu</Text>
 
         <Text style={styles.title}>Kulübünüzü tek yerden yönetin</Text>
 
         <Text style={styles.subtitle}>
-          TeamSync; kulüp sahipleri, koçlar, veliler ve sporcular için takım
+          MaviTeam; kulüp sahipleri, koçlar, veliler ve sporcular için takım
           yönetimini daha kolay hale getirir.
         </Text>
 
         <View style={styles.featureBox}>
-          <Text style={styles.featureTitle}>TeamSync ile neler yapacağız?</Text>
+          <Text style={styles.featureTitle}>MaviTeam ile neler yapacağız?</Text>
 
           {features.map((feature) => (
             <Text key={feature} style={styles.featureText}>
@@ -59,7 +59,7 @@ export default function HomeScreen() {
             <AppButton
               title="Giriş yap"
               variant="ghost"
-              accessibilityLabel="TeamSync hesabı ile giriş yap"
+              accessibilityLabel="MaviTeam hesabı ile giriş yap"
               style={styles.button}
             />
           </Link>

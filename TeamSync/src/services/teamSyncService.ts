@@ -41,6 +41,7 @@ type CreateJoinRequestInput = { fullName: string; email: string; inviteCode: str
 type SaveAttendanceInput = { teamId?: string; sessionDate: string; records: { userId: string; status: AttendanceStatus }[] };
 type UpdateMyProfileInput = Partial<Pick<UserProfile, "fullName" | "email">>;
 type FirestoreWorkspace = NonNullable<Awaited<ReturnType<typeof firestoreTeamSyncService.getCurrentWorkspace>>>;
+type ActiveFirestoreWorkspace = FirestoreWorkspace & { club: Club };
 type FirestoreRow = Record<string, unknown>;
 
 function nowIso() { return new Date().toISOString(); }
@@ -73,10 +74,10 @@ function getVerifiedFirebaseUserOrThrow() {
   return firebaseUser;
 }
 
-async function getWorkspaceOrThrow() {
+async function getWorkspaceOrThrow(): Promise<ActiveFirestoreWorkspace> {
   const workspace = await firestoreTeamSyncService.getCurrentWorkspace(getVerifiedFirebaseUserOrThrow());
   if (workspace === null || workspace.club === null) throw new Error("FIRESTORE_WORKSPACE_MISSING");
-  return workspace;
+  return { ...workspace, club: workspace.club };
 }
 
 async function listClubDocs<T>(collectionName: string, clubId: string, mapper: (snapshot: QueryDocumentSnapshot) => T) {

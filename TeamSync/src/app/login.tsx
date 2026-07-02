@@ -6,6 +6,7 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { getFirebaseConfigStatusMessage } from "@/lib/firebase";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
@@ -23,11 +24,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    firebaseIsReady
-      ? "Firebase Auth hazır. E-posta doğrulanmış hesap ile giriş yapabilirsin."
-      : "Firebase ayarları eksik. Gerçek giriş için önce .env bilgileri eklenmeli."
-  );
+  const [statusMessage, setStatusMessage] = useState(getFirebaseConfigStatusMessage());
   const [error, setError] = useState("");
 
   function clearErrorOnChange() {
@@ -40,7 +37,7 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!firebaseIsReady) {
-      setError("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
+      setError(getFirebaseConfigStatusMessage());
       return;
     }
 
@@ -90,7 +87,7 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!firebaseIsReady) {
-      setError("Firebase ayarları eksik. Şifre yenileme için önce Firebase bağlantısı kurulmalı.");
+      setError(getFirebaseConfigStatusMessage());
       return;
     }
 
@@ -219,97 +216,83 @@ const styles = StyleSheet.create({
     padding: theme.spacing["3xl"],
   },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
+    color: theme.colors.primary[600],
+    fontSize: theme.typography.fontSize.xl,
+    fontWeight: theme.typography.fontWeight.extrabold,
+    textAlign: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  badge: {
+    color: theme.colors.text.muted,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.semibold,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
-  badge: {
-    alignSelf: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
-    marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
-  },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    fontSize: theme.typography.fontSize["3xl"],
+    fontWeight: theme.typography.fontWeight.extrabold,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.secondary,
+    fontSize: theme.typography.fontSize.md,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
-    marginBottom: theme.spacing["2xl"],
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
   },
   infoBox: {
-    width: "100%",
-    backgroundColor: theme.colors.background.subtle,
+    backgroundColor: theme.colors.surface.muted,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.xl,
     borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    borderColor: theme.colors.border.light,
   },
   infoTitle: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: theme.typography.fontWeight.bold,
     marginBottom: theme.spacing.xs,
   },
   infoText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
+    fontSize: theme.typography.fontSize.sm,
+    lineHeight: 20,
   },
   form: {
-    width: "100%",
     gap: theme.spacing.lg,
+    marginBottom: theme.spacing.lg,
   },
   inputGroup: {
-    width: "100%",
+    gap: theme.spacing.sm,
   },
   label: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.bold,
   },
   input: {
-    width: "100%",
     minHeight: 52,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
     borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border.light,
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.fontSizes.lg,
     color: theme.colors.text.primary,
+    backgroundColor: theme.colors.surface.primary,
+    fontSize: theme.typography.fontSize.md,
   },
   errorText: {
-    marginTop: theme.spacing.lg,
-    color: theme.colors.text.danger,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.status.danger,
     textAlign: "center",
-    lineHeight: theme.lineHeights.md,
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: theme.typography.fontWeight.semibold,
+    marginBottom: theme.spacing.lg,
   },
   buttonGroup: {
-    width: "100%",
     gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
   },
   button: {
     width: "100%",

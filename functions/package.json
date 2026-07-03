@@ -1,0 +1,16 @@
+{
+  "name": "maviteam-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0",
+    "firebase-functions": "^6.5.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

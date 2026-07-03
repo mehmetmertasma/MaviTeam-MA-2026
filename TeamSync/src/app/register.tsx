@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { getFirebaseConfigStatusMessage } from "@/lib/firebase";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationCodeService } from "@/services/emailVerificationCodeService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -81,7 +82,7 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Firebase hesabı oluşturuluyor ve doğrulama e-postası gönderiliyor...");
+      setStatusMessage("Hesap oluşturuluyor ve 6 haneli doğrulama kodu gönderiliyor...");
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -89,7 +90,8 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage("Doğrulama e-postası gönderildi. Mail kutunu kontrol et.");
+      await emailVerificationCodeService.sendCode();
+      setStatusMessage("6 haneli doğrulama kodu gönderildi. Mail kutunu kontrol et.");
 
       router.replace({
         pathname: "/verify-email",
@@ -115,7 +117,7 @@ export default function RegisterScreen() {
         <Text style={styles.badge}>Güvenli hesap oluşturma</Text>
         <Text style={styles.title}>Hesap oluştur</Text>
         <Text style={styles.subtitle}>
-          Önce gerçek MaviTeam hesabını oluştur. Sonra e-posta adresini doğrulayıp kulüp kurabilir veya takım kodu ile katılabilirsin.
+          Önce gerçek MaviTeam hesabını oluştur. Sonra e-posta adresine gelen 6 haneli kodu girerek kulüp kurabilir veya takım kodu ile katılabilirsin.
         </Text>
 
         <View style={styles.form}>
@@ -193,9 +195,9 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>E-posta doğrulama gerekli</Text>
+          <Text style={styles.infoTitle}>Kod doğrulama gerekli</Text>
           <Text style={styles.infoText}>
-            Hesap oluşturulduktan sonra doğrulama linki e-postana gönderilir. E-postanı doğrulamadan uygulama içine geçemezsin.
+            Hesap oluşturulduktan sonra e-postana 6 haneli MaviTeam kodu gönderilir. Kodu girmeden uygulama içine geçemezsin.
           </Text>
         </View>
 
@@ -203,10 +205,10 @@ export default function RegisterScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve doğrula"}
+            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve kod gönder"}
             onPress={handleContinue}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="Firebase hesabı oluştur ve e-posta doğrulama ekranına geç"
+            accessibilityLabel="Firebase hesabı oluştur ve kod doğrulama ekranına geç"
             style={styles.button}
           />
 

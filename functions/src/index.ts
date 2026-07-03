@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
+import { logger } from "firebase-functions";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 
@@ -22,6 +23,10 @@ function requiredEnv(name: string) {
   return value;
 }
 
+function fromEmail() {
+  return process.env.MAVITEAM_FROM_EMAIL?.trim() || "MaviTeam <onboarding@resend.dev>";
+}
+
 function hashCode(uid: string, email: string, code: string) {
   return createHash("sha256").update(`${uid}:${email.toLowerCase()}:${code}:${requiredEnv("VERIFICATION_CODE_PEPPER")}`).digest("hex");
 }
@@ -32,8 +37,41 @@ function compareHash(a: string, b: string) {
   return bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB);
 }
 
+function emailHtml(code: string) {
+  return `
+    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;color:#0f172a">
+      <div style="max-width:520px;margin:0 auto;background:white;border:1px solid #e2e8f0;border-radius:16px;padding:32px">
+        <h1 style="margin:0 0 12px;color:#2563eb">Verify your MaviTeam account</h1>
+        <p style="font-size:16px;line-height:24px;color:#475569">Use this verification code to finish setting up your MaviTeam account.</p>
+        <div style="font-size:36px;font-weight:800;letter-spacing:8px;text-align:center;padding:18px 16px;background:#eff6ff;border-radius:12px;color:#1d4ed8;margin:28px 0">${code}</div>
+        <p style="font-size:14px;line-height:22px;color:#64748b">This code expires in 10 minutes. If you did not create a MaviTeam account, you can safely ignore this email.</p>
+        <p style="font-size:14px;color:#64748b;margin-top:28px">The MaviTeam Team</p>
+      </div>
+    </div>
+  `;
+}
+
 async function sendCodeEmail(email: string, code: string) {
-  console.log(`MaviTeam verification code for ${email}: ${code}`);
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requiredEnv("RESEND_API_KEY")}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail(),
+      to: [email],
+      subject: `Your MaviTeam verification code: ${code}`,
+      html: emailHtml(code),
+      text: `Your MaviTeam verification code is ${code}. This code expires in 10 minutes.`,
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    logger.error("MaviTeam verification email failed", { details, status: response.status });
+    throw new HttpsError("internal", "Doğrulama e-postası gönderilemedi. Lütfen tekrar dene.");
+  }
 }
 
 export const sendEmailVerificationCode = onCall({ region: REGION }, async (request) => {

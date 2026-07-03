@@ -100,11 +100,12 @@ export const sendEmailVerificationCode = onCall({ region: REGION }, async (reque
   const previousCode = await codeRef.get();
   const lastSentAt = previousCode.get("lastSentAt") as Timestamp | undefined;
   const lockoutUntil = previousCode.get("lockoutUntil") as Timestamp | undefined;
+  const attempts = typeof previousCode.get("attempts") === "number" ? (previousCode.get("attempts") as number) : 0;
 
   assertNotLocked(lockoutUntil);
 
-  if (lastSentAt && Date.now() - lastSentAt.toMillis() < MIN_RESEND_MS) {
-    throw new HttpsError("resource-exhausted", "Wait 60 seconds before requesting a new code.");
+  if (attempts > 0 && lastSentAt && Date.now() - lastSentAt.toMillis() < MIN_RESEND_MS) {
+    throw new HttpsError("resource-exhausted", "Wait 60 seconds before requesting a new code after a failed attempt.");
   }
 
   const code = createCode();

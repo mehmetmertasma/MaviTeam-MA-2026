@@ -172,7 +172,7 @@ export default function LoginScreen() {
           <AppButton
             title={isSubmitting ? "Giriş yapılıyor..." : "Giriş yap"}
             onPress={handleLogin}
-            disabled={isSubmitting || !firebaseIsReady}
+            disabled={isSubmitting}
             accessibilityLabel="MaviTeam hesabına giriş yap"
             style={styles.button}
           />
@@ -181,7 +181,7 @@ export default function LoginScreen() {
             title="Şifremi unuttum"
             variant="secondary"
             onPress={handlePasswordReset}
-            disabled={isSubmitting || !firebaseIsReady}
+            disabled={isSubmitting}
             accessibilityLabel="Şifre yenileme e-postası gönder"
             style={styles.button}
           />

@@ -10,6 +10,7 @@ initializeApp();
 const REGION = "us-central1";
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MIN_RESEND_MS = 60 * 1000;
+const FAILED_ATTEMPT_COOLDOWN_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const CODE_COLLECTION = "emailVerificationCodes";
 
@@ -35,6 +36,16 @@ function compareHash(a: string, b: string) {
   const bufferA = Buffer.from(a, "hex");
   const bufferB = Buffer.from(b, "hex");
   return bufferA.length === bufferB.length && timingSafeEqual(bufferA, bufferB);
+}
+
+function remainingMinutes(until: Timestamp) {
+  return Math.max(1, Math.ceil((until.toMillis() - Date.now()) / 60000));
+}
+
+function assertNotLocked(lockoutUntil: Timestamp | undefined) {
+  if (lockoutUntil && lockoutUntil.toMillis() > Date.now()) {
+    throw new HttpsError("resource-exhausted", `Too many failed attempts. Try again in about ${remainingMinutes(lockoutUntil)} minutes.`);
+  }
 }
 
 function emailHtml(code: string) {
@@ -70,27 +81,30 @@ async function sendCodeEmail(email: string, code: string) {
   if (!response.ok) {
     const details = await response.text();
     logger.error("MaviTeam verification email failed", { details, status: response.status });
-    throw new HttpsError("internal", "Doğrulama e-postası gönderilemedi. Lütfen tekrar dene.");
+    throw new HttpsError("internal", "Verification email could not be sent. Please try again.");
   }
 }
 
 export const sendEmailVerificationCode = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Giriş yapmalısın.");
+  if (!uid) throw new HttpsError("unauthenticated", "You must be signed in.");
 
   const userRecord = await getAuth().getUser(uid);
   if (userRecord.emailVerified) return { alreadyVerified: true, sent: false };
 
   const email = userRecord.email;
-  if (!email) throw new HttpsError("failed-precondition", "E-posta adresi bulunamadı.");
+  if (!email) throw new HttpsError("failed-precondition", "Email address is missing.");
 
   const db = getFirestore();
   const codeRef = db.collection(CODE_COLLECTION).doc(uid);
   const previousCode = await codeRef.get();
   const lastSentAt = previousCode.get("lastSentAt") as Timestamp | undefined;
+  const lockoutUntil = previousCode.get("lockoutUntil") as Timestamp | undefined;
+
+  assertNotLocked(lockoutUntil);
 
   if (lastSentAt && Date.now() - lastSentAt.toMillis() < MIN_RESEND_MS) {
-    throw new HttpsError("resource-exhausted", "Yeni kod istemeden önce 60 saniye bekle.");
+    throw new HttpsError("resource-exhausted", "Wait 60 seconds before requesting a new code.");
   }
 
   const code = createCode();
@@ -101,6 +115,7 @@ export const sendEmailVerificationCode = onCall({ region: REGION }, async (reque
       email,
       expiresAt: Timestamp.fromMillis(Date.now() + CODE_TTL_MS),
       lastSentAt: FieldValue.serverTimestamp(),
+      lockoutUntil: FieldValue.delete(),
       updatedAt: FieldValue.serverTimestamp(),
       uid,
     },
@@ -114,35 +129,51 @@ export const sendEmailVerificationCode = onCall({ region: REGION }, async (reque
 export const verifyEmailCode = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid;
   const code = typeof request.data?.code === "string" ? request.data.code.trim() : "";
-  if (!uid) throw new HttpsError("unauthenticated", "Giriş yapmalısın.");
-  if (!/^\d{6}$/.test(code)) throw new HttpsError("invalid-argument", "6 haneli kod gir.");
+  if (!uid) throw new HttpsError("unauthenticated", "You must be signed in.");
+  if (!/^\d{6}$/.test(code)) throw new HttpsError("invalid-argument", "Enter a 6 digit code.");
 
   const db = getFirestore();
   const codeRef = db.collection(CODE_COLLECTION).doc(uid);
   const snapshot = await codeRef.get();
-  if (!snapshot.exists) throw new HttpsError("not-found", "Aktif kod bulunamadı.");
+  if (!snapshot.exists) throw new HttpsError("not-found", "No active code found. Request a new code.");
 
   const data = snapshot.data();
   const email = typeof data?.email === "string" ? data.email : "";
   const codeHash = typeof data?.codeHash === "string" ? data.codeHash : "";
   const attempts = typeof data?.attempts === "number" ? data.attempts : 0;
   const expiresAt = data?.expiresAt as Timestamp | undefined;
+  const lockoutUntil = data?.lockoutUntil as Timestamp | undefined;
+
+  assertNotLocked(lockoutUntil);
 
   if (!email || !codeHash || !expiresAt) {
     await codeRef.delete();
-    throw new HttpsError("failed-precondition", "Kod kaydı bozuk. Yeni kod iste.");
+    throw new HttpsError("failed-precondition", "Code record is invalid. Request a new code.");
   }
   if (expiresAt.toMillis() < Date.now()) {
     await codeRef.delete();
-    throw new HttpsError("deadline-exceeded", "Kodun süresi doldu. Yeni kod iste.");
+    throw new HttpsError("deadline-exceeded", "Code expired. Request a new code.");
   }
-  if (attempts >= MAX_ATTEMPTS) {
-    await codeRef.delete();
-    throw new HttpsError("resource-exhausted", "Çok fazla deneme. Yeni kod iste.");
-  }
+
   if (!compareHash(codeHash, hashCode(uid, email, code))) {
-    await codeRef.set({ attempts: FieldValue.increment(1), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-    throw new HttpsError("permission-denied", "Kod hatalı.");
+    const nextAttempts = attempts + 1;
+    if (nextAttempts >= MAX_ATTEMPTS) {
+      const nextLockoutUntil = Timestamp.fromMillis(Date.now() + FAILED_ATTEMPT_COOLDOWN_MS);
+      await codeRef.set(
+        {
+          attempts: nextAttempts,
+          codeHash: FieldValue.delete(),
+          expiresAt: FieldValue.delete(),
+          lockoutUntil: nextLockoutUntil,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      throw new HttpsError("resource-exhausted", `Too many failed attempts. Try again in about ${remainingMinutes(nextLockoutUntil)} minutes.`);
+    }
+
+    await codeRef.set({ attempts: nextAttempts, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    throw new HttpsError("permission-denied", `Wrong code. Attempts left: ${MAX_ATTEMPTS - nextAttempts}.`);
   }
 
   await getAuth().updateUser(uid, { emailVerified: true });

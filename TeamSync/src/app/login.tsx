@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { getFirebaseConfigStatusMessage } from "@/lib/firebase";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationCodeService } from "@/services/emailVerificationCodeService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function isValidEmail(value: string) {
@@ -60,10 +61,16 @@ export default function LoginScreen() {
       const refreshedUser = await authService.refreshCurrentUser();
 
       if (!refreshedUser.emailVerified) {
-        await authService.sendVerificationEmail(refreshedUser);
-        await authService.logout();
-        setError("E-posta adresin doğrulanmamış. Doğrulama linkini tekrar gönderdik; mailini doğrulayıp yeniden giriş yap.");
-        setStatusMessage("E-posta doğrulaması gerekli.");
+        await emailVerificationCodeService.sendCode();
+        setStatusMessage("E-posta doğrulaması gerekli. Yeni kod gönderildi.");
+        router.replace({
+          pathname: "/verify-email",
+          params: {
+            fullName: refreshedUser.displayName ?? "",
+            email: refreshedUser.email ?? trimmedEmail,
+            next: "create-club",
+          },
+        } as never);
         return;
       }
 
@@ -76,7 +83,7 @@ export default function LoginScreen() {
       setStatusMessage("Giriş başarılı. Workspace kontrol ediliyor.");
       router.replace("/dashboard");
     } catch (loginError) {
-      setError(getAuthErrorMessage(loginError));
+      setError(loginError instanceof Error ? loginError.message : getAuthErrorMessage(loginError));
       setStatusMessage("Giriş tamamlanamadı.");
     } finally {
       setIsSubmitting(false);

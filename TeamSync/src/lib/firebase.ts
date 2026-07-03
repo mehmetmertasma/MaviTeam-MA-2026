@@ -4,6 +4,8 @@ import { getAuth } from "firebase/auth";
 import type { Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import type { Functions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 import type { FirebaseStorage } from "firebase/storage";
 
@@ -26,6 +28,8 @@ const firebaseConfig: FirebaseOptions = {
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID ?? "",
 };
+
+const firebaseFunctionsRegion = process.env.EXPO_PUBLIC_FIREBASE_FUNCTIONS_REGION ?? "us-central1";
 
 const firebaseConfigFields: FirebaseConfigField[] = [
   {
@@ -64,6 +68,7 @@ type FirebaseServices = {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
+  functions: Functions;
   storage: FirebaseStorage;
 };
 
@@ -108,6 +113,7 @@ export function getFirebaseServices() {
     app,
     auth: getAuth(app),
     db: getFirestore(app),
+    functions: getFunctions(app, firebaseFunctionsRegion),
     storage: getStorage(app),
   };
 
@@ -128,4 +134,5 @@ export const firebaseServices = getFirebaseServices();
 export const firebaseApp = firebaseServices?.app ?? null;
 export const firebaseAuth = firebaseServices?.auth ?? null;
 export const firestoreDb = firebaseServices?.db ?? null;
+export const firebaseFunctions = firebaseServices?.functions ?? null;
 export const firebaseStorage = firebaseServices?.storage ?? null;

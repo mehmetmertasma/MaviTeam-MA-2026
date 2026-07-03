@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationCodeService } from "@/services/emailVerificationCodeService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function getFirstParam(value: string | string[] | undefined) {
@@ -27,6 +28,10 @@ function getNextRoute(value: string | string[] | undefined) {
   return "/create-club";
 }
 
+function cleanCode(value: string) {
+  return value.replace(/\D/g, "").slice(0, 6);
+}
+
 export default function VerifyEmailScreen() {
   const router = useRouter();
   const { email, fullName, next } = useLocalSearchParams();
@@ -34,27 +39,29 @@ export default function VerifyEmailScreen() {
   const displayEmail = getFirstParam(email);
   const displayName = getFirstParam(fullName);
 
+  const [code, setCode] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
     displayEmail
-      ? `${displayEmail} adresine doğrulama linki gönderdik.`
-      : "E-posta adresine doğrulama linki gönderdik."
+      ? `${displayEmail} adresine 6 haneli MaviTeam doğrulama kodu gönderdik.`
+      : "E-posta adresine 6 haneli MaviTeam doğrulama kodu gönderdik."
   );
 
-  async function handleCheckVerification() {
+  async function handleVerifyCode() {
+    const verificationCode = cleanCode(code);
+
+    if (verificationCode.length !== 6) {
+      setStatusMessage("Lütfen e-postana gelen 6 haneli doğrulama kodunu gir.");
+      return;
+    }
+
     try {
       setIsChecking(true);
-      setStatusMessage("E-posta doğrulama durumu kontrol ediliyor...");
+      setStatusMessage("Kod kontrol ediliyor...");
 
+      await emailVerificationCodeService.verifyCode(verificationCode);
       const user = await authService.refreshCurrentUser();
-
-      if (!user.emailVerified) {
-        setStatusMessage("E-posta henüz doğrulanmamış. Mail kutundaki linke tıkla, sonra tekrar kontrol et.");
-        return;
-      }
-
-      setStatusMessage("E-posta doğrulandı. Firestore kullanıcı profili hazırlanıyor...");
 
       await firestoreTeamSyncService.ensureUserProfile({
         user,
@@ -72,7 +79,7 @@ export default function VerifyEmailScreen() {
         },
       } as never);
     } catch (error) {
-      setStatusMessage(getAuthErrorMessage(error));
+      setStatusMessage(error instanceof Error ? error.message : getAuthErrorMessage(error));
     } finally {
       setIsChecking(false);
     }
@@ -81,11 +88,12 @@ export default function VerifyEmailScreen() {
   async function handleResendVerification() {
     try {
       setIsResending(true);
-      setStatusMessage("Doğrulama e-postası tekrar gönderiliyor...");
-      await authService.sendVerificationEmail();
-      setStatusMessage("Doğrulama e-postası tekrar gönderildi. Spam/Junk klasörünü de kontrol et.");
+      setStatusMessage("Yeni doğrulama kodu gönderiliyor...");
+      await emailVerificationCodeService.sendCode();
+      setCode("");
+      setStatusMessage("Yeni 6 haneli doğrulama kodu gönderildi. Mail kutunu ve spam klasörünü kontrol et.");
     } catch (error) {
-      setStatusMessage(getAuthErrorMessage(error));
+      setStatusMessage(error instanceof Error ? error.message : getAuthErrorMessage(error));
     } finally {
       setIsResending(false);
     }
@@ -106,38 +114,52 @@ export default function VerifyEmailScreen() {
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/login" />
 
-        <Text style={styles.logo}>TeamSync</Text>
-        <Text style={styles.badge}>E-posta doğrulama</Text>
-        <Text style={styles.title}>Mailini kontrol et</Text>
+        <Text style={styles.logo}>MaviTeam</Text>
+        <Text style={styles.badge}>Kod doğrulama</Text>
+        <Text style={styles.title}>E-postandaki kodu gir</Text>
 
         <Text style={styles.subtitle}>
-          TeamSync hesabını güvenli hale getirmek için e-posta adresini doğrulaman gerekiyor.
+          Hesabını güvenli hale getirmek için e-postana gönderdiğimiz 6 haneli kodu gir.
         </Text>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Ne yapmalısın?</Text>
-          <Text style={styles.infoText}>1. Mail kutunu aç.</Text>
-          <Text style={styles.infoText}>2. Firebase/TeamSync doğrulama linkine tıkla.</Text>
-          <Text style={styles.infoText}>3. Bu sayfaya dönüp “Doğruladım, devam et” butonuna bas.</Text>
+          <Text style={styles.infoTitle}>Nasıl çalışır?</Text>
+          <Text style={styles.infoText}>1. Mail kutunu ve spam klasörünü kontrol et.</Text>
+          <Text style={styles.infoText}>2. MaviTeam doğrulama kodunu kopyala.</Text>
+          <Text style={styles.infoText}>3. Kodu aşağıya yazıp devam et.</Text>
+        </View>
+
+        <View style={styles.codeBox}>
+          <Text style={styles.label}>6 haneli kod</Text>
+          <TextInput
+            value={code}
+            onChangeText={(value) => setCode(cleanCode(value))}
+            placeholder="123456"
+            placeholderTextColor={theme.colors.text.muted}
+            keyboardType="number-pad"
+            maxLength={6}
+            style={styles.codeInput}
+            accessibilityLabel="6 haneli doğrulama kodu"
+          />
         </View>
 
         <Text style={styles.statusText}>{statusMessage}</Text>
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isChecking ? "Kontrol ediliyor..." : "Doğruladım, devam et"}
-            onPress={handleCheckVerification}
+            title={isChecking ? "Kontrol ediliyor..." : "Kodu doğrula ve devam et"}
+            onPress={handleVerifyCode}
             disabled={isChecking || isResending}
-            accessibilityLabel="E-posta doğrulama durumunu kontrol et"
+            accessibilityLabel="Doğrulama kodunu kontrol et"
             style={styles.button}
           />
 
           <AppButton
-            title={isResending ? "Tekrar gönderiliyor..." : "Doğrulama emailini tekrar gönder"}
+            title={isResending ? "Yeni kod gönderiliyor..." : "Yeni kod gönder"}
             variant="secondary"
             onPress={handleResendVerification}
             disabled={isChecking || isResending}
-            accessibilityLabel="Doğrulama e-postasını tekrar gönder"
+            accessibilityLabel="Yeni doğrulama kodu gönder"
             style={styles.button}
           />
 
@@ -218,6 +240,31 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
+  },
+  codeBox: {
+    width: "100%",
+    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.sm,
+  },
+  label: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.extrabold,
+  },
+  codeInput: {
+    width: "100%",
+    minHeight: 58,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.background.surface,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.md,
+    fontSize: theme.fontSizes["3xl"],
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.primary,
+    textAlign: "center",
+    letterSpacing: 8,
   },
   statusText: {
     marginTop: theme.spacing.lg,

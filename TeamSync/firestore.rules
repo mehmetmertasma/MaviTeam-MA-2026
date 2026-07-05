@@ -34,6 +34,10 @@ service cloud.firestore {
       return currentUserProfile().data.role;
     }
 
+    function currentUserTeamIds() {
+      return currentUserProfile().data.teamIds;
+    }
+
     function currentUserIsActive() {
       return currentUserProfile().data.status == 'active';
     }
@@ -42,12 +46,154 @@ service cloud.firestore {
       return currentUserHasProfile() && currentUserIsActive() && currentUserRole() == 'clubAdmin';
     }
 
+    function currentUserIsCoach() {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserRole() == 'coach';
+    }
+
     function currentUserIsClubStaff() {
-      return currentUserHasProfile() && currentUserIsActive() && (currentUserRole() == 'clubAdmin' || currentUserRole() == 'coach');
+      return currentUserIsClubAdmin() || currentUserIsCoach();
     }
 
     function belongsToCurrentUsersClub(clubId) {
       return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId;
+    }
+
+    function isCurrentUsersTeam(teamId) {
+      return currentUserHasProfile()
+        && teamId is string
+        && teamId in currentUserTeamIds();
+    }
+
+    function isClubWideData(data) {
+      return !('teamId' in data) || data.teamId == null || data.teamId == '';
+    }
+
+    function isCurrentUsersTeamData(data) {
+      return ('teamId' in data) && isCurrentUsersTeam(data.teamId);
+    }
+
+    function canReadClubWideOrOwnTeamData(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || isClubWideData(data)
+          || isCurrentUsersTeamData(data)
+        );
+    }
+
+    function canCoachManageOwnTeamData(data) {
+      return currentUserIsCoach()
+        && request.resource.data.clubId == currentUserClubId()
+        && ('teamId' in data)
+        && isCurrentUsersTeam(data.teamId);
+    }
+
+    function canReadAnnouncement(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || data.targetType == 'allClub'
+          || (data.targetType == 'team' && ('targetTeamId' in data) && isCurrentUsersTeam(data.targetTeamId))
+        );
+    }
+
+    function canCreateOrUpdateAnnouncement(data) {
+      return data.clubId == currentUserClubId()
+        && (
+          currentUserIsClubAdmin()
+          || (currentUserIsCoach() && data.targetType == 'team' && ('targetTeamId' in data) && isCurrentUsersTeam(data.targetTeamId))
+        );
+    }
+
+    function canReadAttendance(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || data.userId == request.auth.uid
+          || isCurrentUsersTeamData(data)
+        );
+    }
+
+    function canCreateOrUpdateAttendance(data) {
+      return data.clubId == currentUserClubId()
+        && data.recordedByUserId == request.auth.uid
+        && (
+          currentUserIsClubAdmin()
+          || (currentUserIsCoach() && isCurrentUsersTeamData(data))
+        );
+    }
+
+    function canReadPayment(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || data.userId == request.auth.uid
+        );
+    }
+
+    function canReadChatGroupData(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || (('visibleUserIds' in data) && data.visibleUserIds is list && request.auth.uid in data.visibleUserIds)
+          || isCurrentUsersTeamData(data)
+        );
+    }
+
+    function canCreateOrUpdateChatGroupData(data) {
+      return data.clubId == currentUserClubId()
+        && (
+          currentUserIsClubAdmin()
+          || (currentUserIsCoach() && isCurrentUsersTeamData(data))
+        );
+    }
+
+    function chatGroupExists(groupId) {
+      return groupId is string
+        && exists(/databases/$(database)/documents/chatGroups/$(groupId));
+    }
+
+    function chatGroupData(groupId) {
+      return get(/databases/$(database)/documents/chatGroups/$(groupId)).data;
+    }
+
+    function canReadChatMessage(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          data.senderUserId == request.auth.uid
+          || (('directUserIds' in data) && data.directUserIds is list && request.auth.uid in data.directUserIds)
+          || (('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId)))
+        );
+    }
+
+    function canCreateChatMessage(data) {
+      return currentUserHasProfile()
+        && currentUserIsActive()
+        && data.clubId == currentUserClubId()
+        && data.senderUserId == request.auth.uid
+        && (
+          (('directUserIds' in data) && data.directUserIds is list && request.auth.uid in data.directUserIds)
+          || (('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId)))
+        );
+    }
+
+    function canReadReplay(data) {
+      return belongsToCurrentUsersClub(data.clubId)
+        && (
+          currentUserIsClubAdmin()
+          || data.createdByUserId == request.auth.uid
+          || (('visibleUserIds' in data) && data.visibleUserIds is list && request.auth.uid in data.visibleUserIds)
+          || isCurrentUsersTeamData(data)
+        );
+    }
+
+    function canCreateOrUpdateReplay(data) {
+      return data.clubId == currentUserClubId()
+        && data.createdByUserId == request.auth.uid
+        && (
+          currentUserIsClubAdmin()
+          || (currentUserIsCoach() && isCurrentUsersTeamData(data))
+        );
     }
 
     match /users/{userId} {
@@ -58,6 +204,7 @@ service cloud.firestore {
         && request.resource.data.emailVerified == true
         && request.resource.data.status == 'emailVerified'
         && request.resource.data.clubId == null
+        && request.resource.data.teamIds is list
         && (request.resource.data.role == 'clubAdmin' || request.resource.data.role == 'coach' || request.resource.data.role == 'parent' || request.resource.data.role == 'athlete');
 
       allow read: if isSelf(userId)
@@ -82,7 +229,8 @@ service cloud.firestore {
         && request.resource.data.emailVerified == true
         && request.resource.data.role == 'clubAdmin'
         && request.resource.data.status == 'active'
-        && request.resource.data.clubId is string;
+        && request.resource.data.clubId is string
+        && request.resource.data.teamIds is list;
 
       allow update: if verifiedEmail()
         && isSelf(userId)
@@ -95,7 +243,8 @@ service cloud.firestore {
         && request.resource.data.emailVerified == true
         && (request.resource.data.role == 'coach' || request.resource.data.role == 'parent' || request.resource.data.role == 'athlete')
         && request.resource.data.status == 'pending'
-        && request.resource.data.clubId is string;
+        && request.resource.data.clubId is string
+        && request.resource.data.teamIds is list;
 
       allow update: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId()
@@ -133,39 +282,37 @@ service cloud.firestore {
 
     match /teams/{teamId} {
       allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
+      allow create, update: if currentUserIsClubAdmin()
         && request.resource.data.clubId == currentUserClubId();
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }
 
     match /announcements/{announcementId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
-        && request.resource.data.clubId == currentUserClubId();
+      allow read: if canReadAnnouncement(resource.data);
+      allow create, update: if canCreateOrUpdateAnnouncement(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }
 
     match /scheduleEvents/{scheduleEventId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
-        && request.resource.data.clubId == currentUserClubId();
+      allow read: if canReadClubWideOrOwnTeamData(resource.data);
+      allow create, update: if currentUserIsClubAdmin()
+        && request.resource.data.clubId == currentUserClubId()
+        || canCoachManageOwnTeamData(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }
 
     match /attendanceRecords/{attendanceRecordId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
-        && request.resource.data.clubId == currentUserClubId();
+      allow read: if canReadAttendance(resource.data);
+      allow create, update: if canCreateOrUpdateAttendance(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }
 
     match /payments/{paymentId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
-        && (currentUserIsClubStaff() || resource.data.userId == request.auth.uid);
+      allow read: if canReadPayment(resource.data);
       allow create, update: if currentUserIsClubAdmin()
         && request.resource.data.clubId == currentUserClubId();
       allow delete: if currentUserIsClubAdmin()
@@ -191,26 +338,21 @@ service cloud.firestore {
     }
 
     match /chatGroups/{chatGroupId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
-        && request.resource.data.clubId == currentUserClubId();
+      allow read: if canReadChatGroupData(resource.data);
+      allow create, update: if canCreateOrUpdateChatGroupData(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }
 
     match /chatMessages/{chatMessageId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create: if currentUserHasProfile()
-        && currentUserIsActive()
-        && request.resource.data.clubId == currentUserClubId()
-        && request.resource.data.senderUserId == request.auth.uid;
+      allow read: if canReadChatMessage(resource.data);
+      allow create: if canCreateChatMessage(request.resource.data);
       allow update, delete: if false;
     }
 
     match /replays/{replayId} {
-      allow read: if belongsToCurrentUsersClub(resource.data.clubId);
-      allow create, update: if currentUserIsClubStaff()
-        && request.resource.data.clubId == currentUserClubId();
+      allow read: if canReadReplay(resource.data);
+      allow create, update: if canCreateOrUpdateReplay(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }

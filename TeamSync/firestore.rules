@@ -83,7 +83,7 @@ service cloud.firestore {
 
     function canCoachManageOwnTeamData(data) {
       return currentUserIsCoach()
-        && request.resource.data.clubId == currentUserClubId()
+        && data.clubId == currentUserClubId()
         && ('teamId' in data)
         && isCurrentUsersTeam(data.teamId);
     }
@@ -110,7 +110,7 @@ service cloud.firestore {
         && (
           currentUserIsClubAdmin()
           || data.userId == request.auth.uid
-          || isCurrentUsersTeamData(data)
+          || (currentUserIsCoach() && isCurrentUsersTeamData(data))
         );
     }
 
@@ -297,8 +297,8 @@ service cloud.firestore {
 
     match /scheduleEvents/{scheduleEventId} {
       allow read: if canReadClubWideOrOwnTeamData(resource.data);
-      allow create, update: if currentUserIsClubAdmin()
-        && request.resource.data.clubId == currentUserClubId()
+      allow create, update: if (currentUserIsClubAdmin()
+          && request.resource.data.clubId == currentUserClubId())
         || canCoachManageOwnTeamData(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();

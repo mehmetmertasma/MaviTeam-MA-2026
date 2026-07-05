@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedEmail() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function currentUserProfile() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserHasProfile() {
+      return verifiedEmail() && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserClubId() {
+      return currentUserProfile().data.clubId;
+    }
+
+    function currentUserRole() {
+      return currentUserProfile().data.role;
+    }
+
+    function currentUserIsActive() {
+      return currentUserProfile().data.status == 'active';
+    }
+
+    function currentUserIsClubAdmin() {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserRole() == 'clubAdmin';
+    }
+
+    function currentUserIsCoach() {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserRole() == 'coach';
+    }
+
+    function currentUserIsClubStaff() {
+      return currentUserIsClubAdmin() || currentUserIsCoach();
+    }
+
+    function belongsToCurrentUsersClub(clubId) {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId;
+    }
+
+    function userBelongsToCurrentUsersClub(userId) {
+      return currentUserIsClubStaff()
+        && firestore.exists(/databases/(default)/documents/users/$(userId))
+        && firestore.get(/databases/(default)/documents/users/$(userId)).data.clubId == currentUserClubId();
+    }
+
+    function isSafeImageUpload() {
+      return request.resource != null
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    function isSafeReplayUpload() {
+      return request.resource != null
+        && request.resource.size <= 500 * 1024 * 1024
+        && request.resource.contentType.matches('video/.*');
+    }
+
+    match /users/{userId}/profile/{fileName} {
+      allow read: if isSelf(userId) || userBelongsToCurrentUsersClub(userId);
+      allow write: if isSelf(userId) && verifiedEmail() && isSafeImageUpload();
+    }
+
+    match /clubs/{clubId}/logo/{fileName} {
+      allow read: if belongsToCurrentUsersClub(clubId);
+      allow write: if currentUserIsClubAdmin()
+        && currentUserClubId() == clubId
+        && isSafeImageUpload();
+    }
+
+    match /clubs/{clubId}/replays/{fileName} {
+      allow read: if belongsToCurrentUsersClub(clubId);
+      allow write: if currentUserIsClubStaff()
+        && currentUserClubId() == clubId
+        && isSafeReplayUpload();
+    }
+
+    match /clubs/{clubId}/attachments/{fileName} {
+      allow read: if belongsToCurrentUsersClub(clubId);
+      allow write: if currentUserIsClubStaff()
+        && currentUserClubId() == clubId
+        && request.resource != null
+        && request.resource.size <= 25 * 1024 * 1024;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

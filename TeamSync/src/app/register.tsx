@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationService } from "@/services/emailVerificationService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -24,10 +25,6 @@ function isValidEmail(value: string) {
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   return emailPattern.test(trimmedValue);
-}
-
-function createVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export default function RegisterScreen() {
@@ -84,7 +81,7 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Doğrulama kodu hazırlanıyor...");
+      setStatusMessage("Hesap oluşturuluyor...");
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -92,9 +89,8 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      const verificationCode = createVerificationCode();
-
-      setStatusMessage("Doğrulama kodu hazırlandı.");
+      setStatusMessage("Doğrulama kodu email olarak gönderiliyor...");
+      const challenge = await emailVerificationService.requestCode({ fullName: trimmedName });
 
       router.replace({
         pathname: "/verify-email",
@@ -102,7 +98,8 @@ export default function RegisterScreen() {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
           next: nextRoute,
-          verificationCode,
+          expiresAt: challenge.expiresAt,
+          ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
         },
       } as never);
     } catch (registerError) {
@@ -198,7 +195,7 @@ export default function RegisterScreen() {
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Kod doğrulama</Text>
-          <Text style={styles.infoText}>Hesap oluşturulduktan sonra e-posta doğrulama linki yerine 6 haneli doğrulama kodu kullanılacak.</Text>
+          <Text style={styles.infoText}>Hesap oluşturulduktan sonra 6 haneli doğrulama kodu email adresine gönderilecek.</Text>
         </View>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>

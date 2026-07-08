@@ -72,11 +72,6 @@ export default function CreateClubScreen() {
       return;
     }
 
-    if (authService.isConfigured() && firebaseUser !== null && !firebaseUser.emailVerified) {
-      setError(t.createClub.validation.emailVerificationRequired);
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setError("");

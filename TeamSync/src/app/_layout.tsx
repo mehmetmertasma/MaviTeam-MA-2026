@@ -7,6 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
+import { LanguageProvider } from "@/providers/LanguageProvider";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 export const unstable_settings = {
@@ -34,7 +35,9 @@ const workspaceSetupRoutes = ["/", "/create-club", "/join-club", "/join-request-
 function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
-      <AuthProvider>{children}</AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
@@ -134,7 +137,7 @@ function AppContent() {
     return (
       <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR, alignItems: "center", justifyContent: "center", padding: 24 }}>
         <StatusBar style="light" />
-        <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>TeamSync</Text>
+        <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>MaviTeam</Text>
         <Text style={{ color: "#cbd5e1", fontSize: 15, fontWeight: "700", textAlign: "center" }}>
           Hesap oturumu kontrol ediliyor...
         </Text>

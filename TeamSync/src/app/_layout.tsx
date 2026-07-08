@@ -75,24 +75,13 @@ function AppContent() {
       return;
     }
 
-    if (isSignedIn && user !== null && !user.emailVerified && !routeIsPublic) {
-      router.replace({
-        pathname: "/verify-email",
-        params: {
-          email: user.email ?? "",
-          fullName: user.displayName ?? "",
-        },
-      } as never);
-      return;
-    }
-
-    if (isSignedIn && user?.emailVerified && pathname === "/login") {
+    if (isSignedIn && pathname === "/login") {
       router.replace("/dashboard" as never);
     }
-  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, user]);
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic]);
 
   useEffect(() => {
-    if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null || !user.emailVerified) {
+    if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null) {
       return;
     }
 

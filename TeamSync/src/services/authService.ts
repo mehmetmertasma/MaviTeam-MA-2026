@@ -90,6 +90,16 @@ export function getAuthErrorMessage(error: unknown) {
       return "Ağ bağlantısı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.";
     case "auth/too-many-requests":
       return "Çok fazla deneme yapıldı. Bir süre bekleyip tekrar dene.";
+    case "functions/invalid-argument":
+      return "Doğrulama kodu hatalı veya eksik. Lütfen kodu kontrol edip tekrar dene.";
+    case "functions/deadline-exceeded":
+      return "Doğrulama kodunun süresi doldu. Lütfen yeni kod iste.";
+    case "functions/resource-exhausted":
+      return "Çok fazla yanlış kod denendi. Lütfen yeni kod iste.";
+    case "functions/not-found":
+      return "Aktif doğrulama kodu bulunamadı. Lütfen yeni kod iste.";
+    case "functions/unauthenticated":
+      return "Kod doğrulamak için giriş yapmış olmalısın.";
     default:
       return "Giriş sistemiyle ilgili beklenmeyen bir sorun oluştu. Lütfen tekrar dene.";
   }
@@ -141,6 +151,7 @@ export const authService = {
 
   async refreshCurrentUser() {
     const user = getCurrentUserOrThrow();
+    await user.getIdToken(true);
     await reload(user);
     return getCurrentUserOrThrow();
   },

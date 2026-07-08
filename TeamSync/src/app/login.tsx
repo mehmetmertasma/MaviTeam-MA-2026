@@ -62,15 +62,6 @@ export default function LoginScreen() {
 
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
-
-      if (!refreshedUser.emailVerified) {
-        await authService.sendVerificationEmail(refreshedUser);
-        await authService.logout();
-        setError(t.auth.verificationEmailResent);
-        setStatusMessage(t.auth.verificationRequired);
-        return;
-      }
-
       const displayName = user.displayName?.trim();
 
       await firestoreTeamSyncService.ensureUserProfile({

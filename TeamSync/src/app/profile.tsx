@@ -3,7 +3,9 @@ import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
@@ -36,7 +38,7 @@ function getInitials(name: string) {
     .slice(0, 2)
     .toUpperCase();
 
-  return initials || "TS";
+  return initials || "MT";
 }
 
 function getFormDataFromAppData(appData: TeamSyncAppData): ProfileFormData {
@@ -51,13 +53,56 @@ function getFormDataFromAppData(appData: TeamSyncAppData): ProfileFormData {
 }
 
 export default function ProfileScreen() {
+  const { t, language } = useTranslation();
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Profil merkezi TeamSync datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState(t.profile.messages.loaded);
+
+  const copy = language === "tr"
+    ? {
+        noEmail: "E-posta yok",
+        noTeam: "Takım seçilmedi",
+        teamAccess: "Takım erişimi",
+        activeMembers: "Aktif üye",
+        editDetails: "Profil ve kulüp bilgilerini düzenle",
+        summary: "Profil özeti",
+        pushNotifications: "Push bildirimleri",
+        pushDescription: "Duyuru, program ve mesaj bildirimleri.",
+        emailNotifications: "E-posta bildirimleri",
+        emailDescription: "Önemli kulüp güncellemeleri için e-posta.",
+        accountActions: "Hesap işlemleri",
+        accountActionsSubtitle: "Oturumu güvenli şekilde kapatabilirsiniz.",
+        editingEnabled: "Düzenleme modu açık.",
+        editingCancelled: "Değişiklikler iptal edildi.",
+        defaultUser: "MaviTeam Kullanıcı",
+        defaultClub: "MaviTeam Kulübü",
+        defaultCity: "Şehir yok",
+        signingOut: "Çıkış yapılıyor...",
+      }
+    : {
+        noEmail: "No email",
+        noTeam: "No team selected",
+        teamAccess: "Team access",
+        activeMembers: "Active members",
+        editDetails: "Edit profile and club information",
+        summary: "Profile summary",
+        pushNotifications: "Push notifications",
+        pushDescription: "Announcements, schedule, and message notifications.",
+        emailNotifications: "Email notifications",
+        emailDescription: "Email updates for important club changes.",
+        accountActions: "Account actions",
+        accountActionsSubtitle: "You can securely sign out of your account.",
+        editingEnabled: "Edit mode enabled.",
+        editingCancelled: "Changes cancelled.",
+        defaultUser: "MaviTeam User",
+        defaultClub: "MaviTeam Club",
+        defaultCity: "No city",
+        signingOut: "Signing out...",
+      };
 
   useFocusEffect(
     useCallback(() => {
@@ -70,11 +115,11 @@ export default function ProfileScreen() {
           if (isActive) {
             setAppData(loadedAppData);
             setDraftProfileData(getFormDataFromAppData(loadedAppData));
-            setStatusMessage("Profil merkezi TeamSync datasından yüklendi.");
+            setStatusMessage(t.profile.messages.loaded);
           }
         } catch {
           if (isActive) {
-            setStatusMessage("Profil bilgileri yüklenirken bir sorun oluştu.");
+            setStatusMessage(t.profile.messages.failedToLoad);
           }
         }
       }
@@ -84,7 +129,7 @@ export default function ProfileScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [t.profile.messages.failedToLoad, t.profile.messages.loaded])
   );
 
   function startEditing() {
@@ -93,7 +138,7 @@ export default function ProfileScreen() {
     }
 
     setIsEditing(true);
-    setStatusMessage("Düzenleme modu açık.");
+    setStatusMessage(copy.editingEnabled);
   }
 
   function cancelEditing() {
@@ -102,42 +147,29 @@ export default function ProfileScreen() {
     }
 
     setIsEditing(false);
-    setStatusMessage("Değişiklikler iptal edildi.");
+    setStatusMessage(copy.editingCancelled);
   }
 
   async function saveProfile() {
     try {
       await teamSyncService.updateCurrentUser({
-        fullName: draftProfileData.fullName.trim() || "TeamSync Kullanıcı",
-        email: draftProfileData.email.trim().toLowerCase() || "owner@teamsync.app",
+        fullName: draftProfileData.fullName.trim() || copy.defaultUser,
+        email: draftProfileData.email.trim().toLowerCase(),
       });
 
       const nextAppData = await teamSyncService.updateCurrentClub({
-        name: draftProfileData.clubName.trim() || "TeamSync Kulübü",
-        sport: draftProfileData.clubSport.trim() || "Voleybol",
-        city: draftProfileData.clubCity.trim() || "Şehir yok",
-        code: draftProfileData.clubCode.trim().toUpperCase() || "TEAMSYNC",
+        name: draftProfileData.clubName.trim() || copy.defaultClub,
+        sport: draftProfileData.clubSport.trim() || t.common.volleyball,
+        city: draftProfileData.clubCity.trim() || copy.defaultCity,
+        code: draftProfileData.clubCode.trim().toUpperCase() || "MAVITEAM",
       });
 
       setAppData(nextAppData);
       setDraftProfileData(getFormDataFromAppData(nextAppData));
       setIsEditing(false);
-      setStatusMessage("Profil ve kulüp bilgileri merkezi data service içine kaydedildi.");
+      setStatusMessage(t.profile.messages.updated);
     } catch {
-      setStatusMessage("Profil kaydedilirken bir sorun oluştu.");
-    }
-  }
-
-  async function resetProfile() {
-    try {
-      const resetData = await teamSyncService.resetAppData();
-
-      setAppData(resetData);
-      setDraftProfileData(getFormDataFromAppData(resetData));
-      setIsEditing(false);
-      setStatusMessage("Merkezi başlangıç datasına dönüldü.");
-    } catch {
-      setStatusMessage("Profil sıfırlanırken bir sorun oluştu.");
+      setStatusMessage(t.profile.messages.failedToUpdate);
     }
   }
 
@@ -145,7 +177,7 @@ export default function ProfileScreen() {
     try {
       setIsSigningOut(true);
       setIsEditing(false);
-      setStatusMessage("Güvenli çıkış yapılıyor...");
+      setStatusMessage(t.profile.messages.signingOut);
 
       if (authService.isConfigured()) {
         await authService.logout();
@@ -173,8 +205,8 @@ export default function ProfileScreen() {
       <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
         <View style={styles.container}>
           <View style={styles.pageHeader}>
-            <Text style={styles.logo}>TeamSync</Text>
-            <Text style={styles.pageTitle}>Profil</Text>
+            <Text style={styles.logo}>{t.common.appName}</Text>
+            <Text style={styles.pageTitle}>{t.profile.title}</Text>
             <Text style={styles.pageSubtitle}>{statusMessage}</Text>
           </View>
         </View>
@@ -191,11 +223,9 @@ export default function ProfileScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.pageHeader}>
-          <Text style={styles.logo}>TeamSync</Text>
-          <Text style={styles.pageTitle}>Profil</Text>
-          <Text style={styles.pageSubtitle}>
-            Hesap ve kulüp bilgilerini merkezi data service üzerinden yönet.
-          </Text>
+          <Text style={styles.logo}>{t.common.appName}</Text>
+          <Text style={styles.pageTitle}>{t.profile.title}</Text>
+          <Text style={styles.pageSubtitle}>{t.profile.subtitle}</Text>
         </View>
 
         <View style={styles.heroCard}>
@@ -205,36 +235,36 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.profileHeroText}>
-              <Text style={styles.heroLabel}>Hesap merkezi</Text>
+              <Text style={styles.heroLabel}>{t.profile.heroLabel}</Text>
               <Text style={styles.heroTitle}>{displayData.fullName}</Text>
               <Text style={styles.heroSubtitle}>
-                {displayData.email || "E-posta yok"} · {displayData.clubName}
+                {displayData.email || copy.noEmail} · {displayData.clubName}
               </Text>
             </View>
           </View>
 
           {!isEditing ? (
             <AppButton
-              title="Profili düzenle"
+              title={t.profile.editProfile}
               variant="secondary"
-              accessibilityLabel="Profil bilgilerini düzenle"
+              accessibilityLabel={t.profile.editProfile}
               style={styles.heroButton}
               onPress={startEditing}
             />
           ) : (
             <View style={styles.actionRow}>
               <AppButton
-                title="Kaydet"
+                title={t.common.save}
                 variant="secondary"
-                accessibilityLabel="Profil bilgilerini kaydet"
+                accessibilityLabel={t.common.save}
                 style={styles.actionButton}
                 onPress={saveProfile}
               />
 
               <AppButton
-                title="Vazgeç"
+                title={t.common.cancel}
                 variant="secondary"
-                accessibilityLabel="Profil düzenlemeyi iptal et"
+                accessibilityLabel={t.common.cancel}
                 style={styles.actionButton}
                 onPress={cancelEditing}
               />
@@ -245,26 +275,24 @@ export default function ProfileScreen() {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>1</Text>
-            <Text style={styles.statLabel}>Kulüp</Text>
+            <Text style={styles.statLabel}>{t.profile.club}</Text>
           </View>
 
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{currentUser.teamIds.length}</Text>
-            <Text style={styles.statLabel}>Takım erişimi</Text>
+            <Text style={styles.statLabel}>{copy.teamAccess}</Text>
           </View>
 
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{appData.users.filter((user) => user.status === "active").length}</Text>
-            <Text style={styles.statLabel}>Aktif üye</Text>
+            <Text style={styles.statLabel}>{copy.activeMembers}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>
-                {isEditing ? "Profil ve kulüp bilgilerini düzenle" : "Merkezi profil özeti"}
-              </Text>
+              <Text style={styles.sectionTitle}>{isEditing ? copy.editDetails : copy.summary}</Text>
               <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
             </View>
           </View>
@@ -273,85 +301,87 @@ export default function ProfileScreen() {
             <View style={styles.form}>
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Ad Soyad</Text>
-                  <TextInput value={draftProfileData.fullName} onChangeText={(value) => updateDraftProfile("fullName", value)} placeholder="Ad Soyad" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <Text style={styles.inputLabel}>{t.profile.fullName}</Text>
+                  <TextInput value={draftProfileData.fullName} onChangeText={(value) => updateDraftProfile("fullName", value)} placeholder={t.profile.fullName} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
                 </View>
 
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>E-posta</Text>
-                  <TextInput value={draftProfileData.email} onChangeText={(value) => updateDraftProfile("email", value)} placeholder="E-posta" placeholderTextColor={theme.colors.text.muted} keyboardType="email-address" autoCapitalize="none" style={styles.input} />
-                </View>
-              </View>
-
-              <View style={styles.formGrid}>
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Kulüp adı</Text>
-                  <TextInput value={draftProfileData.clubName} onChangeText={(value) => updateDraftProfile("clubName", value)} placeholder="Kulüp adı" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
-                </View>
-
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Branş</Text>
-                  <TextInput value={draftProfileData.clubSport} onChangeText={(value) => updateDraftProfile("clubSport", value)} placeholder="Branş" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <Text style={styles.inputLabel}>{t.profile.email}</Text>
+                  <TextInput value={draftProfileData.email} onChangeText={(value) => updateDraftProfile("email", value)} placeholder={t.profile.email} placeholderTextColor={theme.colors.text.muted} keyboardType="email-address" autoCapitalize="none" style={styles.input} />
                 </View>
               </View>
 
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Şehir</Text>
-                  <TextInput value={draftProfileData.clubCity} onChangeText={(value) => updateDraftProfile("clubCity", value)} placeholder="Şehir" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <Text style={styles.inputLabel}>{t.profile.club}</Text>
+                  <TextInput value={draftProfileData.clubName} onChangeText={(value) => updateDraftProfile("clubName", value)} placeholder={t.profile.club} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
                 </View>
 
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>Kulüp kodu</Text>
-                  <TextInput value={draftProfileData.clubCode} onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())} placeholder="Kulüp kodu" placeholderTextColor={theme.colors.text.muted} autoCapitalize="characters" style={styles.input} />
+                  <Text style={styles.inputLabel}>{t.common.volleyball}</Text>
+                  <TextInput value={draftProfileData.clubSport} onChangeText={(value) => updateDraftProfile("clubSport", value)} placeholder={t.common.volleyball} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                </View>
+              </View>
+
+              <View style={styles.formGrid}>
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>{language === "tr" ? "Şehir" : "City"}</Text>
+                  <TextInput value={draftProfileData.clubCity} onChangeText={(value) => updateDraftProfile("clubCity", value)} placeholder={language === "tr" ? "Şehir" : "City"} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                </View>
+
+                <View style={styles.formField}>
+                  <Text style={styles.inputLabel}>{t.profile.clubCode}</Text>
+                  <TextInput value={draftProfileData.clubCode} onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())} placeholder={t.profile.clubCode} placeholderTextColor={theme.colors.text.muted} autoCapitalize="characters" style={styles.input} />
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.infoList}>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>Kullanıcı</Text><Text style={styles.infoValue}>{currentUser.fullName}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>E-posta</Text><Text style={styles.infoValue}>{currentUser.email || "E-posta yok"}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>Kulüp</Text><Text style={styles.infoValue}>{currentClub.name}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>Takım</Text><Text style={styles.infoValue}>{primaryTeam?.name ?? "Takım seçilmedi"}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>Kulüp kodu</Text><Text style={styles.infoValue}>{currentClub.code}</Text></View>
-              <View style={styles.infoRowLast}><Text style={styles.infoLabel}>Data modu</Text><Text style={styles.infoValue}>TeamSync service layer</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.fullName}</Text><Text style={styles.infoValue}>{currentUser.fullName}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.email}</Text><Text style={styles.infoValue}>{currentUser.email || copy.noEmail}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.club}</Text><Text style={styles.infoValue}>{currentClub.name}</Text></View>
+              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.team}</Text><Text style={styles.infoValue}>{primaryTeam?.name ?? copy.noTeam}</Text></View>
+              <View style={styles.infoRowLast}><Text style={styles.infoLabel}>{t.profile.clubCode}</Text><Text style={styles.infoValue}>{currentClub.code}</Text></View>
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bildirimler</Text>
-          <Text style={styles.sectionSubtitle}>
-            Şimdilik local state. Gerçek push notification sistemi Firebase/Expo notifications ile bağlanacak.
-          </Text>
+          <Text style={styles.sectionTitle}>{t.profile.languageSettings}</Text>
+          <Text style={styles.sectionSubtitle}>{t.language.subtitle}</Text>
+          <View style={styles.languageBox}>
+            <LanguageSelector />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.profile.notifications}</Text>
+          <Text style={styles.sectionSubtitle}>{copy.pushDescription}</Text>
 
           <View style={styles.preferenceRow}>
             <View style={styles.preferenceTextArea}>
-              <Text style={styles.preferenceTitle}>Push bildirimleri</Text>
-              <Text style={styles.preferenceSubtitle}>Duyuru, program ve mesaj bildirimleri.</Text>
+              <Text style={styles.preferenceTitle}>{copy.pushNotifications}</Text>
+              <Text style={styles.preferenceSubtitle}>{copy.pushDescription}</Text>
             </View>
             <Switch value={pushNotifications} onValueChange={setPushNotifications} />
           </View>
 
           <View style={styles.preferenceRowLast}>
             <View style={styles.preferenceTextArea}>
-              <Text style={styles.preferenceTitle}>E-posta bildirimleri</Text>
-              <Text style={styles.preferenceSubtitle}>Önemli kulüp güncellemeleri için e-posta.</Text>
+              <Text style={styles.preferenceTitle}>{copy.emailNotifications}</Text>
+              <Text style={styles.preferenceSubtitle}>{copy.emailDescription}</Text>
             </View>
             <Switch value={emailNotifications} onValueChange={setEmailNotifications} />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Hesap işlemleri</Text>
-          <Text style={styles.sectionSubtitle}>
-            Oturumu güvenli şekilde kapatabilir veya demo verisini sıfırlayabilirsin.
-          </Text>
+          <Text style={styles.sectionTitle}>{copy.accountActions}</Text>
+          <Text style={styles.sectionSubtitle}>{copy.accountActionsSubtitle}</Text>
 
           <View style={styles.actionRowBottom}>
-            {!isEditing ? <AppButton title="Profili düzenle" onPress={startEditing} style={styles.actionButton} /> : null}
-            <AppButton title="Başlangıç datasına dön" variant="secondary" accessibilityLabel="Başlangıç datasına dön" style={styles.actionButton} onPress={resetProfile} />
-            <AppButton title={isSigningOut ? "Çıkış yapılıyor..." : "Çıkış yap"} variant="ghost" accessibilityLabel="TeamSync hesabından çıkış yap" style={styles.actionButton} onPress={handleLogout} disabled={isSigningOut} />
+            {!isEditing ? <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.actionButton} /> : null}
+            <AppButton title={isSigningOut ? copy.signingOut : t.profile.logout} variant="ghost" accessibilityLabel={t.profile.logout} style={styles.actionButton} onPress={handleLogout} disabled={isSigningOut} />
           </View>
         </View>
       </View>
@@ -387,7 +417,7 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full },
+  languageBox: { marginTop: theme.spacing.xl },
   form: { gap: theme.spacing.lg },
   formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
   formField: { flex: 1, minWidth: 240 },

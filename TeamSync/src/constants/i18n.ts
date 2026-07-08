@@ -5,7 +5,7 @@ export const defaultLanguage: Language = "tr";
 export const translations = {
   tr: {
     common: {
-      appName: "TeamSync",
+      appName: "MaviTeam",
       continue: "Devam et",
       back: "Geri",
       cancel: "Vazgeç",
@@ -22,7 +22,7 @@ export const translations = {
     home: {
       title: "Kulübünüzü tek yerden yönetin",
       subtitle:
-        "TeamSync, Türkiye’deki spor kulüplerinin takım, antrenman, etkinlik ve iletişim süreçlerini daha düzenli yönetmesi için tasarlandı.",
+        "MaviTeam, spor kulüplerinin takım, antrenman, maç ve iletişim süreçlerini daha düzenli yönetmesi için tasarlandı.",
       primaryAction: "Kulüp oluştur",
       secondaryAction: "Kulübe katıl",
       dashboardAction: "Kontrol panelini görüntüle",
@@ -37,7 +37,7 @@ export const translations = {
     createClub: {
       title: "Yeni kulüp oluştur",
       subtitle:
-        "Kulübünüz için TeamSync çalışma alanını hazırlayın. Takım, antrenman ve organizasyon süreçlerini buradan yönetebilirsiniz.",
+        "Kulübünüz için MaviTeam çalışma alanını hazırlayın. Takım, antrenman ve organizasyon süreçlerini buradan yönetebilirsiniz.",
       clubNameLabel: "Kulüp adı",
       clubNamePlaceholder: "Örn. İstanbul Yıldızları SK",
       sportLabel: "Branş",
@@ -54,9 +54,9 @@ export const translations = {
     joinClub: {
       title: "Kulübe katıl",
       subtitle:
-        "Kulüp yöneticinizden aldığınız davet kodunu girerek TeamSync çalışma alanına katılabilirsiniz.",
+        "Kulüp yöneticinizden aldığınız davet kodunu girerek MaviTeam çalışma alanına katılabilirsiniz.",
       invitationCodeLabel: "Davet kodu",
-      invitationCodePlaceholder: "Örn. TS-2026",
+      invitationCodePlaceholder: "Örn. MAVI2026",
       submitButton: "Kulübe katıl",
       validation: {
         invitationCodeRequired: "Lütfen davet kodunu giriniz.",
@@ -99,7 +99,7 @@ export const translations = {
   },
   en: {
     common: {
-      appName: "TeamSync",
+      appName: "MaviTeam",
       continue: "Continue",
       back: "Back",
       cancel: "Cancel",
@@ -116,7 +116,7 @@ export const translations = {
     home: {
       title: "Manage your club from one place",
       subtitle:
-        "TeamSync is designed to help sports clubs manage teams, training sessions, events, and communication with more structure.",
+        "MaviTeam helps sports clubs manage teams, training sessions, matches, and communication with more structure.",
       primaryAction: "Create club",
       secondaryAction: "Join club",
       dashboardAction: "View dashboard",
@@ -131,7 +131,7 @@ export const translations = {
     createClub: {
       title: "Create a new club",
       subtitle:
-        "Set up your TeamSync workspace and start managing teams, training sessions, and club operations in one place.",
+        "Set up your MaviTeam workspace and start managing teams, training sessions, and club operations in one place.",
       clubNameLabel: "Club name",
       clubNamePlaceholder: "E.g. Istanbul Stars SC",
       sportLabel: "Sport",
@@ -148,9 +148,9 @@ export const translations = {
     joinClub: {
       title: "Join a club",
       subtitle:
-        "Enter the invitation code from your club manager to join your TeamSync workspace.",
+        "Enter the invitation code from your club manager to join your MaviTeam workspace.",
       invitationCodeLabel: "Invitation code",
-      invitationCodePlaceholder: "E.g. TS-2026",
+      invitationCodePlaceholder: "E.g. MAVI2026",
       submitButton: "Join club",
       validation: {
         invitationCodeRequired: "Please enter an invitation code.",

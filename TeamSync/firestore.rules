@@ -6,8 +6,11 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // MVP test mode: email-code verification infrastructure stays in the repo,
+    // but Firestore should not block app testing while the project is on Spark.
+    // Later, change this back to: signedIn() && request.auth.token.email_verified == true
     function verifiedEmail() {
-      return signedIn() && request.auth.token.email_verified == true;
+      return signedIn();
     }
 
     function isSelf(userId) {
@@ -201,7 +204,7 @@ service cloud.firestore {
         && isSelf(userId)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.email == request.auth.token.email
-        && request.resource.data.emailVerified == true
+        && request.resource.data.emailVerified is bool
         && request.resource.data.status == 'emailVerified'
         && request.resource.data.clubId == null
         && request.resource.data.teamIds is list
@@ -221,12 +224,12 @@ service cloud.firestore {
         && isSelf(userId)
         && resource.data.uid == request.auth.uid
         && resource.data.email == request.auth.token.email
-        && resource.data.emailVerified == true
+        && resource.data.emailVerified is bool
         && resource.data.status == 'emailVerified'
         && resource.data.clubId == null
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
-        && request.resource.data.emailVerified == true
+        && request.resource.data.emailVerified is bool
         && request.resource.data.role == 'clubAdmin'
         && request.resource.data.status == 'active'
         && request.resource.data.clubId is string
@@ -236,11 +239,11 @@ service cloud.firestore {
         && isSelf(userId)
         && resource.data.uid == request.auth.uid
         && resource.data.email == request.auth.token.email
-        && resource.data.emailVerified == true
+        && resource.data.emailVerified is bool
         && (resource.data.status == 'emailVerified' || resource.data.status == 'pending')
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.email == resource.data.email
-        && request.resource.data.emailVerified == true
+        && request.resource.data.emailVerified is bool
         && (request.resource.data.role == 'coach' || request.resource.data.role == 'parent' || request.resource.data.role == 'athlete')
         && request.resource.data.status == 'pending'
         && request.resource.data.clubId is string

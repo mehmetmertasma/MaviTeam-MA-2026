@@ -6,6 +6,7 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
@@ -19,15 +20,14 @@ function isValidEmail(value: string) {
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
-    firebaseIsReady
-      ? "Firebase Auth hazır. E-posta doğrulanmış hesap ile giriş yapabilirsin."
-      : "Firebase ayarları eksik. Gerçek giriş için önce .env bilgileri eklenmeli."
+    firebaseIsReady ? t.auth.firebaseReadyLogin : t.auth.firebaseMissingLogin
   );
   const [error, setError] = useState("");
 
@@ -41,24 +41,24 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!firebaseIsReady) {
-      setError("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
+      setError(t.auth.validation.firebaseMissing);
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setError("Lütfen geçerli bir e-posta adresi giriniz.");
+      setError(t.auth.validation.emailInvalid);
       return;
     }
 
     if (password.trim() === "") {
-      setError("Lütfen şifrenizi giriniz.");
+      setError(t.auth.validation.passwordRequired);
       return;
     }
 
     try {
       setIsSubmitting(true);
       setError("");
-      setStatusMessage("Giriş yapılıyor...");
+      setStatusMessage(t.auth.loginInProgress);
 
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
@@ -66,8 +66,8 @@ export default function LoginScreen() {
       if (!refreshedUser.emailVerified) {
         await authService.sendVerificationEmail(refreshedUser);
         await authService.logout();
-        setError("E-posta adresin doğrulanmamış. Doğrulama linkini tekrar gönderdik; mailini doğrulayıp yeniden giriş yap.");
-        setStatusMessage("E-posta doğrulaması gerekli.");
+        setError(t.auth.verificationEmailResent);
+        setStatusMessage(t.auth.verificationRequired);
         return;
       }
 
@@ -85,11 +85,11 @@ export default function LoginScreen() {
         ...(displayName ? { fullName: displayName } : {}),
       });
 
-      setStatusMessage("Giriş başarılı. Dashboard açılıyor.");
+      setStatusMessage(t.auth.loginSuccess);
       router.replace("/dashboard");
     } catch (loginError) {
       setError(getAuthErrorMessage(loginError));
-      setStatusMessage("Giriş tamamlanamadı.");
+      setStatusMessage(t.auth.loginFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -99,12 +99,12 @@ export default function LoginScreen() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!firebaseIsReady) {
-      setError("Firebase ayarları eksik. Şifre yenileme için önce Firebase bağlantısı kurulmalı.");
+      setError(t.auth.validation.firebaseMissing);
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setError("Şifre yenileme linki için geçerli e-posta adresini giriniz.");
+      setError(t.auth.validation.resetEmailRequired);
       return;
     }
 
@@ -112,7 +112,7 @@ export default function LoginScreen() {
       setIsSubmitting(true);
       setError("");
       await authService.sendPasswordReset(trimmedEmail);
-      setStatusMessage("Şifre yenileme linki e-posta adresine gönderildi.");
+      setStatusMessage(t.auth.resetLinkSent);
     } catch (resetError) {
       setError(getAuthErrorMessage(resetError));
     } finally {
@@ -125,26 +125,24 @@ export default function LoginScreen() {
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>MaviTeam</Text>
-        <Text style={styles.badge}>Güvenli hesap girişi</Text>
+        <Text style={styles.logo}>{t.common.appName}</Text>
+        <Text style={styles.badge}>{t.auth.loginBadge}</Text>
 
-        <Text style={styles.title}>Giriş yap</Text>
+        <Text style={styles.title}>{t.auth.loginTitle}</Text>
 
-        <Text style={styles.subtitle}>
-          Kulübünüzü, takımlarınızı ve antrenman planlarınızı doğrulanmış MaviTeam hesabınızla yönetmeye devam edin.
-        </Text>
+        <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Firebase Auth durumu</Text>
+          <Text style={styles.infoTitle}>{t.auth.loginBadge}</Text>
           <Text style={styles.infoText}>{statusMessage}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={styles.label}>{t.auth.emailLabel}</Text>
             <TextInput
               style={styles.input}
-              placeholder="ornek@email.com"
+              placeholder={t.auth.emailPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={email}
               onChangeText={(value) => {
@@ -155,15 +153,15 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoComplete="email"
               textContentType="emailAddress"
-              accessibilityLabel="E-posta adresi"
+              accessibilityLabel={t.auth.accessibility.email}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>{t.auth.passwordLabel}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Şifrenizi giriniz"
+              placeholder={t.auth.passwordPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={password}
               onChangeText={(value) => {
@@ -173,7 +171,7 @@ export default function LoginScreen() {
               secureTextEntry
               autoComplete="password"
               textContentType="password"
-              accessibilityLabel="Şifre"
+              accessibilityLabel={t.auth.accessibility.password}
             />
           </View>
         </View>
@@ -182,27 +180,27 @@ export default function LoginScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "Giriş yapılıyor..." : "Giriş yap"}
+            title={isSubmitting ? t.auth.loginSubmitting : t.auth.loginButton}
             onPress={handleLogin}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="MaviTeam hesabına giriş yap"
+            accessibilityLabel={t.auth.accessibility.login}
             style={styles.button}
           />
 
           <AppButton
-            title="Şifremi unuttum"
+            title={t.auth.forgotPassword}
             variant="secondary"
             onPress={handlePasswordReset}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="Şifre yenileme e-postası gönder"
+            accessibilityLabel={t.auth.accessibility.resetPassword}
             style={styles.button}
           />
 
           <Link href="/" asChild>
             <AppButton
-              title="Ana sayfaya dön"
+              title={t.auth.backHome}
               variant="ghost"
-              accessibilityLabel="Ana sayfaya dön"
+              accessibilityLabel={t.auth.accessibility.backHome}
               style={styles.button}
             />
           </Link>

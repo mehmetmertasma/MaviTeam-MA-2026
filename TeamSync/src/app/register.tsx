@@ -26,6 +26,10 @@ function isValidEmail(value: string) {
   return emailPattern.test(trimmedValue);
 }
 
+function createVerificationCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 export default function RegisterScreen() {
   const router = useRouter();
   const { next } = useLocalSearchParams();
@@ -80,7 +84,7 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      setStatusMessage(t.auth.registerInProgress);
+      setStatusMessage("Doğrulama kodu hazırlanıyor...");
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -88,7 +92,9 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage(t.auth.verificationEmailSent);
+      const verificationCode = createVerificationCode();
+
+      setStatusMessage("Doğrulama kodu hazırlandı.");
 
       router.replace({
         pathname: "/verify-email",
@@ -96,6 +102,7 @@ export default function RegisterScreen() {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
           next: nextRoute,
+          verificationCode,
         },
       } as never);
     } catch (registerError) {
@@ -190,8 +197,8 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{t.auth.emailVerificationRequiredTitle}</Text>
-          <Text style={styles.infoText}>{t.auth.emailVerificationRequiredText}</Text>
+          <Text style={styles.infoTitle}>Kod doğrulama</Text>
+          <Text style={styles.infoText}>Hesap oluşturulduktan sonra e-posta doğrulama linki yerine 6 haneli doğrulama kodu kullanılacak.</Text>
         </View>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>

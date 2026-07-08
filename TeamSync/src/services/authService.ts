@@ -2,7 +2,6 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   reload,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
@@ -131,8 +130,6 @@ export const authService = {
       await updateProfile(credential.user, { displayName: cleanName });
     }
 
-    await sendEmailVerification(credential.user);
-
     return credential.user;
   },
 
@@ -148,9 +145,8 @@ export const authService = {
     return getCurrentUserOrThrow();
   },
 
-  async sendVerificationEmail(user?: User) {
-    const targetUser = user ?? getCurrentUserOrThrow();
-    await sendEmailVerification(targetUser);
+  async sendVerificationEmail() {
+    return Promise.resolve();
   },
 
   async logout() {

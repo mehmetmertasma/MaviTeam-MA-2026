@@ -4,9 +4,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppDataDrawer } from "@/components/AppDataDrawer";
-import { LanguageToggle } from "@/components/LanguageToggle";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { theme } from "@/constants/theme";
-import { useLanguage } from "@/providers/LanguageProvider";
+import { useTranslation } from "@/localization";
 import { teamSyncService } from "@/services/teamSyncService";
 
 const routesWithoutTopControls = [
@@ -36,7 +36,7 @@ function getInitials(name: string) {
 export function AppGlobalNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { t } = useLanguage();
+  const { t } = useTranslation();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const [profileInitials, setProfileInitials] = useState("MT");
 
@@ -91,7 +91,7 @@ export function AppGlobalNavigation() {
           <Pressable
             onPress={() => setDrawerIsOpen(true)}
             style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
-            accessibilityLabel="Ana menüyü aç"
+            accessibilityLabel="Open main menu"
           >
             <Text style={styles.menuIcon}>☰</Text>
           </Pressable>
@@ -107,13 +107,13 @@ export function AppGlobalNavigation() {
         </View>
 
         <View pointerEvents="box-none" style={styles.rightControls}>
-          <LanguageToggle compact />
+          <LanguageSelector compact />
 
           {showProfileButton ? (
             <Pressable
               onPress={() => router.push("/profile" as never)}
               style={({ pressed }) => [styles.profileButton, pressed ? styles.pressed : null]}
-              accessibilityLabel="Profil sayfasına git"
+              accessibilityLabel="Open profile"
             >
               <Text style={styles.profileText}>{profileInitials}</Text>
             </Pressable>

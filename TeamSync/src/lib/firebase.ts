@@ -4,6 +4,8 @@ import { getAuth } from "firebase/auth";
 import type { Auth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
+import type { Functions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 import type { FirebaseStorage } from "firebase/storage";
 
@@ -20,6 +22,7 @@ type FirebaseServices = {
   app: FirebaseApp;
   auth: Auth;
   db: Firestore;
+  functions: Functions;
   storage: FirebaseStorage;
 };
 
@@ -53,6 +56,7 @@ export function getFirebaseServices() {
     app,
     auth: getAuth(app),
     db: getFirestore(app),
+    functions: getFunctions(app, "us-central1"),
     storage: getStorage(app),
   };
 
@@ -73,4 +77,5 @@ export const firebaseServices = getFirebaseServices();
 export const firebaseApp = firebaseServices?.app ?? null;
 export const firebaseAuth = firebaseServices?.auth ?? null;
 export const firestoreDb = firebaseServices?.db ?? null;
+export const firebaseFunctions = firebaseServices?.functions ?? null;
 export const firebaseStorage = firebaseServices?.storage ?? null;

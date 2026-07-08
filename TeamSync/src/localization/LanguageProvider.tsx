@@ -23,16 +23,11 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     let isActive = true;
 
     async function loadLanguagePreference() {
-      try {
-        const storedLanguage = await getStoredLanguage();
+      const storedLanguage = await getStoredLanguage();
 
-        if (isActive) {
-          setLanguageState(storedLanguage);
-        }
-      } finally {
-        if (isActive) {
-          setIsLanguageReady(true);
-        }
+      if (isActive) {
+        setLanguageState(storedLanguage);
+        setIsLanguageReady(true);
       }
     }
 

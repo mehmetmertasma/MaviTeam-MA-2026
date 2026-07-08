@@ -8,16 +8,15 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
-import { emailVerificationService } from "@/services/emailVerificationService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
 
   if (firstValue === "join-club") {
-    return "join-club";
+    return "/join-club";
   }
 
-  return "create-club";
+  return "/create-club";
 }
 
 function isValidEmail(value: string) {
@@ -89,17 +88,13 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage("Doğrulama kodu email olarak gönderiliyor...");
-      const challenge = await emailVerificationService.requestCode({ fullName: trimmedName });
+      setStatusMessage("Hesap oluşturuldu. Sonraki adıma geçiliyor...");
 
       router.replace({
-        pathname: "/verify-email",
+        pathname: nextRoute,
         params: {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
-          next: nextRoute,
-          expiresAt: challenge.expiresAt,
-          ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
         },
       } as never);
     } catch (registerError) {
@@ -194,8 +189,8 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Kod doğrulama</Text>
-          <Text style={styles.infoText}>Hesap oluşturulduktan sonra 6 haneli doğrulama kodu email adresine gönderilecek.</Text>
+          <Text style={styles.infoTitle}>MVP test modu</Text>
+          <Text style={styles.infoText}>Şimdilik email doğrulamasını bekletiyoruz. Önce kulüp oluşturma, takıma katılma ve dashboard akışını düzgün test edeceğiz.</Text>
         </View>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>

@@ -5,13 +5,11 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
-
-const t = translations[defaultLanguage];
 
 function getParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -24,6 +22,7 @@ function getParamValue(value: string | string[] | undefined) {
 export default function JoinClubScreen() {
   const router = useRouter();
   const { fullName, email } = useLocalSearchParams();
+  const { t } = useTranslation();
 
   const requestFullName = getParamValue(fullName);
   const requestEmail = getParamValue(email);
@@ -46,12 +45,12 @@ export default function JoinClubScreen() {
     const cleanedCode = inviteCode.trim();
 
     if (cleanedCode === "") {
-      setError("Lütfen takım/kulüp kodunu giriniz.");
+      setError(t.joinClub.validation.invitationCodeRequired);
       return;
     }
 
     if (cleanedCode.length < 4) {
-      setError("Kod en az 4 karakter olmalıdır.");
+      setError(t.joinClub.validation.invitationCodeInvalid);
       return;
     }
 
@@ -63,12 +62,12 @@ export default function JoinClubScreen() {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setError("Kulübe katılmak için önce giriş yapmalısın.");
+          setError(t.joinClub.validation.loginRequired);
           return;
         }
 
         if (!firebaseUser.emailVerified) {
-          setError("Kulübe katılmadan önce e-posta adresini doğrulamalısın.");
+          setError(t.joinClub.validation.emailVerificationRequired);
           return;
         }
 
@@ -79,8 +78,8 @@ export default function JoinClubScreen() {
         });
       } else {
         await teamSyncService.createJoinRequest({
-          fullName: requestFullName || "Yeni Kullanıcı",
-          email: requestEmail || "pending@teamsync.app",
+          fullName: requestFullName || t.joinClub.fallbackName,
+          email: requestEmail || t.joinClub.fallbackEmail,
           inviteCode: cleanedCode,
           requestedRole: "athlete",
         });
@@ -89,7 +88,7 @@ export default function JoinClubScreen() {
       router.replace("/join-request-sent");
     } catch (joinError) {
       const message = joinError instanceof Error && joinError.message === "INVALID_CLUB_CODE"
-        ? "Bu kulüp kodu bulunamadı. Lütfen kodu kontrol edip tekrar deneyiniz."
+        ? t.joinClub.messages.invalidCode
         : getAuthErrorMessage(joinError);
 
       setError(message);
@@ -104,38 +103,35 @@ export default function JoinClubScreen() {
         <AppBackButton fallbackHref="/" />
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.badge}>Takım kodu ile giriş</Text>
+        <Text style={styles.badge}>{t.joinClub.badge}</Text>
 
-        <Text style={styles.title}>Kulübüne katıl</Text>
+        <Text style={styles.title}>{t.joinClub.title}</Text>
 
-        <Text style={styles.subtitle}>
-          Kulüp yöneticinizden aldığınız takım kodunu girerek TeamSync çalışma
-          alanına katılma isteği gönderebilirsiniz.
-        </Text>
+        <Text style={styles.subtitle}>{t.joinClub.subtitle}</Text>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Kayıt bilgileri</Text>
-          <Text style={styles.infoText}>{requestFullName || "Firebase hesabındaki ad kullanılacak"}</Text>
-          <Text style={styles.infoText}>{requestEmail || "Firebase hesabındaki e-posta kullanılacak"}</Text>
+          <Text style={styles.infoTitle}>{t.joinClub.accountInfoTitle}</Text>
+          <Text style={styles.infoText}>{requestFullName || t.joinClub.accountNameFallback}</Text>
+          <Text style={styles.infoText}>{requestEmail || t.joinClub.accountEmailFallback}</Text>
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Kod örneği</Text>
-          <Text style={styles.infoText}>Kulüp yöneticisinin dashboard üzerinde gördüğü kulüp kodu.</Text>
+          <Text style={styles.infoTitle}>{t.joinClub.codeInfoTitle}</Text>
+          <Text style={styles.infoText}>{t.joinClub.codeInfoText}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Takım / kulüp kodu</Text>
+            <Text style={styles.label}>{t.joinClub.invitationCodeLabel}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Örn. TS2026"
+              placeholder={t.joinClub.invitationCodePlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={inviteCode}
               onChangeText={handleInviteCodeChange}
               autoCapitalize="characters"
-              accessibilityLabel="Takım veya kulüp kodu"
+              accessibilityLabel={t.joinClub.accessibility.invitationCode}
             />
           </View>
         </View>
@@ -144,18 +140,18 @@ export default function JoinClubScreen() {
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "İstek gönderiliyor..." : "Katılma isteği gönder"}
+            title={isSubmitting ? t.joinClub.submittingButton : t.joinClub.submitButton}
             onPress={handleJoinClub}
             disabled={isSubmitting}
-            accessibilityLabel="Takım kodu ile katılma isteği gönder"
+            accessibilityLabel={t.joinClub.accessibility.submit}
             style={styles.button}
           />
 
           <Link href="/" asChild>
             <AppButton
-              title="Ana sayfaya dön"
+              title={t.joinClub.backHome}
               variant="ghost"
-              accessibilityLabel="Ana sayfaya dön"
+              accessibilityLabel={t.joinClub.accessibility.backHome}
               style={styles.button}
             />
           </Link>

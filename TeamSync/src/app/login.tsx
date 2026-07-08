@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationService } from "@/services/emailVerificationService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 
@@ -63,6 +64,23 @@ export default function LoginScreen() {
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
       const displayName = user.displayName?.trim();
+
+      if (!refreshedUser.emailVerified) {
+        setStatusMessage("Email henüz doğrulanmamış. Yeni doğrulama kodu gönderiliyor...");
+        const challenge = await emailVerificationService.requestCode({ fullName: displayName || "" });
+
+        router.replace({
+          pathname: "/verify-email",
+          params: {
+            fullName: displayName || "",
+            email: user.email ?? trimmedEmail,
+            next: "create-club",
+            expiresAt: challenge.expiresAt,
+            ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
+          },
+        } as never);
+        return;
+      }
 
       await firestoreTeamSyncService.ensureUserProfile({
         user: refreshedUser,

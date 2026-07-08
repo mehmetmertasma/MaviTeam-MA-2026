@@ -5,13 +5,11 @@ import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { defaultLanguage, translations } from "@/constants/i18n";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
-
-const t = translations[defaultLanguage];
 
 function getParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -21,19 +19,20 @@ function getParamValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function generatePreviewCode(clubName: string) {
+function generatePreviewCode(clubName: string, fallbackPrefix: string) {
   const prefix = clubName
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "")
     .slice(0, 3);
 
-  return `${prefix || "TS"}${new Date().getFullYear()}`;
+  return `${prefix || fallbackPrefix}${new Date().getFullYear()}`;
 }
 
 export default function CreateClubScreen() {
   const router = useRouter();
   const { fullName, email } = useLocalSearchParams();
+  const { t } = useTranslation();
 
   const ownerFullName = getParamValue(fullName);
   const ownerEmail = getParamValue(email);
@@ -44,7 +43,7 @@ export default function CreateClubScreen() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const previewCode = generatePreviewCode(clubName);
+  const previewCode = generatePreviewCode(clubName, t.createClub.defaultCodePrefix);
 
   async function handleCreateClub() {
     const trimmedClubName = clubName.trim();
@@ -52,29 +51,29 @@ export default function CreateClubScreen() {
     const trimmedCity = city.trim();
 
     if (trimmedClubName === "") {
-      setError("Lütfen kulüp adını giriniz.");
+      setError(t.createClub.validation.clubNameRequired);
       return;
     }
 
     if (trimmedSport === "") {
-      setError("Lütfen branş bilgisini giriniz.");
+      setError(t.createClub.validation.sportRequired);
       return;
     }
 
     if (trimmedCity === "") {
-      setError("Lütfen şehir bilgisini giriniz.");
+      setError(t.createClub.validation.cityRequired);
       return;
     }
 
     const firebaseUser = authService.getCurrentUser();
 
     if (authService.isConfigured() && firebaseUser === null) {
-      setError("Kulüp oluşturmak için önce giriş yapmalısın.");
+      setError(t.createClub.validation.loginRequired);
       return;
     }
 
     if (authService.isConfigured() && firebaseUser !== null && !firebaseUser.emailVerified) {
-      setError("Kulüp oluşturmadan önce e-posta adresini doğrulamalısın.");
+      setError(t.createClub.validation.emailVerificationRequired);
       return;
     }
 
@@ -83,8 +82,8 @@ export default function CreateClubScreen() {
       setError("");
 
       const nextData = await teamSyncService.createClubWorkspace({
-        ownerFullName: ownerFullName || firebaseUser?.displayName || "Kulüp Yöneticisi",
-        ownerEmail: ownerEmail || firebaseUser?.email || "demo@teamsync.app",
+        ownerFullName: ownerFullName || firebaseUser?.displayName || t.createClub.ownerFallbackName,
+        ownerEmail: ownerEmail || firebaseUser?.email || t.createClub.ownerFallbackEmail,
         clubName: trimmedClubName,
         sport: trimmedSport,
         city: trimmedCity,
@@ -116,86 +115,81 @@ export default function CreateClubScreen() {
 
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.badge}>Kulüp sahibi / yönetici</Text>
+        <Text style={styles.badge}>{t.createClub.badge}</Text>
 
-        <Text style={styles.title}>Yeni kulüp oluştur</Text>
+        <Text style={styles.title}>{t.createClub.title}</Text>
 
-        <Text style={styles.subtitle}>
-          Kulübünüz için TeamSync çalışma alanını hazırlayın. Oyuncular,
-          veliler ve koçlar daha sonra kulüp kodu ile katılabilecek.
-        </Text>
+        <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
 
         <View style={styles.ownerBox}>
-          <Text style={styles.ownerLabel}>Kayıt bilgileri</Text>
-          <Text style={styles.ownerText}>{ownerFullName || "İsim register ekranından gelecek"}</Text>
-          <Text style={styles.ownerText}>{ownerEmail || "E-posta register ekranından gelecek"}</Text>
+          <Text style={styles.ownerLabel}>{t.createClub.ownerInfoTitle}</Text>
+          <Text style={styles.ownerText}>{ownerFullName || t.createClub.ownerNameFallback}</Text>
+          <Text style={styles.ownerText}>{ownerEmail || t.createClub.ownerEmailFallback}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Kulüp adı</Text>
+            <Text style={styles.label}>{t.createClub.clubNameLabel}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Örn. İstanbul Voleybol Kulübü"
+              placeholder={t.createClub.clubNamePlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={clubName}
               onChangeText={setClubName}
-              accessibilityLabel="Kulüp adı"
+              accessibilityLabel={t.createClub.accessibility.clubName}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Branş</Text>
+            <Text style={styles.label}>{t.createClub.sportLabel}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Örn. Voleybol"
+              placeholder={t.createClub.sportPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={sport}
               onChangeText={setSport}
-              accessibilityLabel="Branş"
+              accessibilityLabel={t.createClub.accessibility.sport}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şehir</Text>
+            <Text style={styles.label}>{t.createClub.cityLabel}</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Örn. İstanbul"
+              placeholder={t.createClub.cityPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               value={city}
               onChangeText={setCity}
-              accessibilityLabel="Şehir"
+              accessibilityLabel={t.createClub.accessibility.city}
             />
           </View>
         </View>
 
         <View style={styles.codePreviewBox}>
-          <Text style={styles.codePreviewLabel}>Oluşacak örnek kulüp kodu</Text>
+          <Text style={styles.codePreviewLabel}>{t.createClub.invitationCodePreview}</Text>
           <Text style={styles.codePreviewValue}>{previewCode}</Text>
-          <Text style={styles.codePreviewHint}>
-            Bu kod hem cihazdaki geçici dataya hem de Firestore merkezi dataya kaydedilecek. İleride oyuncu, veli ve koçlar kulübe katılmak için kullanacak.
-          </Text>
+          <Text style={styles.codePreviewHint}>{t.createClub.invitationCodeHint}</Text>
         </View>
 
         {error !== "" && <Text style={styles.errorText}>{error}</Text>}
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "Kulüp oluşturuluyor..." : "Kulübü oluştur"}
+            title={isSubmitting ? t.createClub.submittingButton : t.createClub.submitButton}
             onPress={handleCreateClub}
             disabled={isSubmitting}
-            accessibilityLabel="Kulübü oluştur ve kontrol paneline git"
+            accessibilityLabel={t.createClub.accessibility.submit}
             style={styles.button}
           />
 
           <Link href="/" asChild>
             <AppButton
-              title="Ana sayfaya dön"
+              title={t.createClub.backHome}
               variant="ghost"
-              accessibilityLabel="Ana sayfaya dön"
+              accessibilityLabel={t.createClub.accessibility.backHome}
               style={styles.button}
             />
           </Link>
@@ -264,25 +258,19 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   ownerLabel: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
-    textTransform: "uppercase",
-    marginBottom: theme.spacing.sm,
-  },
-  ownerText: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
     color: theme.colors.text.primary,
-    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
-  form: {
-    width: "100%",
-    gap: theme.spacing.lg,
+  ownerText: {
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.secondary,
+    lineHeight: theme.lineHeights.md,
   },
-  inputGroup: {
-    width: "100%",
-  },
+  form: { width: "100%", gap: theme.spacing.lg },
+  inputGroup: { width: "100%" },
   label: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
@@ -303,7 +291,7 @@ const styles = StyleSheet.create({
   },
   codePreviewBox: {
     width: "100%",
-    backgroundColor: theme.colors.background.subtle,
+    backgroundColor: theme.colors.state.infoSoft,
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginTop: theme.spacing["2xl"],
@@ -311,19 +299,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   codePreviewLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.secondary,
-    marginBottom: theme.spacing.sm,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    color: theme.colors.text.brand,
+    marginBottom: theme.spacing.xs,
   },
   codePreviewValue: {
     fontSize: theme.fontSizes["3xl"],
     fontWeight: theme.fontWeights.black,
-    color: theme.colors.brand.primary,
-    marginBottom: theme.spacing.sm,
+    color: theme.colors.text.primary,
+    letterSpacing: 1,
+    marginBottom: theme.spacing.xs,
   },
   codePreviewHint: {
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
@@ -341,7 +330,5 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginTop: theme.spacing["2xl"],
   },
-  button: {
-    width: "100%",
-  },
+  button: { width: "100%" },
 });

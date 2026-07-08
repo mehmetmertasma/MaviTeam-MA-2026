@@ -7,7 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
-import { LanguageProvider } from "@/providers/LanguageProvider";
+import { LanguageProvider, useTranslation } from "@/localization";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 export const unstable_settings = {
@@ -42,9 +42,22 @@ function AppProviders({ children }: PropsWithChildren) {
   );
 }
 
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR, alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <StatusBar style="light" />
+      <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>MaviTeam</Text>
+      <Text style={{ color: "#cbd5e1", fontSize: 15, fontWeight: "700", textAlign: "center" }}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
 function AppContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { t, isLanguageReady } = useTranslation();
   const { user, isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
   const routeIsPublic = publicAuthRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
@@ -133,16 +146,12 @@ function AppContent() {
     };
   }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, user]);
 
+  if (!isLanguageReady) {
+    return <LoadingScreen message={t.common.loading} />;
+  }
+
   if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
-    return (
-      <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <StatusBar style="light" />
-        <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>MaviTeam</Text>
-        <Text style={{ color: "#cbd5e1", fontSize: 15, fontWeight: "700", textAlign: "center" }}>
-          Hesap oturumu kontrol ediliyor...
-        </Text>
-      </View>
-    );
+    return <LoadingScreen message={t.common.loading} />;
   }
 
   return (

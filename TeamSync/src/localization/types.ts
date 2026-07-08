@@ -2,7 +2,19 @@ import type { tr } from "@/localization/translations/tr";
 
 export type Language = "tr" | "en";
 
-export type TranslationDictionary = typeof tr;
+type WidenTranslationValues<T> = T extends string
+  ? string
+  : T extends number
+    ? number
+    : T extends boolean
+      ? boolean
+      : T extends readonly (infer Item)[]
+        ? WidenTranslationValues<Item>[]
+        : T extends object
+          ? { [Key in keyof T]: WidenTranslationValues<T[Key]> }
+          : T;
+
+export type TranslationDictionary = WidenTranslationValues<typeof tr>;
 
 export type SupportedLanguage = {
   code: Language;

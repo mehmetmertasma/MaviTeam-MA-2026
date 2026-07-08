@@ -9,7 +9,7 @@ type WidenTranslationValues<T> = T extends string
     : T extends boolean
       ? boolean
       : T extends readonly (infer Item)[]
-        ? WidenTranslationValues<Item>[]
+        ? readonly WidenTranslationValues<Item>[]
         : T extends object
           ? { [Key in keyof T]: WidenTranslationValues<T[Key]> }
           : T;

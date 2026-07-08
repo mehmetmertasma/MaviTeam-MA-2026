@@ -7,6 +7,7 @@ import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationService } from "@/services/emailVerificationService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function getFirstParam(value: string | string[] | undefined) {
@@ -27,21 +28,38 @@ function getNextRoute(value: string | string[] | undefined) {
   return "/create-club";
 }
 
+function getExpirationText(expiresAt: string) {
+  if (!expiresAt) {
+    return "Kod 10 dakika içinde geçerlidir.";
+  }
+
+  const expiresDate = new Date(expiresAt);
+
+  if (Number.isNaN(expiresDate.getTime())) {
+    return "Kod 10 dakika içinde geçerlidir.";
+  }
+
+  return `Kod ${expiresDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} saatine kadar geçerlidir.`;
+}
+
 export default function VerifyEmailScreen() {
   const router = useRouter();
-  const { email, fullName, next, verificationCode } = useLocalSearchParams();
+  const { email, fullName, next, expiresAt, devCode } = useLocalSearchParams();
   const nextRoute = getNextRoute(next);
   const displayEmail = getFirstParam(email);
   const displayName = getFirstParam(fullName);
-  const expectedCode = getFirstParam(verificationCode);
+  const expiresAtText = getFirstParam(expiresAt);
+  const developmentCode = getFirstParam(devCode);
 
   const [code, setCode] = useState("");
   const [isChecking, setIsChecking] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
-    expectedCode
-      ? `Test doğrulama kodu: ${expectedCode}`
-      : "E-posta doğrulama kodunu gir."
+    developmentCode
+      ? `Geliştirme kodu: ${developmentCode}`
+      : `${displayEmail || "E-posta adresine"} 6 haneli doğrulama kodu gönderildi.`
   );
+  const [expirationMessage, setExpirationMessage] = useState(getExpirationText(expiresAtText));
 
   async function handleCheckVerification() {
     const cleanCode = code.trim();
@@ -51,21 +69,12 @@ export default function VerifyEmailScreen() {
       return;
     }
 
-    if (expectedCode && cleanCode !== expectedCode) {
-      setStatusMessage("Kod yanlış. Lütfen kodu kontrol edip tekrar dene.");
-      return;
-    }
-
     try {
       setIsChecking(true);
       setStatusMessage("Kod doğrulanıyor...");
 
-      const user = authService.getCurrentUser();
-
-      if (user === null) {
-        setStatusMessage("Oturum bulunamadı. Lütfen tekrar giriş yap.");
-        return;
-      }
+      await emailVerificationService.verifyCode(cleanCode);
+      const user = await authService.refreshCurrentUser();
 
       await firestoreTeamSyncService.ensureUserProfile({
         user,
@@ -89,6 +98,26 @@ export default function VerifyEmailScreen() {
     }
   }
 
+  async function handleResendCode() {
+    try {
+      setIsResending(true);
+      setStatusMessage("Yeni doğrulama kodu gönderiliyor...");
+
+      const challenge = await emailVerificationService.requestCode({ fullName: displayName });
+
+      setExpirationMessage(getExpirationText(challenge.expiresAt));
+      setStatusMessage(
+        challenge.devCode
+          ? `Yeni geliştirme kodu: ${challenge.devCode}`
+          : "Yeni doğrulama kodu email adresine gönderildi. Spam/Junk klasörünü de kontrol et."
+      );
+    } catch (error) {
+      setStatusMessage(getAuthErrorMessage(error));
+    } finally {
+      setIsResending(false);
+    }
+  }
+
   async function handleBackToLogin() {
     try {
       if (authService.isConfigured()) {
@@ -109,14 +138,15 @@ export default function VerifyEmailScreen() {
         <Text style={styles.title}>Doğrulama kodunu gir</Text>
 
         <Text style={styles.subtitle}>
-          MaviTeam hesabını güvenli hale getirmek için 6 haneli doğrulama kodunu girmen gerekiyor.
+          MaviTeam hesabını güvenli hale getirmek için email adresine gelen 6 haneli kodu gir.
         </Text>
 
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Ne yapmalısın?</Text>
-          <Text style={styles.infoText}>1. 6 haneli doğrulama kodunu kontrol et.</Text>
-          <Text style={styles.infoText}>2. Kodu aşağıdaki alana yaz.</Text>
-          <Text style={styles.infoText}>3. “Kodu doğrula” butonuna bas.</Text>
+          <Text style={styles.infoText}>1. Mail kutunu aç.</Text>
+          <Text style={styles.infoText}>2. MaviTeam doğrulama kodunu bul.</Text>
+          <Text style={styles.infoText}>3. Kodu aşağıdaki alana yazıp doğrula.</Text>
+          <Text style={styles.infoText}>{expirationMessage}</Text>
         </View>
 
         <View style={styles.inputGroup}>
@@ -139,8 +169,17 @@ export default function VerifyEmailScreen() {
           <AppButton
             title={isChecking ? "Kontrol ediliyor..." : "Kodu doğrula"}
             onPress={handleCheckVerification}
-            disabled={isChecking}
+            disabled={isChecking || isResending}
             accessibilityLabel="Doğrulama kodunu kontrol et"
+            style={styles.button}
+          />
+
+          <AppButton
+            title={isResending ? "Yeni kod gönderiliyor..." : "Yeni kod gönder"}
+            variant="secondary"
+            onPress={handleResendCode}
+            disabled={isChecking || isResending}
+            accessibilityLabel="Yeni doğrulama kodu gönder"
             style={styles.button}
           />
 

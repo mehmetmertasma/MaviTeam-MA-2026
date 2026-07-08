@@ -4,7 +4,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppDataDrawer } from "@/components/AppDataDrawer";
+import { LanguageToggle } from "@/components/LanguageToggle";
 import { theme } from "@/constants/theme";
+import { useLanguage } from "@/providers/LanguageProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 
 const routesWithoutTopControls = [
@@ -34,6 +36,7 @@ function getInitials(name: string) {
 export function AppGlobalNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const [profileInitials, setProfileInitials] = useState("MT");
 
@@ -96,24 +99,28 @@ export function AppGlobalNavigation() {
           <Pressable
             onPress={handleBackPress}
             style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-            accessibilityLabel="Geri dön"
+            accessibilityLabel={t.common.back}
           >
             <Text style={styles.backIcon}>←</Text>
-            <Text style={styles.backText}>Geri</Text>
+            <Text style={styles.backText}>{t.common.back}</Text>
           </Pressable>
         </View>
 
-        {showProfileButton ? (
-          <Pressable
-            onPress={() => router.push("/profile" as never)}
-            style={({ pressed }) => [styles.profileButton, pressed ? styles.pressed : null]}
-            accessibilityLabel="Profil sayfasına git"
-          >
-            <Text style={styles.profileText}>{profileInitials}</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.profileSpacer} />
-        )}
+        <View pointerEvents="box-none" style={styles.rightControls}>
+          <LanguageToggle compact />
+
+          {showProfileButton ? (
+            <Pressable
+              onPress={() => router.push("/profile" as never)}
+              style={({ pressed }) => [styles.profileButton, pressed ? styles.pressed : null]}
+              accessibilityLabel="Profil sayfasına git"
+            >
+              <Text style={styles.profileText}>{profileInitials}</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.profileSpacer} />
+          )}
+        </View>
       </View>
 
       <AppDataDrawer visible={drawerIsOpen} onClose={() => setDrawerIsOpen(false)} />
@@ -144,6 +151,12 @@ const styles = StyleSheet.create({
   leftControls: {
     flexDirection: "row",
     alignItems: "center",
+    gap: theme.spacing.sm,
+  },
+  rightControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
     gap: theme.spacing.sm,
   },
   iconButton: {

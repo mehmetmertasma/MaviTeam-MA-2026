@@ -2,35 +2,33 @@ import { Link } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
-
-const features = [
-  "Kulüp sahipleri kendi kulübünü oluşturabilir",
-  "Oyuncu, veli ve koçlar takım kodu ile katılabilir",
-  "Antrenman, maç ve duyurular tek yerden takip edilir",
-  "Web, iPhone ve Android için ortak deneyim",
-];
+import { useTranslation } from "@/localization";
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <ScreenCard centered style={styles.card}>
-        <Text style={styles.logo}>MaviTeam</Text>
+        <View style={styles.languageContainer}>
+          <LanguageSelector compact />
+        </View>
 
-        <Text style={styles.badge}>Spor kulüpleri için yönetim platformu</Text>
+        <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.title}>Kulübünüzü tek yerden yönetin</Text>
+        <Text style={styles.badge}>{t.home.badge}</Text>
 
-        <Text style={styles.subtitle}>
-          MaviTeam; kulüp sahipleri, koçlar, veliler ve sporcular için takım
-          yönetimini daha kolay hale getirir.
-        </Text>
+        <Text style={styles.title}>{t.home.title}</Text>
+
+        <Text style={styles.subtitle}>{t.home.subtitle}</Text>
 
         <View style={styles.featureBox}>
-          <Text style={styles.featureTitle}>MaviTeam ile neler yapacağız?</Text>
+          <Text style={styles.featureTitle}>{t.home.featuresTitle}</Text>
 
-          {features.map((feature) => (
+          {t.home.features.map((feature) => (
             <Text key={feature} style={styles.featureText}>
               ✓ {feature}
             </Text>
@@ -40,34 +38,32 @@ export default function HomeScreen() {
         <View style={styles.buttonGroup}>
           <Link href={{ pathname: "/register", params: { next: "create-club" } }} asChild>
             <AppButton
-              title="Kulüp oluştur"
-              accessibilityLabel="Kayıt ekranından sonra yeni kulüp oluşturma sayfasına git"
+              title={t.home.primaryAction}
+              accessibilityLabel={t.home.accessibility.createClub}
               style={styles.button}
             />
           </Link>
 
           <Link href={{ pathname: "/register", params: { next: "join-club" } }} asChild>
             <AppButton
-              title="Takım kodu ile katıl"
+              title={t.home.secondaryAction}
               variant="secondary"
-              accessibilityLabel="Kayıt ekranından sonra takım kodu ile kulübe katılma sayfasına git"
+              accessibilityLabel={t.home.accessibility.joinClub}
               style={styles.button}
             />
           </Link>
 
           <Link href="/login" asChild>
             <AppButton
-              title="Giriş yap"
+              title={t.home.loginAction}
               variant="ghost"
-              accessibilityLabel="MaviTeam hesabı ile giriş yap"
+              accessibilityLabel={t.home.accessibility.login}
               style={styles.button}
             />
           </Link>
         </View>
 
-        <Text style={styles.footerText}>
-          Yeni kullanıcılar hesap oluşturur. Mevcut kullanıcılar giriş yapabilir.
-        </Text>
+        <Text style={styles.footerText}>{t.home.footerText}</Text>
       </ScreenCard>
     </ScrollView>
   );
@@ -87,6 +83,10 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: theme.spacing["3xl"],
+  },
+  languageContainer: {
+    alignSelf: "flex-end",
+    marginBottom: theme.spacing.lg,
   },
   logo: {
     fontSize: theme.fontSizes["3xl"],

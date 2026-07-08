@@ -6,6 +6,7 @@ import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 
 function getNextRoute(value: string | string[] | undefined) {
@@ -28,6 +29,7 @@ function isValidEmail(value: string) {
 export default function RegisterScreen() {
   const router = useRouter();
   const { next } = useLocalSearchParams();
+  const { t } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
 
   const [fullName, setFullName] = useState("");
@@ -36,14 +38,12 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
-    firebaseIsReady
-      ? "Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin."
-      : "Firebase ayarları eksik. Gerçek kayıt için önce .env bilgileri eklenmeli."
+    firebaseIsReady ? t.auth.firebaseReadyRegister : t.auth.firebaseMissingRegister
   );
 
   function clearStatusOnChange() {
-    if (statusMessage !== "Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin." && firebaseIsReady) {
-      setStatusMessage("Bilgilerini girerek gerçek MaviTeam hesabını oluşturabilirsin.");
+    if (firebaseIsReady && statusMessage !== t.auth.firebaseReadyRegister) {
+      setStatusMessage(t.auth.firebaseReadyRegister);
     }
   }
 
@@ -54,33 +54,33 @@ export default function RegisterScreen() {
     const nextRoute = getNextRoute(next);
 
     if (!firebaseIsReady) {
-      setStatusMessage("Firebase ayarları eksik. .env dosyasını ekleyip uygulamayı yeniden başlat.");
+      setStatusMessage(t.auth.validation.firebaseMissing);
       return;
     }
 
     if (trimmedName === "") {
-      setStatusMessage("Lütfen ad soyad bilgisini giriniz.");
+      setStatusMessage(t.auth.validation.fullNameRequired);
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setStatusMessage("Lütfen geçerli bir e-posta adresi giriniz. Örn. isim@email.com");
+      setStatusMessage(t.auth.validation.emailInvalidExample);
       return;
     }
 
     if (cleanPassword.length < 6) {
-      setStatusMessage("Şifre en az 6 karakter olmalıdır.");
+      setStatusMessage(t.auth.validation.passwordTooShort);
       return;
     }
 
     if (cleanPassword !== confirmPassword.trim()) {
-      setStatusMessage("Şifreler aynı olmalıdır.");
+      setStatusMessage(t.auth.validation.passwordMismatch);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Firebase hesabı oluşturuluyor ve doğrulama e-postası gönderiliyor...");
+      setStatusMessage(t.auth.registerInProgress);
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -88,7 +88,7 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage("Doğrulama e-postası gönderildi. Mail kutunu kontrol et.");
+      setStatusMessage(t.auth.verificationEmailSent);
 
       router.replace({
         pathname: "/verify-email",
@@ -110,110 +110,106 @@ export default function RegisterScreen() {
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>MaviTeam</Text>
-        <Text style={styles.badge}>Güvenli hesap oluşturma</Text>
-        <Text style={styles.title}>Hesap oluştur</Text>
-        <Text style={styles.subtitle}>
-          Önce gerçek MaviTeam hesabını oluştur. Sonra e-posta adresini doğrulayıp kulüp kurabilir veya takım kodu ile katılabilirsin.
-        </Text>
+        <Text style={styles.logo}>{t.common.appName}</Text>
+        <Text style={styles.badge}>{t.auth.registerBadge}</Text>
+        <Text style={styles.title}>{t.auth.registerTitle}</Text>
+        <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ad Soyad</Text>
+            <Text style={styles.label}>{t.auth.fullNameLabel}</Text>
             <TextInput
               value={fullName}
               onChangeText={(value) => {
                 setFullName(value);
                 clearStatusOnChange();
               }}
-              placeholder="Örn. Mert Asma"
+              placeholder={t.auth.fullNamePlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               style={styles.input}
               autoComplete="name"
               textContentType="name"
-              accessibilityLabel="Ad soyad"
+              accessibilityLabel={t.auth.accessibility.fullName}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={styles.label}>{t.auth.emailLabel}</Text>
             <TextInput
               value={email}
               onChangeText={(value) => {
                 setEmail(value);
                 clearStatusOnChange();
               }}
-              placeholder="ornek@email.com"
+              placeholder={t.auth.emailPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
               textContentType="emailAddress"
               style={styles.input}
-              accessibilityLabel="E-posta adresi"
+              accessibilityLabel={t.auth.accessibility.email}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>{t.auth.passwordLabel}</Text>
             <TextInput
               value={password}
               onChangeText={(value) => {
                 setPassword(value);
                 clearStatusOnChange();
               }}
-              placeholder="En az 6 karakter"
+              placeholder={t.auth.newPasswordPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               secureTextEntry
               autoComplete="new-password"
               textContentType="newPassword"
               style={styles.input}
-              accessibilityLabel="Şifre"
+              accessibilityLabel={t.auth.accessibility.password}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şifre tekrar</Text>
+            <Text style={styles.label}>{t.auth.confirmPasswordLabel}</Text>
             <TextInput
               value={confirmPassword}
               onChangeText={(value) => {
                 setConfirmPassword(value);
                 clearStatusOnChange();
               }}
-              placeholder="Şifrenizi tekrar giriniz"
+              placeholder={t.auth.confirmPasswordPlaceholder}
               placeholderTextColor={theme.colors.text.muted}
               secureTextEntry
               autoComplete="new-password"
               textContentType="newPassword"
               style={styles.input}
-              accessibilityLabel="Şifre tekrar"
+              accessibilityLabel={t.auth.accessibility.confirmPassword}
             />
           </View>
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>E-posta doğrulama gerekli</Text>
-          <Text style={styles.infoText}>
-            Hesap oluşturulduktan sonra doğrulama linki e-postana gönderilir. E-postanı doğrulamadan uygulama içine geçemezsin.
-          </Text>
+          <Text style={styles.infoTitle}>{t.auth.emailVerificationRequiredTitle}</Text>
+          <Text style={styles.infoText}>{t.auth.emailVerificationRequiredText}</Text>
         </View>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
 
         <View style={styles.buttonGroup}>
           <AppButton
-            title={isSubmitting ? "Hesap oluşturuluyor..." : "Hesap oluştur ve doğrula"}
+            title={isSubmitting ? t.auth.registerSubmitting : t.auth.registerButton}
             onPress={handleContinue}
             disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel="Firebase hesabı oluştur ve e-posta doğrulama ekranına geç"
+            accessibilityLabel={t.auth.accessibility.register}
             style={styles.button}
           />
 
           <AppButton
-            title="Ana sayfaya dön"
+            title={t.auth.backHome}
             variant="ghost"
             onPress={() => router.replace("/")}
-            accessibilityLabel="Ana sayfaya dön"
+            accessibilityLabel={t.auth.accessibility.backHome}
             style={styles.button}
           />
         </View>

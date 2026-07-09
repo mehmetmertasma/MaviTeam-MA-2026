@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ScheduleEvent, TeamSyncAppData, UserRole } from "@/types/teamSync";
 
@@ -27,85 +28,26 @@ type QuickAction = {
   route: AppRoute;
 };
 
-const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = {
-  superAdmin: {
-    title: "Platform operasyon merkezi",
-    subtitle: "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek panelden takip et.",
-  },
-  clubAdmin: {
-    title: "Kulüp operasyon merkezi",
-    subtitle: "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı.",
-  },
-  coach: {
-    title: "Takım operasyon paneli",
-    subtitle: "Program, yoklama, uygunluk ve takım iletişimini hızlıca yönet.",
-  },
-  parent: {
-    title: "Takım takip paneli",
-    subtitle: "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et.",
-  },
-  athlete: {
-    title: "Takım program paneli",
-    subtitle: "Antrenman, maç, duyuru ve paylaşılan içeriklere tek ekrandan ulaş.",
-  },
-};
+type AttentionTone = "success" | "warning" | "info";
 
-const quickActionsByRole: Record<UserRole, QuickAction[]> = {
-  superAdmin: [
-    { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" },
-    { title: "İstatistikleri gör", meta: "Platform ve kulüp özeti", route: "/statistics" },
-    { title: "Profil bilgileri", meta: "Hesap merkezine git", route: "/profile" },
-  ],
-  clubAdmin: [
-    { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
-    { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
-    { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-    { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-    { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
-    { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
-  ],
-  coach: [
-    { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
-    { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
-    { title: "Uygunluk cevapları", meta: "Katılım planlamasını gör", route: "/availability" },
-    { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
-    { title: "Mesajları aç", meta: "Takım iletişimi", route: "/messages" },
-    { title: "Video / drill paylaş", meta: "İçerik ekranına git", route: "/replays" },
-  ],
-  parent: [
-    { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-    { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-    { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-    { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
-    { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
-  ],
-  athlete: [
-    { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-    { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
-    { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
-    { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-    { title: "Video / drill izle", meta: "Paylaşılan içerikler", route: "/replays" },
-  ],
-};
-
-function getFirstName(name: string) {
+function getFirstName(name: string, fallback: string) {
   const trimmedName = name.trim();
 
   if (trimmedName.length === 0) {
-    return "Kullanıcı";
+    return fallback;
   }
 
   return trimmedName.split(" ")[0];
 }
 
-function formatEventTime(value: string) {
+function formatEventTime(value: string, locale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok";
+    return locale === "tr-TR" ? "Tarih yok" : "No date";
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -115,15 +57,230 @@ function formatEventTime(value: string) {
 
 function getUpcomingEvents(events: ScheduleEvent[]) {
   return [...events]
-    .sort((firstEvent, secondEvent) => {
-      return new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime();
-    })
+    .sort((firstEvent, secondEvent) => new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime())
     .slice(0, 3);
 }
 
+function getDashboardCopy(language: "tr" | "en") {
+  if (language === "en") {
+    return {
+      appSubtitle: "Club management system",
+      loading: "Loading",
+      ready: "System ready",
+      connectionIssue: "Data connection needs attention",
+      loadingTitle: "Operations dashboard",
+      pageEyebrow: "Operations dashboard",
+      welcome: "Welcome",
+      userFallback: "User",
+      editProfile: "Edit profile",
+      editProfileAccessLabel: "Open profile settings",
+      heroLabel: "Club overview",
+      workspaceLabel: "Workspace",
+      clubCode: "Club code",
+      noTeam: "No team selected",
+      activeMember: "Active members",
+      team: "Teams",
+      event: "Events",
+      athlete: "Athletes",
+      announcement: "Announcements",
+      approval: "Approvals",
+      accessOpen: "Access open",
+      registered: "Registered",
+      organized: "Organized",
+      calendar: "Calendar",
+      published: "Published",
+      pending: "Pending",
+      pendingMembers: "Pending memberships",
+      openPayments: "Open payments",
+      upcomingEvents: "Upcoming events",
+      currentRecord: "Current record",
+      quickActionsTitle: "Priority actions",
+      quickActionsSubtitle: "The most important screens for managing your club.",
+      todaySummaryTitle: "Today’s summary",
+      todaySummarySubtitle: "Items that need quick attention.",
+      noEvents: "No upcoming events yet.",
+      clubSummaryTitle: "Club summary",
+      clubSummarySubtitle: "Workspace and club details.",
+      club: "Club",
+      city: "City",
+      operationStatus: "Operational status",
+      steady: "On track",
+      needsAttention: "Needs attention",
+      open: "Open",
+      roleHeroText: {
+        superAdmin: {
+          title: "Platform operations center",
+          subtitle: "Monitor clubs, users, and platform activity from one executive view.",
+        },
+        clubAdmin: {
+          title: "Club operations center",
+          subtitle: "Manage teams, members, schedules, communication, and payments with a clean professional workflow.",
+        },
+        coach: {
+          title: "Team operations dashboard",
+          subtitle: "Manage schedule, attendance, availability, and team communication from one place.",
+        },
+        parent: {
+          title: "Team family dashboard",
+          subtitle: "Follow schedule, announcements, messages, and payment updates for your athlete.",
+        },
+        athlete: {
+          title: "Team schedule dashboard",
+          subtitle: "Access practices, matches, announcements, messages, and shared content in one place.",
+        },
+      } satisfies Record<UserRole, { title: string; subtitle: string }>,
+      quickActionsByRole: {
+        superAdmin: [
+          { title: "Club dashboard", meta: "Review club workspace", route: "/dashboard" },
+          { title: "View statistics", meta: "Platform and club summary", route: "/statistics" },
+          { title: "Account center", meta: "Open profile settings", route: "/profile" },
+        ],
+        clubAdmin: [
+          { title: "Manage teams", meta: "Teams and rosters", route: "/teams" },
+          { title: "Pending approvals", meta: "Approve new members", route: "/pending-approvals" },
+          { title: "Publish announcement", meta: "Club and team updates", route: "/announcements" },
+          { title: "Create schedule", meta: "Practices and matches", route: "/schedule" },
+          { title: "Open messages", meta: "Team and direct chats", route: "/messages" },
+          { title: "Review payments", meta: "Membership payment tracking", route: "/payments" },
+        ],
+        coach: [
+          { title: "Manage schedule", meta: "Add practice or match", route: "/schedule" },
+          { title: "Take attendance", meta: "Mark attendance status", route: "/attendance" },
+          { title: "Availability", meta: "Plan participation", route: "/availability" },
+          { title: "Team announcement", meta: "Open announcements", route: "/announcements" },
+          { title: "Open messages", meta: "Team communication", route: "/messages" },
+          { title: "Share replay", meta: "Video and drill content", route: "/replays" },
+        ],
+        parent: [
+          { title: "View schedule", meta: "Practices and matches", route: "/schedule" },
+          { title: "Read announcements", meta: "Club and team updates", route: "/announcements" },
+          { title: "Send message", meta: "Team communication", route: "/messages" },
+          { title: "Set availability", meta: "Submit participation status", route: "/availability" },
+          { title: "Check payments", meta: "Monthly payment details", route: "/payments" },
+        ],
+        athlete: [
+          { title: "View my schedule", meta: "Practices and matches", route: "/schedule" },
+          { title: "Set availability", meta: "Submit participation status", route: "/availability" },
+          { title: "Read announcements", meta: "Team updates", route: "/announcements" },
+          { title: "Send message", meta: "Team communication", route: "/messages" },
+          { title: "Watch replay", meta: "Shared content", route: "/replays" },
+        ],
+      } satisfies Record<UserRole, QuickAction[]>,
+    };
+  }
+
+  return {
+    appSubtitle: "Kulüp yönetim sistemi",
+    loading: "Yükleniyor",
+    ready: "Sistem hazır",
+    connectionIssue: "Veri bağlantısı kontrol edilmeli",
+    loadingTitle: "Operasyon paneli",
+    pageEyebrow: "Operasyon paneli",
+    welcome: "Hoş geldin",
+    userFallback: "Kullanıcı",
+    editProfile: "Profili düzenle",
+    editProfileAccessLabel: "Profil ayarlarını aç",
+    heroLabel: "Kulüp özeti",
+    workspaceLabel: "Çalışma alanı",
+    clubCode: "Kulüp kodu",
+    noTeam: "Takım seçilmedi",
+    activeMember: "Aktif üye",
+    team: "Takım",
+    event: "Etkinlik",
+    athlete: "Sporcu",
+    announcement: "Duyuru",
+    approval: "Onay",
+    accessOpen: "Erişim açık",
+    registered: "Kayıtlı",
+    organized: "Organize",
+    calendar: "Takvim",
+    published: "Yayın",
+    pending: "Bekleyen",
+    pendingMembers: "Bekleyen üyelik",
+    openPayments: "Açık ödeme",
+    upcomingEvents: "Yaklaşan etkinlik",
+    currentRecord: "Güncel kayıt",
+    quickActionsTitle: "Öncelikli işlemler",
+    quickActionsSubtitle: "Kulübü yönetmek için en önemli ekranlar.",
+    todaySummaryTitle: "Bugünün özeti",
+    todaySummarySubtitle: "Hızlı takip edilmesi gereken başlıklar.",
+    noEvents: "Henüz etkinlik yok.",
+    clubSummaryTitle: "Kulüp özeti",
+    clubSummarySubtitle: "Çalışma alanı ve kulüp bilgileri.",
+    club: "Kulüp",
+    city: "Şehir",
+    operationStatus: "Operasyon durumu",
+    steady: "Düzenli",
+    needsAttention: "Takip gerekli",
+    open: "Aç",
+    roleHeroText: {
+      superAdmin: {
+        title: "Platform operasyon merkezi",
+        subtitle: "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek yönetici ekranından takip et.",
+      },
+      clubAdmin: {
+        title: "Kulüp operasyon merkezi",
+        subtitle: "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı.",
+      },
+      coach: {
+        title: "Takım operasyon paneli",
+        subtitle: "Program, yoklama, uygunluk ve takım iletişimini tek yerden yönet.",
+      },
+      parent: {
+        title: "Takım takip paneli",
+        subtitle: "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et.",
+      },
+      athlete: {
+        title: "Takım program paneli",
+        subtitle: "Antrenman, maç, duyuru, mesaj ve paylaşılan içeriklere tek ekrandan ulaş.",
+      },
+    } satisfies Record<UserRole, { title: string; subtitle: string }>,
+    quickActionsByRole: {
+      superAdmin: [
+        { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" },
+        { title: "İstatistikleri gör", meta: "Platform ve kulüp özeti", route: "/statistics" },
+        { title: "Hesap merkezi", meta: "Profil ayarlarını aç", route: "/profile" },
+      ],
+      clubAdmin: [
+        { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
+        { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
+        { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+        { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
+        { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
+      ],
+      coach: [
+        { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
+        { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
+        { title: "Uygunluk cevapları", meta: "Katılım planlamasını gör", route: "/availability" },
+        { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
+        { title: "Mesajları aç", meta: "Takım iletişimi", route: "/messages" },
+        { title: "Video / drill paylaş", meta: "İçerik ekranına git", route: "/replays" },
+      ],
+      parent: [
+        { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
+        { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+        { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
+        { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
+      ],
+      athlete: [
+        { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
+        { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
+        { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
+        { title: "Video / drill izle", meta: "Paylaşılan içerikler", route: "/replays" },
+      ],
+    } satisfies Record<UserRole, QuickAction[]>,
+  };
+}
+
 export default function DashboardScreen() {
+  const { language } = useTranslation();
+  const copy = getDashboardCopy(language);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Yükleniyor");
+  const [statusMessage, setStatusMessage] = useState(copy.loading);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,12 +292,12 @@ export default function DashboardScreen() {
 
           if (isActive) {
             setAppData(loadedAppData);
-            setStatusMessage("Sistem hazır");
+            setStatusMessage(copy.ready);
           }
         } catch {
           if (isActive) {
             setAppData(null);
-            setStatusMessage("Veri bağlantısı kontrol edilmeli");
+            setStatusMessage(copy.connectionIssue);
           }
         }
       }
@@ -150,64 +307,16 @@ export default function DashboardScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [copy.connectionIssue, copy.ready])
   );
 
-  const dashboardModel = useMemo(() => {
-    if (appData === null) {
-      return null;
-    }
-
-    const { club, currentUser, users, teams, announcements, scheduleEvents, payments, joinRequests } = appData;
-    const activeUsers = users.filter((user) => user.status === "active");
-    const athleteCount = activeUsers.filter((user) => user.role === "athlete").length;
-    const pendingRequestCount = joinRequests.filter((request) => request.status === "pending").length;
-    const unpaidPaymentCount = payments.filter((payment) => payment.status !== "paid").length;
-    const primaryTeam = teams.find((team) => currentUser.teamIds.includes(team.id));
-    const heroText = roleHeroText[currentUser.role];
-
-    return {
-      club,
-      currentUser,
-      primaryTeam,
-      heroText,
-      quickActions: quickActionsByRole[currentUser.role],
-      upcomingEvents: getUpcomingEvents(scheduleEvents),
-      heroMetrics: [
-        { label: "Aktif üye", value: String(activeUsers.length) },
-        { label: "Takım", value: String(teams.length) },
-        { label: "Etkinlik", value: String(scheduleEvents.length) },
-      ],
-      stats: [
-        { label: "Aktif üye", value: String(activeUsers.length), hint: "Erişim açık" },
-        { label: "Oyuncu", value: String(athleteCount), hint: "Kayıtlı" },
-        { label: "Takım", value: String(teams.length), hint: "Organize" },
-        { label: "Etkinlik", value: String(scheduleEvents.length), hint: "Takvim" },
-        { label: "Duyuru", value: String(announcements.length), hint: "Yayın" },
-        { label: "Onay", value: String(pendingRequestCount), hint: "Bekleyen" },
-      ],
-      attentionItems: [
-        { label: "Bekleyen üyelik", value: String(pendingRequestCount), tone: pendingRequestCount > 0 ? "warning" : "success" },
-        { label: "Açık ödeme", value: String(unpaidPaymentCount), tone: unpaidPaymentCount > 0 ? "warning" : "success" },
-        { label: "Yaklaşan etkinlik", value: String(Math.min(scheduleEvents.length, 3)), tone: "info" },
-      ],
-      overview: [
-        { label: "Kulüp", value: club.name },
-        { label: "Takım", value: primaryTeam?.name ?? "Takım seçilmedi" },
-        { label: "Kulüp kodu", value: club.code },
-        { label: "Şehir", value: club.city },
-        { label: "Operasyon durumu", value: unpaidPaymentCount === 0 && pendingRequestCount === 0 ? "Düzenli" : "Takip gerekli" },
-      ],
-    };
-  }, [appData]);
-
-  if (dashboardModel === null) {
+  if (appData === null) {
     return (
       <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
         <View style={styles.container}>
           <View style={styles.loadingCard}>
-            <Text style={styles.logo}>TeamSync</Text>
-            <Text style={styles.loadingTitle}>Operasyon paneli</Text>
+            <Text style={styles.logo}>MaviTeam</Text>
+            <Text style={styles.loadingTitle}>{copy.loadingTitle}</Text>
             <Text style={styles.loadingText}>{statusMessage}</Text>
           </View>
         </View>
@@ -215,13 +324,48 @@ export default function DashboardScreen() {
     );
   }
 
+  const { club, currentUser, users, teams, announcements, scheduleEvents, payments, joinRequests } = appData;
+  const activeUsers = users.filter((user) => user.status === "active");
+  const athleteCount = activeUsers.filter((user) => user.role === "athlete").length;
+  const pendingRequestCount = joinRequests.filter((request) => request.status === "pending").length;
+  const unpaidPaymentCount = payments.filter((payment) => payment.status !== "paid").length;
+  const primaryTeam = teams.find((team) => currentUser.teamIds.includes(team.id));
+  const heroText = copy.roleHeroText[currentUser.role];
+  const quickActions = copy.quickActionsByRole[currentUser.role];
+  const upcomingEvents = getUpcomingEvents(scheduleEvents);
+  const heroMetrics = [
+    { label: copy.activeMember, value: String(activeUsers.length) },
+    { label: copy.team, value: String(teams.length) },
+    { label: copy.event, value: String(scheduleEvents.length) },
+  ];
+  const stats = [
+    { label: copy.activeMember, value: String(activeUsers.length), hint: copy.accessOpen },
+    { label: copy.athlete, value: String(athleteCount), hint: copy.registered },
+    { label: copy.team, value: String(teams.length), hint: copy.organized },
+    { label: copy.event, value: String(scheduleEvents.length), hint: copy.calendar },
+    { label: copy.announcement, value: String(announcements.length), hint: copy.published },
+    { label: copy.approval, value: String(pendingRequestCount), hint: copy.pending },
+  ];
+  const attentionItems: { label: string; value: string; tone: AttentionTone }[] = [
+    { label: copy.pendingMembers, value: String(pendingRequestCount), tone: pendingRequestCount > 0 ? "warning" : "success" },
+    { label: copy.openPayments, value: String(unpaidPaymentCount), tone: unpaidPaymentCount > 0 ? "warning" : "success" },
+    { label: copy.upcomingEvents, value: String(Math.min(scheduleEvents.length, 3)), tone: "info" },
+  ];
+  const overview = [
+    { label: copy.club, value: club.name },
+    { label: copy.team, value: primaryTeam?.name ?? copy.noTeam },
+    { label: copy.clubCode, value: club.code },
+    { label: copy.city, value: club.city || "—" },
+    { label: copy.operationStatus, value: unpaidPaymentCount === 0 && pendingRequestCount === 0 ? copy.steady : copy.needsAttention },
+  ];
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.topBar}>
           <View>
-            <Text style={styles.logo}>TeamSync</Text>
-            <Text style={styles.topBarSub}>Kulüp yönetim sistemi</Text>
+            <Text style={styles.logo}>MaviTeam</Text>
+            <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
           </View>
           <View style={styles.systemBadge}>
             <View style={styles.systemDot} />
@@ -231,15 +375,17 @@ export default function DashboardScreen() {
 
         <View style={styles.pageHeader}>
           <View style={styles.pageTitleArea}>
-            <Text style={styles.pageEyebrow}>Operasyon paneli</Text>
-            <Text style={styles.welcome}>Hoş geldin, {getFirstName(dashboardModel.currentUser.fullName)}</Text>
-            <Text style={styles.subtitle}>{dashboardModel.club.name}</Text>
+            <Text style={styles.pageEyebrow}>{copy.pageEyebrow}</Text>
+            <Text style={styles.welcome}>
+              {copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}
+            </Text>
+            <Text style={styles.subtitle}>{club.name}</Text>
           </View>
 
           <AppButton
-            title="Profili düzenle"
+            title={copy.editProfile}
             variant="secondary"
-            accessibilityLabel="Profil düzenleme sayfasına git"
+            accessibilityLabel={copy.editProfileAccessLabel}
             style={styles.editProfileButton}
             onPress={() => router.push("/profile" as never)}
           />
@@ -247,12 +393,12 @@ export default function DashboardScreen() {
 
         <View style={styles.executiveHero}>
           <View style={styles.heroMainContent}>
-            <Text style={styles.heroLabel}>Management overview</Text>
-            <Text style={styles.heroTitle}>{dashboardModel.heroText.title}</Text>
-            <Text style={styles.heroSubtitle}>{dashboardModel.heroText.subtitle}</Text>
+            <Text style={styles.heroLabel}>{copy.heroLabel}</Text>
+            <Text style={styles.heroTitle}>{heroText.title}</Text>
+            <Text style={styles.heroSubtitle}>{heroText.subtitle}</Text>
 
             <View style={styles.heroMetricRow}>
-              {dashboardModel.heroMetrics.map((metric) => (
+              {heroMetrics.map((metric) => (
                 <View key={metric.label} style={styles.heroMetricCard}>
                   <Text style={styles.heroMetricValue}>{metric.value}</Text>
                   <Text style={styles.heroMetricLabel}>{metric.label}</Text>
@@ -262,17 +408,17 @@ export default function DashboardScreen() {
           </View>
 
           <View style={styles.workspaceCard}>
-            <Text style={styles.workspaceLabel}>Workspace</Text>
-            <Text style={styles.workspaceName}>{dashboardModel.club.name}</Text>
+            <Text style={styles.workspaceLabel}>{copy.workspaceLabel}</Text>
+            <Text style={styles.workspaceName}>{club.name}</Text>
             <View style={styles.workspaceDivider} />
-            <Text style={styles.workspaceMetaLabel}>Kulüp kodu</Text>
-            <Text style={styles.workspaceCode}>{dashboardModel.club.code}</Text>
-            <Text style={styles.workspaceTeam}>{dashboardModel.primaryTeam?.name ?? "Takım seçilmedi"}</Text>
+            <Text style={styles.workspaceMetaLabel}>{copy.clubCode}</Text>
+            <Text style={styles.workspaceCode}>{club.code}</Text>
+            <Text style={styles.workspaceTeam}>{primaryTeam?.name ?? copy.noTeam}</Text>
           </View>
         </View>
 
         <View style={styles.statsGrid}>
-          {dashboardModel.stats.map((stat) => (
+          {stats.map((stat) => (
             <View key={stat.label} style={styles.statCard}>
               <Text style={styles.statHint}>{stat.hint}</Text>
               <Text style={styles.statValue}>{stat.value}</Text>
@@ -285,44 +431,42 @@ export default function DashboardScreen() {
           <View style={[styles.panel, styles.actionPanel]}>
             <View style={styles.panelHeader}>
               <View>
-                <Text style={styles.panelTitle}>Öncelikli işlemler</Text>
-                <Text style={styles.panelSubtitle}>En sık kullanılan yönetim ekranları.</Text>
+                <Text style={styles.panelTitle}>{copy.quickActionsTitle}</Text>
+                <Text style={styles.panelSubtitle}>{copy.quickActionsSubtitle}</Text>
               </View>
-              <Text style={styles.panelCount}>{dashboardModel.quickActions.length}</Text>
+              <Text style={styles.panelCount}>{quickActions.length}</Text>
             </View>
 
             <View style={styles.actionGrid}>
-              {dashboardModel.quickActions.map((action) => {
-                return (
-                  <Pressable
-                    key={action.title}
-                    onPress={() => router.push(action.route as never)}
-                    style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
-                  >
-                    <View style={styles.actionAccent} />
-                    <View style={styles.actionTextArea}>
-                      <Text style={styles.actionText}>{action.title}</Text>
-                      <Text style={styles.actionMeta}>{action.meta}</Text>
-                    </View>
-                    <Text style={styles.actionOpenText}>Aç</Text>
-                  </Pressable>
-                );
-              })}
+              {quickActions.map((action) => (
+                <Pressable
+                  key={action.title}
+                  onPress={() => router.push(action.route as never)}
+                  style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
+                >
+                  <View style={styles.actionAccent} />
+                  <View style={styles.actionTextArea}>
+                    <Text style={styles.actionText}>{action.title}</Text>
+                    <Text style={styles.actionMeta}>{action.meta}</Text>
+                  </View>
+                  <Text style={styles.actionOpenText}>{copy.open}</Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 
           <View style={[styles.panel, styles.sidePanel]}>
             <View style={styles.panelHeaderCompact}>
-              <Text style={styles.panelTitle}>Bugünün özeti</Text>
-              <Text style={styles.panelSubtitle}>Takip edilmesi gereken başlıklar.</Text>
+              <Text style={styles.panelTitle}>{copy.todaySummaryTitle}</Text>
+              <Text style={styles.panelSubtitle}>{copy.todaySummarySubtitle}</Text>
             </View>
 
             <View style={styles.attentionList}>
-              {dashboardModel.attentionItems.map((item) => (
+              {attentionItems.map((item) => (
                 <View key={item.label} style={styles.attentionRow}>
                   <View>
                     <Text style={styles.attentionLabel}>{item.label}</Text>
-                    <Text style={styles.attentionMeta}>Güncel kayıt</Text>
+                    <Text style={styles.attentionMeta}>{copy.currentRecord}</Text>
                   </View>
                   <Text
                     style={[
@@ -338,20 +482,20 @@ export default function DashboardScreen() {
             </View>
 
             <View style={styles.eventBlock}>
-              <Text style={styles.blockTitle}>Yaklaşan etkinlikler</Text>
-              {dashboardModel.upcomingEvents.length === 0 ? (
-                <Text style={styles.emptyText}>Henüz etkinlik yok.</Text>
+              <Text style={styles.blockTitle}>{copy.upcomingEvents}</Text>
+              {upcomingEvents.length === 0 ? (
+                <Text style={styles.emptyText}>{copy.noEvents}</Text>
               ) : (
                 <View style={styles.eventList}>
-                  {dashboardModel.upcomingEvents.map((event) => (
+                  {upcomingEvents.map((event) => (
                     <View key={event.id} style={styles.eventCard}>
                       <View style={styles.eventDateBox}>
-                        <Text style={styles.eventDateText}>{formatEventTime(event.startsAt).split(" ")[0]}</Text>
+                        <Text style={styles.eventDateText}>{formatEventTime(event.startsAt, locale).split(" ")[0]}</Text>
                       </View>
 
                       <View style={styles.eventContent}>
                         <Text style={styles.eventTitle}>{event.title}</Text>
-                        <Text style={styles.eventTime}>{formatEventTime(event.startsAt)}</Text>
+                        <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
                         <Text style={styles.eventLocation}>{event.location}</Text>
                       </View>
                     </View>
@@ -364,19 +508,17 @@ export default function DashboardScreen() {
 
         <View style={styles.panel}>
           <View style={styles.panelHeaderCompact}>
-            <Text style={styles.panelTitle}>Kulüp özeti</Text>
-            <Text style={styles.panelSubtitle}>Çalışma alanı bilgileri.</Text>
+            <Text style={styles.panelTitle}>{copy.clubSummaryTitle}</Text>
+            <Text style={styles.panelSubtitle}>{copy.clubSummarySubtitle}</Text>
           </View>
 
           <View style={styles.overviewGrid}>
-            {dashboardModel.overview.map((item) => {
-              return (
-                <View key={item.label} style={styles.infoCard}>
-                  <Text style={styles.infoLabel}>{item.label}</Text>
-                  <Text style={styles.infoValue}>{item.value}</Text>
-                </View>
-              );
-            })}
+            {overview.map((item) => (
+              <View key={item.label} style={styles.infoCard}>
+                <Text style={styles.infoLabel}>{item.label}</Text>
+                <Text style={styles.infoValue}>{item.value}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>

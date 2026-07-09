@@ -85,6 +85,12 @@ export default function CreateClubScreen() {
       });
 
       if (authService.isConfigured() && firebaseUser !== null) {
+        await firestoreTeamSyncService.ensureUserProfile({
+          user: firebaseUser,
+          role: "clubAdmin",
+          status: "emailVerified",
+        });
+
         await firestoreTeamSyncService.createClubWorkspace({
           firebaseUser,
           clubId: nextData.club.id,

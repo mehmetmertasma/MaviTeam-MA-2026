@@ -54,6 +54,14 @@ function LoadingScreen({ message }: { message: string }) {
   );
 }
 
+function getSetupRouteForSignedInUser(pathname: string) {
+  if (pathname === "/join-club" || pathname === "/join-request-sent") {
+    return pathname;
+  }
+
+  return "/create-club";
+}
+
 function AppContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -98,7 +106,7 @@ function AppContent() {
 
         if (workspace === null) {
           if (!workspaceSetupRoutes.includes(pathname)) {
-            router.replace("/" as never);
+            router.replace(getSetupRouteForSignedInUser(pathname) as never);
           }
 
           return;
@@ -119,11 +127,11 @@ function AppContent() {
         }
 
         if (workspace.club === null && !workspaceSetupRoutes.includes(pathname)) {
-          router.replace("/" as never);
+          router.replace(getSetupRouteForSignedInUser(pathname) as never);
         }
       } catch {
         if (isActive && !workspaceSetupRoutes.includes(pathname)) {
-          router.replace("/" as never);
+          router.replace(getSetupRouteForSignedInUser(pathname) as never);
         }
       }
     }

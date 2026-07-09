@@ -52,8 +52,65 @@ function getFormDataFromAppData(appData: TeamSyncAppData): ProfileFormData {
   };
 }
 
+function getProfileCopy(language: "tr" | "en") {
+  if (language === "en") {
+    return {
+      noEmail: "No email",
+      noTeam: "No team selected",
+      teamAccess: "Team access",
+      activeMembers: "Active members",
+      editDetails: "Edit profile and club information",
+      summary: "Profile summary",
+      pushNotifications: "Push notifications",
+      pushDescription: "Announcements, schedule, and message notifications.",
+      emailNotifications: "Email notifications",
+      emailDescription: "Email updates for important club changes.",
+      accountActions: "Account actions",
+      accountActionsSubtitle: "Securely manage this session from your account center.",
+      logoutTitle: "Log out",
+      logoutDescription: "End this session securely and return to the login screen.",
+      logoutButton: "Log out",
+      signingOut: "Logging out...",
+      logoutFailed: "Logout failed. Please try again.",
+      editingEnabled: "Edit mode enabled.",
+      editingCancelled: "Changes cancelled.",
+      defaultUser: "MaviTeam User",
+      defaultClub: "MaviTeam Club",
+      defaultCity: "No city",
+      city: "City",
+    };
+  }
+
+  return {
+    noEmail: "E-posta yok",
+    noTeam: "Takım seçilmedi",
+    teamAccess: "Takım erişimi",
+    activeMembers: "Aktif üye",
+    editDetails: "Profil ve kulüp bilgilerini düzenle",
+    summary: "Profil özeti",
+    pushNotifications: "Push bildirimleri",
+    pushDescription: "Duyuru, program ve mesaj bildirimleri.",
+    emailNotifications: "E-posta bildirimleri",
+    emailDescription: "Önemli kulüp güncellemeleri için e-posta.",
+    accountActions: "Hesap işlemleri",
+    accountActionsSubtitle: "Oturumunuzu hesap merkezinden güvenli şekilde yönetebilirsiniz.",
+    logoutTitle: "Çıkış yap",
+    logoutDescription: "Bu oturumu güvenli şekilde kapatıp giriş ekranına dön.",
+    logoutButton: "Çıkış yap",
+    signingOut: "Çıkış yapılıyor...",
+    logoutFailed: "Çıkış yapılamadı. Lütfen tekrar dene.",
+    editingEnabled: "Düzenleme modu açık.",
+    editingCancelled: "Değişiklikler iptal edildi.",
+    defaultUser: "MaviTeam Kullanıcı",
+    defaultClub: "MaviTeam Kulübü",
+    defaultCity: "Şehir yok",
+    city: "Şehir",
+  };
+}
+
 export default function ProfileScreen() {
   const { t, language } = useTranslation();
+  const copy = getProfileCopy(language === "tr" ? "tr" : "en");
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
@@ -61,48 +118,6 @@ export default function ProfileScreen() {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [statusMessage, setStatusMessage] = useState(t.profile.messages.loaded);
-
-  const copy = language === "tr"
-    ? {
-        noEmail: "E-posta yok",
-        noTeam: "Takım seçilmedi",
-        teamAccess: "Takım erişimi",
-        activeMembers: "Aktif üye",
-        editDetails: "Profil ve kulüp bilgilerini düzenle",
-        summary: "Profil özeti",
-        pushNotifications: "Push bildirimleri",
-        pushDescription: "Duyuru, program ve mesaj bildirimleri.",
-        emailNotifications: "E-posta bildirimleri",
-        emailDescription: "Önemli kulüp güncellemeleri için e-posta.",
-        accountActions: "Hesap işlemleri",
-        accountActionsSubtitle: "Oturumu güvenli şekilde kapatabilirsiniz.",
-        editingEnabled: "Düzenleme modu açık.",
-        editingCancelled: "Değişiklikler iptal edildi.",
-        defaultUser: "MaviTeam Kullanıcı",
-        defaultClub: "MaviTeam Kulübü",
-        defaultCity: "Şehir yok",
-        signingOut: "Çıkış yapılıyor...",
-      }
-    : {
-        noEmail: "No email",
-        noTeam: "No team selected",
-        teamAccess: "Team access",
-        activeMembers: "Active members",
-        editDetails: "Edit profile and club information",
-        summary: "Profile summary",
-        pushNotifications: "Push notifications",
-        pushDescription: "Announcements, schedule, and message notifications.",
-        emailNotifications: "Email notifications",
-        emailDescription: "Email updates for important club changes.",
-        accountActions: "Account actions",
-        accountActionsSubtitle: "You can securely sign out of your account.",
-        editingEnabled: "Edit mode enabled.",
-        editingCancelled: "Changes cancelled.",
-        defaultUser: "MaviTeam User",
-        defaultClub: "MaviTeam Club",
-        defaultCity: "No city",
-        signingOut: "Signing out...",
-      };
 
   useFocusEffect(
     useCallback(() => {
@@ -174,21 +189,25 @@ export default function ProfileScreen() {
   }
 
   async function handleLogout() {
+    if (isSigningOut) {
+      return;
+    }
+
     try {
       setIsSigningOut(true);
       setIsEditing(false);
-      setStatusMessage(t.profile.messages.signingOut);
+      setStatusMessage(copy.signingOut);
 
       if (authService.isConfigured()) {
         await authService.logout();
       }
 
+      await teamSyncService.resetAppData();
       setAppData(null);
       setDraftProfileData(emptyFormData);
-      router.replace((authService.isConfigured() ? "/login" : "/") as never);
+      router.replace("/login" as never);
     } catch (logoutError) {
-      setStatusMessage(getAuthErrorMessage(logoutError));
-    } finally {
+      setStatusMessage(getAuthErrorMessage(logoutError) || copy.logoutFailed);
       setIsSigningOut(false);
     }
   }
@@ -302,46 +321,100 @@ export default function ProfileScreen() {
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.profile.fullName}</Text>
-                  <TextInput value={draftProfileData.fullName} onChangeText={(value) => updateDraftProfile("fullName", value)} placeholder={t.profile.fullName} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <TextInput
+                    value={draftProfileData.fullName}
+                    onChangeText={(value) => updateDraftProfile("fullName", value)}
+                    placeholder={t.profile.fullName}
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
                 </View>
 
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.profile.email}</Text>
-                  <TextInput value={draftProfileData.email} onChangeText={(value) => updateDraftProfile("email", value)} placeholder={t.profile.email} placeholderTextColor={theme.colors.text.muted} keyboardType="email-address" autoCapitalize="none" style={styles.input} />
+                  <TextInput
+                    value={draftProfileData.email}
+                    onChangeText={(value) => updateDraftProfile("email", value)}
+                    placeholder={t.profile.email}
+                    placeholderTextColor={theme.colors.text.muted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    style={styles.input}
+                  />
                 </View>
               </View>
 
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.profile.club}</Text>
-                  <TextInput value={draftProfileData.clubName} onChangeText={(value) => updateDraftProfile("clubName", value)} placeholder={t.profile.club} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <TextInput
+                    value={draftProfileData.clubName}
+                    onChangeText={(value) => updateDraftProfile("clubName", value)}
+                    placeholder={t.profile.club}
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
                 </View>
 
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.common.volleyball}</Text>
-                  <TextInput value={draftProfileData.clubSport} onChangeText={(value) => updateDraftProfile("clubSport", value)} placeholder={t.common.volleyball} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <TextInput
+                    value={draftProfileData.clubSport}
+                    onChangeText={(value) => updateDraftProfile("clubSport", value)}
+                    placeholder={t.common.volleyball}
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
                 </View>
               </View>
 
               <View style={styles.formGrid}>
                 <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>{language === "tr" ? "Şehir" : "City"}</Text>
-                  <TextInput value={draftProfileData.clubCity} onChangeText={(value) => updateDraftProfile("clubCity", value)} placeholder={language === "tr" ? "Şehir" : "City"} placeholderTextColor={theme.colors.text.muted} style={styles.input} />
+                  <Text style={styles.inputLabel}>{copy.city}</Text>
+                  <TextInput
+                    value={draftProfileData.clubCity}
+                    onChangeText={(value) => updateDraftProfile("clubCity", value)}
+                    placeholder={copy.city}
+                    placeholderTextColor={theme.colors.text.muted}
+                    style={styles.input}
+                  />
                 </View>
 
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.profile.clubCode}</Text>
-                  <TextInput value={draftProfileData.clubCode} onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())} placeholder={t.profile.clubCode} placeholderTextColor={theme.colors.text.muted} autoCapitalize="characters" style={styles.input} />
+                  <TextInput
+                    value={draftProfileData.clubCode}
+                    onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())}
+                    placeholder={t.profile.clubCode}
+                    placeholderTextColor={theme.colors.text.muted}
+                    autoCapitalize="characters"
+                    style={styles.input}
+                  />
                 </View>
               </View>
             </View>
           ) : (
             <View style={styles.infoList}>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.fullName}</Text><Text style={styles.infoValue}>{currentUser.fullName}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.email}</Text><Text style={styles.infoValue}>{currentUser.email || copy.noEmail}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.club}</Text><Text style={styles.infoValue}>{currentClub.name}</Text></View>
-              <View style={styles.infoRow}><Text style={styles.infoLabel}>{t.profile.team}</Text><Text style={styles.infoValue}>{primaryTeam?.name ?? copy.noTeam}</Text></View>
-              <View style={styles.infoRowLast}><Text style={styles.infoLabel}>{t.profile.clubCode}</Text><Text style={styles.infoValue}>{currentClub.code}</Text></View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{t.profile.fullName}</Text>
+                <Text style={styles.infoValue}>{currentUser.fullName}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{t.profile.email}</Text>
+                <Text style={styles.infoValue}>{currentUser.email || copy.noEmail}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{t.profile.club}</Text>
+                <Text style={styles.infoValue}>{currentClub.name}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{t.profile.team}</Text>
+                <Text style={styles.infoValue}>{primaryTeam?.name ?? copy.noTeam}</Text>
+              </View>
+              <View style={styles.infoRowLast}>
+                <Text style={styles.infoLabel}>{t.profile.clubCode}</Text>
+                <Text style={styles.infoValue}>{currentClub.code}</Text>
+              </View>
             </View>
           )}
         </View>
@@ -375,14 +448,30 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.logoutSection]}>
           <Text style={styles.sectionTitle}>{copy.accountActions}</Text>
           <Text style={styles.sectionSubtitle}>{copy.accountActionsSubtitle}</Text>
 
-          <View style={styles.actionRowBottom}>
-            {!isEditing ? <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.actionButton} /> : null}
-            <AppButton title={isSigningOut ? copy.signingOut : t.profile.logout} variant="ghost" accessibilityLabel={t.profile.logout} style={styles.actionButton} onPress={handleLogout} disabled={isSigningOut} />
+          <View style={styles.logoutCard}>
+            <View style={styles.logoutTextArea}>
+              <Text style={styles.logoutTitle}>{copy.logoutTitle}</Text>
+              <Text style={styles.logoutDescription}>{copy.logoutDescription}</Text>
+            </View>
+
+            <AppButton
+              title={isSigningOut ? copy.signingOut : copy.logoutButton}
+              variant="ghost"
+              accessibilityLabel={copy.logoutButton}
+              style={styles.logoutButton}
+              textStyle={styles.logoutButtonText}
+              onPress={handleLogout}
+              disabled={isSigningOut}
+            />
           </View>
+
+          {!isEditing ? (
+            <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.editBottomButton} />
+          ) : null}
         </View>
       </View>
     </ScrollView>
@@ -433,5 +522,12 @@ const styles = StyleSheet.create({
   preferenceTextArea: { flex: 1 },
   preferenceTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
   preferenceSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  actionRowBottom: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.xl },
+  logoutSection: { borderColor: "rgba(225, 29, 72, 0.24)" },
+  logoutCard: { backgroundColor: theme.colors.state.dangerSoft, borderWidth: 1, borderColor: "rgba(225, 29, 72, 0.22)", borderRadius: theme.radius.xl, padding: theme.spacing.lg, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg, marginTop: theme.spacing.xl },
+  logoutTextArea: { flex: 1, minWidth: 240 },
+  logoutTitle: { color: theme.colors.text.danger, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  logoutDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  logoutButton: { minWidth: 160, borderColor: "rgba(225, 29, 72, 0.28)" },
+  logoutButtonText: { color: theme.colors.text.danger },
+  editBottomButton: { marginTop: theme.spacing.lg, alignSelf: "flex-start", minWidth: 180 },
 });

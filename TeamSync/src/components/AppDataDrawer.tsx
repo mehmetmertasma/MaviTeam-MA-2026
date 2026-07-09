@@ -18,7 +18,13 @@ type DrawerItem = {
   subtitle: string;
   route?: string;
   isDisabled?: boolean;
+  allowedRoles?: UserRole[];
 };
+
+const allRoles: UserRole[] = ["superAdmin", "clubAdmin", "coach", "parent", "athlete"];
+const staffRoles: UserRole[] = ["superAdmin", "clubAdmin", "coach"];
+const adminRoles: UserRole[] = ["superAdmin", "clubAdmin"];
+const paymentRoles: UserRole[] = ["superAdmin", "clubAdmin", "parent"];
 
 function getDrawerCopy(language: "tr" | "en") {
   if (language === "en") {
@@ -40,18 +46,19 @@ function getDrawerCopy(language: "tr" | "en") {
         athlete: "Athlete",
       } satisfies Record<UserRole, string>,
       items: [
-        { label: "Dashboard", subtitle: "Club command center", route: "/dashboard" },
-        { label: "Messages", subtitle: "Team and direct conversations", route: "/messages" },
-        { label: "Announcements", subtitle: "Club and team updates", route: "/announcements" },
-        { label: "Schedule", subtitle: "Practices and match calendar", route: "/schedule" },
-        { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance" },
-        { label: "Availability", subtitle: "Available / unavailable responses", route: "/availability" },
-        { label: "Teams", subtitle: "Team management", route: "/teams" },
-        { label: "Payments", subtitle: "Payment tracking", route: "/payments" },
-        { label: "Statistics", subtitle: "Performance and participation summary", route: "/statistics" },
-        { label: "Replays", subtitle: "Video and drill content", route: "/replays" },
-        { label: "Profile", subtitle: "Account and club profile", route: "/profile" },
-        { label: "Settings", subtitle: "App preferences", isDisabled: true },
+        { label: "Dashboard", subtitle: "Club command center", route: "/dashboard", allowedRoles: allRoles },
+        { label: "Teams", subtitle: "Team management", route: "/teams", allowedRoles: staffRoles },
+        { label: "Approvals", subtitle: "Review pending join requests", route: "/pending-approvals", allowedRoles: adminRoles },
+        { label: "Schedule", subtitle: "Practices and match calendar", route: "/schedule", allowedRoles: allRoles },
+        { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance", allowedRoles: staffRoles },
+        { label: "Availability", subtitle: "Available / unavailable responses", route: "/availability", allowedRoles: allRoles },
+        { label: "Messages", subtitle: "Team and direct conversations", route: "/messages", allowedRoles: allRoles },
+        { label: "Announcements", subtitle: "Club and team updates", route: "/announcements", allowedRoles: allRoles },
+        { label: "Payments", subtitle: "Payment tracking", route: "/payments", allowedRoles: paymentRoles },
+        { label: "Statistics", subtitle: "Performance and participation summary", route: "/statistics", allowedRoles: staffRoles },
+        { label: "Replays", subtitle: "Video and drill content", route: "/replays", allowedRoles: allRoles },
+        { label: "Profile", subtitle: "Account and club profile", route: "/profile", allowedRoles: allRoles },
+        { label: "Settings", subtitle: "App preferences", isDisabled: true, allowedRoles: allRoles },
       ] satisfies DrawerItem[],
     };
   }
@@ -74,18 +81,19 @@ function getDrawerCopy(language: "tr" | "en") {
       athlete: "Sporcu",
     } satisfies Record<UserRole, string>,
     items: [
-      { label: "Panel", subtitle: "Kulüp kontrol merkezi", route: "/dashboard" },
-      { label: "Mesajlar", subtitle: "Takım ve bireysel mesajlar", route: "/messages" },
-      { label: "Duyurular", subtitle: "Kulüp ve takım duyuruları", route: "/announcements" },
-      { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule" },
-      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance" },
-      { label: "Uygunluk", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability" },
-      { label: "Takımlar", subtitle: "Takım yönetimi", route: "/teams" },
-      { label: "Ödemeler", subtitle: "Ödeme takibi", route: "/payments" },
-      { label: "İstatistikler", subtitle: "Performans ve katılım özeti", route: "/statistics" },
-      { label: "Videolar", subtitle: "Video ve drill içerikleri", route: "/replays" },
-      { label: "Profil", subtitle: "Hesap ve kulüp bilgileri", route: "/profile" },
-      { label: "Ayarlar", subtitle: "Uygulama tercihleri", isDisabled: true },
+      { label: "Panel", subtitle: "Kulüp kontrol merkezi", route: "/dashboard", allowedRoles: allRoles },
+      { label: "Takımlar", subtitle: "Takım yönetimi", route: "/teams", allowedRoles: staffRoles },
+      { label: "Onaylar", subtitle: "Bekleyen katılım istekleri", route: "/pending-approvals", allowedRoles: adminRoles },
+      { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule", allowedRoles: allRoles },
+      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance", allowedRoles: staffRoles },
+      { label: "Uygunluk", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability", allowedRoles: allRoles },
+      { label: "Mesajlar", subtitle: "Takım ve bireysel mesajlar", route: "/messages", allowedRoles: allRoles },
+      { label: "Duyurular", subtitle: "Kulüp ve takım duyuruları", route: "/announcements", allowedRoles: allRoles },
+      { label: "Ödemeler", subtitle: "Ödeme takibi", route: "/payments", allowedRoles: paymentRoles },
+      { label: "İstatistikler", subtitle: "Performans ve katılım özeti", route: "/statistics", allowedRoles: staffRoles },
+      { label: "Videolar", subtitle: "Video ve drill içerikleri", route: "/replays", allowedRoles: allRoles },
+      { label: "Profil", subtitle: "Hesap ve kulüp bilgileri", route: "/profile", allowedRoles: allRoles },
+      { label: "Ayarlar", subtitle: "Uygulama tercihleri", isDisabled: true, allowedRoles: allRoles },
     ] satisfies DrawerItem[],
   };
 }
@@ -101,6 +109,14 @@ function getInitials(name: string) {
     .toUpperCase();
 
   return initials || "MT";
+}
+
+function canShowDrawerItem(item: DrawerItem, userRole?: UserRole) {
+  if (item.allowedRoles === undefined || userRole === undefined) {
+    return true;
+  }
+
+  return item.allowedRoles.includes(userRole);
 }
 
 export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
@@ -148,6 +164,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
   const primaryTeam = currentUser
     ? appData?.teams.find((team) => currentUser.teamIds.includes(team.id))
     : undefined;
+  const visibleDrawerItems = drawerCopy.items.filter((item) => canShowDrawerItem(item, currentUser?.role));
 
   const profileName = currentUser?.fullName ?? drawerCopy.userFallback;
   const profileInitials = getInitials(profileName);
@@ -221,7 +238,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
           contentContainerStyle={styles.items}
           showsVerticalScrollIndicator={false}
         >
-          {drawerCopy.items.map((item) => {
+          {visibleDrawerItems.map((item) => {
             return (
               <Pressable
                 key={item.label}

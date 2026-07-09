@@ -30,8 +30,23 @@ function isValidEmail(value: string) {
 export default function RegisterScreen() {
   const router = useRouter();
   const { next } = useLocalSearchParams();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
+  const registerCopy = language === "tr"
+    ? {
+        accountSetupTitle: "Güvenli hesap kurulumu",
+        accountSetupText: "Hesabınızı oluşturduktan sonra kulübünüzü kurabilir veya davet kodu ile mevcut kulübünüze katılabilirsiniz.",
+        creatingAccount: "Hesap oluşturuluyor...",
+        preparingProfile: "Hesap profili hazırlanıyor...",
+        readyForNextStep: "Hesap oluşturuldu. Sonraki adıma geçiliyor...",
+      }
+    : {
+        accountSetupTitle: "Secure account setup",
+        accountSetupText: "After creating your account, you can create a club workspace or join an existing club with an invite code.",
+        creatingAccount: "Creating account...",
+        preparingProfile: "Preparing account profile...",
+        readyForNextStep: "Account created. Moving to the next step...",
+      };
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -81,7 +96,7 @@ export default function RegisterScreen() {
 
     try {
       setIsSubmitting(true);
-      setStatusMessage("Hesap oluşturuluyor...");
+      setStatusMessage(registerCopy.creatingAccount);
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -89,14 +104,14 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage("Test profili hazırlanıyor...");
+      setStatusMessage(registerCopy.preparingProfile);
       await firestoreTeamSyncService.ensureUserProfile({
         user,
         role: nextRoute === "/create-club" ? "clubAdmin" : "athlete",
         status: "emailVerified",
       });
 
-      setStatusMessage("Hesap oluşturuldu. Sonraki adıma geçiliyor...");
+      setStatusMessage(registerCopy.readyForNextStep);
 
       router.replace({
         pathname: nextRoute,
@@ -197,8 +212,8 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>MVP test modu</Text>
-          <Text style={styles.infoText}>Şimdilik email doğrulamasını bekletiyoruz. Önce kulüp oluşturma, takıma katılma ve dashboard akışını düzgün test edeceğiz.</Text>
+          <Text style={styles.infoTitle}>{registerCopy.accountSetupTitle}</Text>
+          <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
         </View>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>

@@ -9,7 +9,6 @@ import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
-import { teamSyncService } from "@/services/teamSyncService";
 
 function isValidEmail(value: string) {
   const trimmedValue = value.trim();
@@ -62,18 +61,11 @@ export default function LoginScreen() {
 
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
-      const displayName = user.displayName?.trim();
 
       await firestoreTeamSyncService.ensureUserProfile({
         user: refreshedUser,
         role: "clubAdmin",
         status: "emailVerified",
-      });
-
-      await teamSyncService.updateCurrentUser({
-        email: user.email ?? trimmedEmail,
-        status: "active",
-        ...(displayName ? { fullName: displayName } : {}),
       });
 
       setStatusMessage(t.auth.loginSuccess);

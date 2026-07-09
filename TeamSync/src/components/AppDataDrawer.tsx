@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
+import { authService } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
 
@@ -27,6 +28,10 @@ function getDrawerCopy(language: "tr" | "en") {
       loadingProfile: "Loading profile details",
       noClub: "No club yet",
       soon: "Soon",
+      logout: "Log out",
+      logoutSubtitle: "End this session securely",
+      loggingOut: "Logging out...",
+      logoutFailed: "Logout failed. Please try again.",
       roleLabels: {
         superAdmin: "Platform admin",
         clubAdmin: "Club admin",
@@ -57,6 +62,10 @@ function getDrawerCopy(language: "tr" | "en") {
     loadingProfile: "Profil bilgileri yükleniyor",
     noClub: "Kulüp yok",
     soon: "Yakında",
+    logout: "Çıkış yap",
+    logoutSubtitle: "Bu oturumu güvenli şekilde kapat",
+    loggingOut: "Çıkış yapılıyor...",
+    logoutFailed: "Çıkış yapılamadı. Lütfen tekrar dene.",
     roleLabels: {
       superAdmin: "Platform yöneticisi",
       clubAdmin: "Kulüp yöneticisi",
@@ -98,6 +107,8 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
   const { language } = useTranslation();
   const drawerCopy = getDrawerCopy(language);
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
 
   useEffect(() => {
     if (!visible) {
@@ -120,6 +131,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
       }
     }
 
+    setLogoutError("");
     loadDrawerData();
 
     return () => {
@@ -144,12 +156,34 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
     : drawerCopy.loadingProfile;
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
-    if (isDisabled || route === undefined) {
+    if (isDisabled || route === undefined || isLoggingOut) {
       return;
     }
 
     onClose();
     router.push(route as never);
+  }
+
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    try {
+      setIsLoggingOut(true);
+      setLogoutError("");
+
+      if (authService.isConfigured()) {
+        await authService.logout();
+      }
+
+      await teamSyncService.resetAppData();
+      onClose();
+      router.replace("/login" as never);
+    } catch {
+      setLogoutError(drawerCopy.logoutFailed);
+      setIsLoggingOut(false);
+    }
   }
 
   return (
@@ -191,7 +225,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
             return (
               <Pressable
                 key={item.label}
-                disabled={item.isDisabled}
+                disabled={item.isDisabled || isLoggingOut}
                 onPress={() => handleNavigate(item.route, item.isDisabled)}
                 style={({ pressed }) => [
                   styles.item,
@@ -212,6 +246,28 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
             );
           })}
         </ScrollView>
+
+        <View style={styles.logoutArea}>
+          {logoutError !== "" ? <Text style={styles.logoutError}>{logoutError}</Text> : null}
+
+          <Pressable
+            disabled={isLoggingOut}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel={drawerCopy.logout}
+            style={({ pressed }) => [
+              styles.logoutButton,
+              isLoggingOut ? styles.logoutButtonDisabled : null,
+              pressed && !isLoggingOut ? styles.pressed : null,
+            ]}
+          >
+            <View style={styles.logoutTextArea}>
+              <Text style={styles.logoutTitle}>{isLoggingOut ? drawerCopy.loggingOut : drawerCopy.logout}</Text>
+              <Text style={styles.logoutSubtitle}>{drawerCopy.logoutSubtitle}</Text>
+            </View>
+            <Text style={styles.logoutArrow}>↗</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -359,6 +415,53 @@ const styles = StyleSheet.create({
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
+  },
+  logoutArea: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.default,
+    paddingTop: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
+  },
+  logoutButton: {
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.state.dangerSoft,
+    borderWidth: 1,
+    borderColor: "rgba(225, 29, 72, 0.22)",
+    padding: theme.spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.62,
+  },
+  logoutTextArea: {
+    flex: 1,
+  },
+  logoutTitle: {
+    color: theme.colors.text.danger,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
+  },
+  logoutSubtitle: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.sm,
+  },
+  logoutArrow: {
+    color: theme.colors.text.danger,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+  },
+  logoutError: {
+    color: theme.colors.text.danger,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.extrabold,
+    marginBottom: theme.spacing.sm,
+    lineHeight: theme.lineHeights.sm,
   },
   disabledText: {
     color: theme.colors.text.muted,

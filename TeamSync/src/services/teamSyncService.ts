@@ -135,7 +135,7 @@ async function loadAppData(): Promise<TeamSyncAppData> {
 
   const firebaseUser = authService.getCurrentUser();
 
-  if (firebaseUser === null || !firebaseUser.emailVerified) {
+  if (firebaseUser === null) {
     return localAppData;
   }
 
@@ -170,7 +170,7 @@ async function syncCurrentWorkspaceToFirestore(data: TeamSyncAppData) {
 
   const firebaseUser = authService.getCurrentUser();
 
-  if (firebaseUser === null || !firebaseUser.emailVerified) {
+  if (firebaseUser === null) {
     return;
   }
 
@@ -184,10 +184,10 @@ async function syncCurrentWorkspaceToFirestore(data: TeamSyncAppData) {
   });
 }
 
-function getVerifiedFirebaseUserOrThrow() {
+function getFirebaseUserOrThrow() {
   const firebaseUser = authService.getCurrentUser();
 
-  if (firebaseUser === null || !firebaseUser.emailVerified) {
+  if (firebaseUser === null) {
     throw new Error("AUTH_USER_MISSING");
   }
 
@@ -398,7 +398,7 @@ export const teamSyncService = {
 
   async createTeam(input: Omit<Team, "id" | "createdAt" | "updatedAt">) {
     if (authService.isConfigured()) {
-      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      const firebaseUser = getFirebaseUserOrThrow();
       await firestoreTeamSyncService.createTeam(firebaseUser, {
         name: input.name,
         ageGroup: input.ageGroup,
@@ -417,7 +417,7 @@ export const teamSyncService = {
 
   async removeTeam(teamId: string) {
     if (authService.isConfigured()) {
-      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      const firebaseUser = getFirebaseUserOrThrow();
       await firestoreTeamSyncService.removeTeam(firebaseUser, teamId);
 
       return loadAppData();
@@ -468,7 +468,7 @@ export const teamSyncService = {
 
   async createScheduleEvent(input: Omit<ScheduleEvent, "id" | "createdAt" | "updatedAt">) {
     if (authService.isConfigured()) {
-      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      const firebaseUser = getFirebaseUserOrThrow();
       await firestoreTeamSyncService.createScheduleEvent(firebaseUser, {
         teamId: input.teamId,
         title: input.title,
@@ -489,7 +489,7 @@ export const teamSyncService = {
 
   async updateScheduleEvent(eventId: string, updates: Partial<Pick<ScheduleEvent, "title" | "type" | "startsAt" | "endsAt" | "location" | "note" | "teamId">>) {
     if (authService.isConfigured()) {
-      const firebaseUser = getVerifiedFirebaseUserOrThrow();
+      const firebaseUser = getFirebaseUserOrThrow();
       await firestoreTeamSyncService.updateScheduleEvent(firebaseUser, eventId, updates);
 
       return loadAppData();

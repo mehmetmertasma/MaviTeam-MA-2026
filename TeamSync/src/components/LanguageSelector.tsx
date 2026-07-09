@@ -9,6 +9,11 @@ type LanguageSelectorProps = {
 
 export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
   const { language, setLanguage, t } = useTranslation();
+  const currentLanguage = supportedLanguages.find((item) => item.code === language) ?? supportedLanguages[0];
+  const nextLanguage = supportedLanguages.find((item) => item.code !== language) ?? currentLanguage;
+  const switchLabel = compact
+    ? `${currentLanguage.shortLabel} → ${nextLanguage.shortLabel}`
+    : `${currentLanguage.nativeLabel} → ${nextLanguage.nativeLabel}`;
 
   return (
     <View style={[styles.container, compact ? styles.compactContainer : null]}>
@@ -19,32 +24,28 @@ export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
         </View>
       ) : null}
 
-      <View style={[styles.options, compact ? styles.compactOptions : null]}>
-        {supportedLanguages.map((item) => {
-          const isSelected = language === item.code;
+      <Pressable
+        onPress={() => setLanguage(nextLanguage.code)}
+        accessibilityRole="button"
+        accessibilityLabel={`Switch language to ${nextLanguage.nativeLabel}`}
+        style={({ pressed }) => [
+          styles.toggle,
+          compact ? styles.compactToggle : null,
+          pressed ? styles.pressed : null,
+        ]}
+      >
+        <View style={styles.currentSide}>
+          <Text style={styles.flag}>{currentLanguage.flag}</Text>
+          <View style={styles.languageTextArea}>
+            {!compact ? <Text style={styles.metaLabel}>{t.language.title}</Text> : null}
+            <Text style={[styles.toggleText, compact ? styles.compactToggleText : null]}>{switchLabel}</Text>
+          </View>
+        </View>
 
-          return (
-            <Pressable
-              key={item.code}
-              onPress={() => setLanguage(item.code)}
-              accessibilityRole="button"
-              accessibilityLabel={item.nativeLabel}
-              style={({ pressed }) => [
-                styles.option,
-                compact ? styles.compactOption : null,
-                isSelected ? styles.selectedOption : null,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <Text style={styles.flag}>{item.flag}</Text>
-              <Text style={[styles.optionText, isSelected ? styles.selectedOptionText : null]}>
-                {compact ? item.shortLabel : item.nativeLabel}
-              </Text>
-              {!compact && isSelected ? <Text style={styles.checkMark}>✓</Text> : null}
-            </Pressable>
-          );
-        })}
-      </View>
+        <View style={styles.nextPill}>
+          <Text style={styles.nextPillText}>{nextLanguage.shortLabel}</Text>
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -70,50 +71,62 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
   },
-  options: {
-    gap: theme.spacing.sm,
-  },
-  compactOptions: {
-    flexDirection: "row",
-    gap: theme.spacing.sm,
-  },
-  option: {
-    minHeight: 52,
+  toggle: {
+    minHeight: 56,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     backgroundColor: theme.colors.background.surface,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: theme.spacing.md,
+    gap: theme.spacing.lg,
   },
-  compactOption: {
-    minHeight: 36,
+  compactToggle: {
+    minHeight: 38,
     borderRadius: theme.radius.full,
+    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    gap: theme.spacing.xs,
+    gap: theme.spacing.sm,
   },
-  selectedOption: {
-    borderColor: theme.colors.brand.primary,
-    backgroundColor: theme.colors.brand.primary,
+  currentSide: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
   },
   flag: {
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.lg,
   },
-  optionText: {
+  languageTextArea: {
     flex: 1,
+  },
+  metaLabel: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.extrabold,
+    textTransform: "uppercase",
+    marginBottom: 2,
+  },
+  toggleText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
   },
-  selectedOptionText: {
-    color: theme.colors.text.inverse,
+  compactToggleText: {
+    fontSize: theme.fontSizes.sm,
   },
-  checkMark: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.lg,
+  nextPill: {
+    backgroundColor: theme.colors.brand.primarySoft,
+    borderRadius: theme.radius.full,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+  },
+  nextPillText: {
+    color: theme.colors.text.brand,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
   pressed: {

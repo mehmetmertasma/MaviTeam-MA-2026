@@ -5,7 +5,7 @@ const updatedAt = "2026-01-01T00:00:00.000Z";
 
 const starterUser = {
   id: "user-unassigned",
-  fullName: "TeamSync User",
+  fullName: "MaviTeam User",
   email: "",
   role: "clubAdmin" as const,
   status: "pending" as const,
@@ -18,10 +18,10 @@ const starterUser = {
 export const initialTeamSyncData: TeamSyncAppData = {
   club: {
     id: "club-unassigned",
-    name: "TeamSync Club",
+    name: "MaviTeam Club",
     sport: "",
     city: "",
-    code: "TEAMSYNC",
+    code: "MAVITEAM",
     ownerId: starterUser.id,
     primaryColor: "#2563eb",
     createdAt,

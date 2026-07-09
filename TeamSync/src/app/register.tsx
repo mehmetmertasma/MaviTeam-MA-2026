@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -86,6 +87,13 @@ export default function RegisterScreen() {
         fullName: trimmedName,
         email: trimmedEmail,
         password: cleanPassword,
+      });
+
+      setStatusMessage("Test profili hazırlanıyor...");
+      await firestoreTeamSyncService.ensureUserProfile({
+        user,
+        role: nextRoute === "/create-club" ? "clubAdmin" : "athlete",
+        status: "emailVerified",
       });
 
       setStatusMessage("Hesap oluşturuldu. Sonraki adıma geçiliyor...");

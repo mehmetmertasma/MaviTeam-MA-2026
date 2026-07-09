@@ -43,7 +43,7 @@ function getInitials(name: string) {
     .slice(0, 2)
     .toUpperCase();
 
-  return initials || "TS";
+  return initials || "MT";
 }
 
 export function AppDrawer({ visible, onClose }: AppDrawerProps) {
@@ -87,7 +87,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
     ? appData?.teams.find((team) => currentUser.teamIds.includes(team.id))
     : undefined;
 
-  const profileName = currentUser?.fullName ?? "TeamSync Kullanıcı";
+  const profileName = currentUser?.fullName ?? "MaviTeam Kullanıcı";
   const profileInitials = getInitials(profileName);
   const profileSubtitle = primaryTeam?.name ?? currentClub?.name ?? "Profil bilgileri yükleniyor";
 
@@ -107,7 +107,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
       <View style={styles.drawer}>
         <View style={styles.drawerHeader}>
           <View>
-            <Text style={styles.logo}>TeamSync</Text>
+            <Text style={styles.logo}>MaviTeam</Text>
             <Text style={styles.title}>Menu</Text>
           </View>
 
@@ -264,33 +264,33 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
   },
   profileRole: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
+    lineHeight: theme.lineHeights.sm,
   },
   itemsScroll: {
     flex: 1,
   },
   items: {
     gap: theme.spacing.sm,
-    paddingBottom: theme.spacing["2xl"],
+    paddingBottom: theme.spacing.xl,
   },
   item: {
-    backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.subtle,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     gap: theme.spacing.md,
   },
   itemDisabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
   itemTextArea: {
     flex: 1,
@@ -299,23 +299,24 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
+    marginBottom: theme.spacing.xs,
   },
   itemSubtitle: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
+    lineHeight: theme.lineHeights.sm,
   },
   itemArrow: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.xl,
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
   },
   disabledText: {
     color: theme.colors.text.muted,
   },
   pressed: {
-    opacity: 0.84,
+    opacity: 0.82,
     transform: [{ scale: 0.99 }],
   },
 });

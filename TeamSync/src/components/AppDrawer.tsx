@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
 
@@ -18,20 +19,51 @@ type AppDrawerProps = {
   onClose: () => void;
 };
 
-const drawerItems: DrawerItem[] = [
-  { label: "Dashboard", subtitle: "Kulüp kontrol merkezi", route: "/dashboard" },
-  { label: "Messages", subtitle: "Takım ve bireysel mesajlar", route: "/messages" },
-  { label: "Announcements", subtitle: "Kulüp duyuruları", route: "/announcements" },
-  { label: "Schedule", subtitle: "Antrenman ve maç takvimi", route: "/schedule" },
-  { label: "Attendance", subtitle: "Yoklama sistemi", route: "/attendance" },
-  { label: "Availability", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability" },
-  { label: "Teams", subtitle: "Takım yönetimi", route: "/teams" },
-  { label: "Payments", subtitle: "Ödeme takibi", route: "/payments" },
-  { label: "Statistics", subtitle: "Performans ve katılım özeti", route: "/statistics" },
-  { label: "Replays", subtitle: "Video ve drill içerikleri", route: "/replays" },
-  { label: "Profile", subtitle: "Profil bilgileri", route: "/profile" },
-  { label: "Settings", subtitle: "Uygulama ayarları", isDisabled: true },
-];
+function getDrawerCopy(language: "tr" | "en") {
+  if (language === "en") {
+    return {
+      menuTitle: "Menu",
+      userFallback: "MaviTeam User",
+      loadingProfile: "Loading profile details",
+      soon: "Soon",
+      items: [
+        { label: "Dashboard", subtitle: "Club command center", route: "/dashboard" },
+        { label: "Messages", subtitle: "Team and direct conversations", route: "/messages" },
+        { label: "Announcements", subtitle: "Club and team updates", route: "/announcements" },
+        { label: "Schedule", subtitle: "Practices and match calendar", route: "/schedule" },
+        { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance" },
+        { label: "Availability", subtitle: "Available / unavailable responses", route: "/availability" },
+        { label: "Teams", subtitle: "Team management", route: "/teams" },
+        { label: "Payments", subtitle: "Payment tracking", route: "/payments" },
+        { label: "Statistics", subtitle: "Performance and participation summary", route: "/statistics" },
+        { label: "Replays", subtitle: "Video and drill content", route: "/replays" },
+        { label: "Profile", subtitle: "Account and club profile", route: "/profile" },
+        { label: "Settings", subtitle: "App preferences", isDisabled: true },
+      ] satisfies DrawerItem[],
+    };
+  }
+
+  return {
+    menuTitle: "Menü",
+    userFallback: "MaviTeam Kullanıcı",
+    loadingProfile: "Profil bilgileri yükleniyor",
+    soon: "Yakında",
+    items: [
+      { label: "Panel", subtitle: "Kulüp kontrol merkezi", route: "/dashboard" },
+      { label: "Mesajlar", subtitle: "Takım ve bireysel mesajlar", route: "/messages" },
+      { label: "Duyurular", subtitle: "Kulüp ve takım duyuruları", route: "/announcements" },
+      { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule" },
+      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance" },
+      { label: "Uygunluk", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability" },
+      { label: "Takımlar", subtitle: "Takım yönetimi", route: "/teams" },
+      { label: "Ödemeler", subtitle: "Ödeme takibi", route: "/payments" },
+      { label: "İstatistikler", subtitle: "Performans ve katılım özeti", route: "/statistics" },
+      { label: "Videolar", subtitle: "Video ve drill içerikleri", route: "/replays" },
+      { label: "Profil", subtitle: "Hesap ve kulüp bilgileri", route: "/profile" },
+      { label: "Ayarlar", subtitle: "Uygulama tercihleri", isDisabled: true },
+    ] satisfies DrawerItem[],
+  };
+}
 
 function getInitials(name: string) {
   const initials = name
@@ -47,6 +79,8 @@ function getInitials(name: string) {
 }
 
 export function AppDrawer({ visible, onClose }: AppDrawerProps) {
+  const { language } = useTranslation();
+  const drawerCopy = getDrawerCopy(language);
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
 
   useEffect(() => {
@@ -87,9 +121,9 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
     ? appData?.teams.find((team) => currentUser.teamIds.includes(team.id))
     : undefined;
 
-  const profileName = currentUser?.fullName ?? "MaviTeam Kullanıcı";
+  const profileName = currentUser?.fullName ?? drawerCopy.userFallback;
   const profileInitials = getInitials(profileName);
-  const profileSubtitle = primaryTeam?.name ?? currentClub?.name ?? "Profil bilgileri yükleniyor";
+  const profileSubtitle = primaryTeam?.name ?? currentClub?.name ?? drawerCopy.loadingProfile;
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
     if (isDisabled || route === undefined) {
@@ -108,7 +142,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
         <View style={styles.drawerHeader}>
           <View>
             <Text style={styles.logo}>MaviTeam</Text>
-            <Text style={styles.title}>Menu</Text>
+            <Text style={styles.title}>{drawerCopy.menuTitle}</Text>
           </View>
 
           <Pressable
@@ -135,7 +169,7 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
           contentContainerStyle={styles.items}
           showsVerticalScrollIndicator={false}
         >
-          {drawerItems.map((item) => {
+          {drawerCopy.items.map((item) => {
             return (
               <Pressable
                 key={item.label}
@@ -148,17 +182,13 @@ export function AppDrawer({ visible, onClose }: AppDrawerProps) {
                 ]}
               >
                 <View style={styles.itemTextArea}>
-                  <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>
-                    {item.label}
-                  </Text>
+                  <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>{item.label}</Text>
 
-                  <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>
-                    {item.subtitle}
-                  </Text>
+                  <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>{item.subtitle}</Text>
                 </View>
 
                 <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
-                  {item.isDisabled ? "Soon" : "›"}
+                  {item.isDisabled ? drawerCopy.soon : "›"}
                 </Text>
               </Pressable>
             );

@@ -164,6 +164,10 @@ function filterByClubId<T extends { clubId: string }>(items: T[], clubId: string
   return items.filter((item) => item.clubId === clubId);
 }
 
+function userCanReadClubRoster(role: UserRole) {
+  return role === "clubAdmin" || role === "coach";
+}
+
 function mergeFirestoreWorkspaceIntoAppData(
   localAppData: TeamSyncAppData,
   workspace: FirestoreWorkspace,
@@ -238,14 +242,20 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace);
   }
 
+  const usersPromise = userCanReadClubRoster(workspace.currentUser.role)
+    ? firestoreMaviTeamDataService.listUsersForClub(workspace.club.id)
+    : Promise.resolve([workspace.currentUser]);
+
+  const joinRequestsPromise = workspace.currentUser.role === "clubAdmin"
+    ? firestoreMaviTeamDataService.listJoinRequestsForClub(workspace.club.id)
+    : Promise.resolve([]);
+
   const [users, teams, scheduleEvents, announcements, joinRequests] = await Promise.all([
-    firestoreMaviTeamDataService.listUsersForClub(workspace.club.id),
+    usersPromise,
     firestoreTeamSyncService.listTeamsForClub(workspace.club.id),
-    firestoreTeamSyncService.listScheduleEventsForClub(workspace.club.id),
-    firestoreMaviTeamDataService.listAnnouncementsForClub(workspace.club.id),
-    workspace.currentUser.role === "clubAdmin"
-      ? firestoreMaviTeamDataService.listJoinRequestsForClub(workspace.club.id)
-      : Promise.resolve([]),
+    firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser),
+    firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser),
+    joinRequestsPromise,
   ]);
 
   return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {

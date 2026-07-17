@@ -48,6 +48,7 @@ function getDrawerCopy(language: "tr" | "en") {
       items: [
         { label: "Dashboard", subtitle: "Club command center", route: "/dashboard", allowedRoles: allRoles },
         { label: "Teams", subtitle: "Team management", route: "/teams", allowedRoles: staffRoles },
+        { label: "Members", subtitle: "Roles, status and team access", route: "/members", allowedRoles: adminRoles },
         { label: "Approvals", subtitle: "Review pending join requests", route: "/pending-approvals", allowedRoles: adminRoles },
         { label: "Schedule", subtitle: "Practices and match calendar", route: "/schedule", allowedRoles: allRoles },
         { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance", allowedRoles: staffRoles },
@@ -83,6 +84,7 @@ function getDrawerCopy(language: "tr" | "en") {
     items: [
       { label: "Panel", subtitle: "Kulüp kontrol merkezi", route: "/dashboard", allowedRoles: allRoles },
       { label: "Takımlar", subtitle: "Takım yönetimi", route: "/teams", allowedRoles: staffRoles },
+      { label: "Üyeler", subtitle: "Rol, durum ve takım erişimi", route: "/members", allowedRoles: adminRoles },
       { label: "Onaylar", subtitle: "Bekleyen katılım istekleri", route: "/pending-approvals", allowedRoles: adminRoles },
       { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule", allowedRoles: allRoles },
       { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance", allowedRoles: staffRoles },
@@ -318,8 +320,6 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing["4xl"],
     paddingHorizontal: theme.spacing.xl,
     paddingBottom: theme.spacing.xl,
-    borderTopRightRadius: theme.radius["2xl"],
-    borderBottomRightRadius: theme.radius["2xl"],
     ...theme.shadows.md,
   },
   drawerHeader: {

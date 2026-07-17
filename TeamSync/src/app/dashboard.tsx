@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -37,17 +37,8 @@ function getFirstName(name: string, fallback: string) {
 
 function formatEventTime(value: string, locale: string) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return locale === "tr-TR" ? "Tarih yok" : "No date";
-  }
-
-  return date.toLocaleString(locale, {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (Number.isNaN(date.getTime())) return locale === "tr-TR" ? "Tarih yok" : "No date";
+  return date.toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 function getUpcomingEvents(events: ScheduleEvent[]) {
@@ -103,26 +94,11 @@ function getDashboardCopy(language: "tr" | "en") {
     needsAttention: isEnglish ? "Needs attention" : "Takip gerekli",
     open: isEnglish ? "Open" : "Aç",
     roleHeroText: {
-      superAdmin: {
-        title: isEnglish ? "Platform operations center" : "Platform operasyon merkezi",
-        subtitle: isEnglish ? "Monitor clubs, users, and platform activity from one executive view." : "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek yönetici ekranından takip et.",
-      },
-      clubAdmin: {
-        title: isEnglish ? "Club operations center" : "Kulüp operasyon merkezi",
-        subtitle: isEnglish ? "Manage teams, members, schedules, communication, and payments with a clean professional workflow." : "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı.",
-      },
-      coach: {
-        title: isEnglish ? "Team operations dashboard" : "Takım operasyon paneli",
-        subtitle: isEnglish ? "Manage schedule, attendance, availability, and team communication from one place." : "Program, yoklama, uygunluk ve takım iletişimini tek yerden yönet.",
-      },
-      parent: {
-        title: isEnglish ? "Team family dashboard" : "Takım takip paneli",
-        subtitle: isEnglish ? "Follow schedule, announcements, messages, and payment updates for your athlete." : "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et.",
-      },
-      athlete: {
-        title: isEnglish ? "Team schedule dashboard" : "Takım program paneli",
-        subtitle: isEnglish ? "Access practices, matches, announcements, messages, and shared content in one place." : "Antrenman, maç, duyuru, mesaj ve paylaşılan içeriklere tek ekrandan ulaş.",
-      },
+      superAdmin: { title: isEnglish ? "Platform operations center" : "Platform operasyon merkezi", subtitle: isEnglish ? "Monitor clubs, users, and platform activity from one executive view." : "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek yönetici ekranından takip et." },
+      clubAdmin: { title: isEnglish ? "Club operations center" : "Kulüp operasyon merkezi", subtitle: isEnglish ? "Manage teams, members, schedules, communication, and payments with a clean professional workflow." : "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı." },
+      coach: { title: isEnglish ? "Team operations dashboard" : "Takım operasyon paneli", subtitle: isEnglish ? "Manage schedule, attendance, availability, and team communication from one place." : "Program, yoklama, uygunluk ve takım iletişimini tek yerden yönet." },
+      parent: { title: isEnglish ? "Team family dashboard" : "Takım takip paneli", subtitle: isEnglish ? "Follow schedule, announcements, messages, and payment updates for your athlete." : "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et." },
+      athlete: { title: isEnglish ? "Team schedule dashboard" : "Takım program paneli", subtitle: isEnglish ? "Access practices, matches, announcements, messages, and shared content in one place." : "Antrenman, maç, duyuru, mesaj ve paylaşılan içeriklere tek ekrandan ulaş." },
     } satisfies Record<UserRole, { title: string; subtitle: string }>,
     quickActionsByRole: {
       superAdmin: [
@@ -179,7 +155,6 @@ export default function DashboardScreen() {
         try {
           setStatusMessage(copy.loading);
           const loadedAppData = await teamSyncService.getAppData();
-
           if (isActive) {
             setAppData(loadedAppData);
             setStatusMessage(copy.ready);
@@ -193,7 +168,6 @@ export default function DashboardScreen() {
       }
 
       loadDashboardData();
-
       return () => {
         isActive = false;
       };
@@ -222,7 +196,7 @@ export default function DashboardScreen() {
   const primaryTeam = teams.find((team) => currentUser.teamIds.includes(team.id));
   const heroText = copy.roleHeroText[currentUser.role];
   const quickActions = copy.quickActionsByRole[currentUser.role];
-  const upcomingEvents = useMemo(() => getUpcomingEvents(scheduleEvents), [scheduleEvents]);
+  const upcomingEvents = getUpcomingEvents(scheduleEvents);
   const stats = [
     { label: copy.activeMember, value: String(activeUsers.length), hint: copy.accessOpen },
     { label: copy.athlete, value: String(athleteCount), hint: copy.registered },
@@ -264,13 +238,7 @@ export default function DashboardScreen() {
             <Text style={styles.welcome}>{copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}</Text>
             <Text style={styles.subtitle}>{club.name}</Text>
           </View>
-          <AppButton
-            title={copy.editProfile}
-            variant="secondary"
-            accessibilityLabel={copy.editProfileAccessLabel}
-            style={styles.editProfileButton}
-            onPress={() => router.push("/profile" as never)}
-          />
+          <AppButton title={copy.editProfile} variant="secondary" accessibilityLabel={copy.editProfileAccessLabel} style={styles.editProfileButton} onPress={() => router.push("/profile" as never)} />
         </View>
 
         <View style={styles.executiveHero}>
@@ -298,19 +266,11 @@ export default function DashboardScreen() {
 
         <View style={styles.mainGrid}>
           <View style={styles.panel}>
-            <View style={styles.panelHeader}>
-              <View>
-                <Text style={styles.panelTitle}>{copy.quickActionsTitle}</Text>
-                <Text style={styles.panelSubtitle}>{copy.quickActionsSubtitle}</Text>
-              </View>
-            </View>
+            <Text style={styles.panelTitle}>{copy.quickActionsTitle}</Text>
+            <Text style={styles.panelSubtitle}>{copy.quickActionsSubtitle}</Text>
             <View style={styles.actionGrid}>
               {quickActions.map((action) => (
-                <Pressable
-                  key={action.title}
-                  onPress={() => router.push(action.route as never)}
-                  style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
-                >
+                <Pressable key={action.title} onPress={() => router.push(action.route as never)} style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}>
                   <View style={styles.actionTextArea}>
                     <Text style={styles.actionText}>{action.title}</Text>
                     <Text style={styles.actionMeta}>{action.meta}</Text>
@@ -331,31 +291,19 @@ export default function DashboardScreen() {
                     <Text style={styles.attentionLabel}>{item.label}</Text>
                     <Text style={styles.attentionMeta}>{copy.currentRecord}</Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.attentionValue,
-                      item.tone === "warning" ? styles.attentionWarning : null,
-                      item.tone === "success" ? styles.attentionSuccess : null,
-                    ]}
-                  >
-                    {item.value}
-                  </Text>
+                  <Text style={[styles.attentionValue, item.tone === "warning" ? styles.attentionWarning : null, item.tone === "success" ? styles.attentionSuccess : null]}>{item.value}</Text>
                 </View>
               ))}
             </View>
             <View style={styles.eventBlock}>
               <Text style={styles.blockTitle}>{copy.upcomingEvents}</Text>
-              {upcomingEvents.length === 0 ? (
-                <Text style={styles.emptyText}>{copy.noEvents}</Text>
-              ) : (
-                upcomingEvents.map((event) => (
-                  <View key={event.id} style={styles.eventCard}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
-                    <Text style={styles.eventLocation}>{event.location}</Text>
-                  </View>
-                ))
-              )}
+              {upcomingEvents.length === 0 ? <Text style={styles.emptyText}>{copy.noEvents}</Text> : upcomingEvents.map((event) => (
+                <View key={event.id} style={styles.eventCard}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
+                  <Text style={styles.eventLocation}>{event.location}</Text>
+                </View>
+              ))}
             </View>
           </View>
         </View>
@@ -378,357 +326,65 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
-  screen: {
-    padding: theme.spacing.xl,
-    paddingBottom: theme.spacing["4xl"],
-  },
-  container: {
-    width: "100%",
-    maxWidth: 1180,
-    alignSelf: "center",
-    gap: theme.spacing.xl,
-  },
-  loadingCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing["3xl"],
-    ...theme.shadows.md,
-  },
-  logo: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-  },
-  loadingTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    marginTop: theme.spacing.xl,
-  },
-  loadingText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.bold,
-    marginTop: theme.spacing.md,
-  },
-  topBar: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.xl,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-  },
-  topBarSub: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
-  },
-  systemBadge: {
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.background.subtle,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-  },
-  systemDot: {
-    width: 8,
-    height: 8,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.state.success,
-  },
-  systemBadgeText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-  },
-  pageHeader: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing["2xl"],
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.xl,
-  },
-  pageTitleArea: {
-    flex: 1,
-  },
-  pageEyebrow: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.sm,
-  },
-  welcome: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-  },
-  subtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.bold,
-    marginTop: theme.spacing.sm,
-  },
-  editProfileButton: {
-    alignSelf: "flex-start",
-  },
-  executiveHero: {
-    flexDirection: "row",
-    gap: theme.spacing.xl,
-  },
-  heroMainContent: {
-    flex: 1,
-    backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["2xl"],
-  },
-  heroLabel: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    opacity: 0.86,
-    marginBottom: theme.spacing.sm,
-  },
-  heroTitle: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
-  },
-  heroSubtitle: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-    marginTop: theme.spacing.md,
-    opacity: 0.9,
-  },
-  workspaceCard: {
-    width: 260,
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.xl,
-  },
-  workspaceLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  workspaceCode: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
-    marginTop: theme.spacing.sm,
-  },
-  workspaceTeam: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.bold,
-    marginTop: theme.spacing.sm,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-  },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 160,
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.lg,
-  },
-  statHint: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.black,
-  },
-  statValue: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
-    marginVertical: theme.spacing.xs,
-  },
-  statLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.bold,
-  },
-  mainGrid: {
-    flexDirection: "row",
-    gap: theme.spacing.xl,
-  },
-  panel: {
-    flex: 1,
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.xl,
-    gap: theme.spacing.lg,
-  },
-  panelHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.md,
-  },
-  panelTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-  },
-  panelSubtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
-  },
-  actionGrid: {
-    gap: theme.spacing.md,
-  },
-  actionCard: {
-    borderRadius: theme.radius.xl,
-    backgroundColor: theme.colors.background.subtle,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing.md,
-  },
-  actionTextArea: {
-    flex: 1,
-  },
-  actionText: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  actionMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
-  },
-  actionOpenText: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  attentionList: {
-    gap: theme.spacing.sm,
-  },
-  attentionRow: {
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.subtle,
-    padding: theme.spacing.md,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.md,
-  },
-  attentionLabel: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  attentionMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
-  },
-  attentionValue: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-  },
-  attentionWarning: {
-    color: theme.colors.text.warning,
-  },
-  attentionSuccess: {
-    color: theme.colors.text.success,
-  },
-  eventBlock: {
-    gap: theme.spacing.sm,
-  },
-  blockTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  eventCard: {
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.subtle,
-    padding: theme.spacing.md,
-    gap: theme.spacing.xs,
-  },
-  eventTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  eventTime: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  eventLocation: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  overviewGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-  },
-  infoCard: {
-    flexGrow: 1,
-    flexBasis: 180,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.subtle,
-    padding: theme.spacing.md,
-  },
-  infoLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.black,
-  },
-  infoValue: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
-    marginTop: theme.spacing.xs,
-  },
-  cardPressed: {
-    opacity: 0.82,
-    transform: [{ scale: 0.99 }],
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
+  screen: { padding: theme.spacing.xl, paddingBottom: theme.spacing["4xl"] },
+  container: { width: "100%", maxWidth: 1180, alignSelf: "center", gap: theme.spacing.xl },
+  loadingCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing["3xl"], ...theme.shadows.md },
+  logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
+  loadingTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xl },
+  loadingText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.bold, marginTop: theme.spacing.md },
+  topBar: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg },
+  topBarSub: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  systemBadge: { borderRadius: theme.radius.full, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
+  systemDot: { width: 8, height: 8, borderRadius: theme.radius.full, backgroundColor: theme.colors.state.success },
+  systemBadgeText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
+  pageHeader: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing["2xl"], flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.xl },
+  pageTitleArea: { flex: 1 },
+  pageEyebrow: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  welcome: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black },
+  subtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.bold, marginTop: theme.spacing.sm },
+  editProfileButton: { alignSelf: "flex-start" },
+  executiveHero: { flexDirection: "row", gap: theme.spacing.xl },
+  heroMainContent: { flex: 1, backgroundColor: theme.colors.brand.primary, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"] },
+  heroLabel: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, opacity: 0.86, marginBottom: theme.spacing.sm },
+  heroTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black },
+  heroSubtitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md, marginTop: theme.spacing.md, opacity: 0.9 },
+  workspaceCard: { width: 260, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl },
+  workspaceLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  workspaceCode: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black, marginTop: theme.spacing.sm },
+  workspaceTeam: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.bold, marginTop: theme.spacing.sm },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
+  statCard: { flexGrow: 1, flexBasis: 160, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg },
+  statHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black },
+  statValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black, marginVertical: theme.spacing.xs },
+  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.bold },
+  mainGrid: { flexDirection: "row", gap: theme.spacing.xl },
+  panel: { flex: 1, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, gap: theme.spacing.lg },
+  panelTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
+  panelSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  actionGrid: { gap: theme.spacing.md },
+  actionCard: { borderRadius: theme.radius.xl, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
+  actionTextArea: { flex: 1 },
+  actionText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  actionMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  actionOpenText: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  attentionList: { gap: theme.spacing.sm },
+  attentionRow: { borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.md, flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: theme.spacing.md },
+  attentionLabel: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  attentionMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
+  attentionValue: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
+  attentionWarning: { color: theme.colors.text.warning },
+  attentionSuccess: { color: theme.colors.text.success },
+  eventBlock: { gap: theme.spacing.sm },
+  blockTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  eventCard: { borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.md, gap: theme.spacing.xs },
+  eventTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  eventTime: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  eventLocation: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
+  infoCard: { flexGrow: 1, flexBasis: 180, borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.md },
+  infoLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black },
+  infoValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xs },
+  cardPressed: { opacity: 0.82, transform: [{ scale: 0.99 }] },
 });

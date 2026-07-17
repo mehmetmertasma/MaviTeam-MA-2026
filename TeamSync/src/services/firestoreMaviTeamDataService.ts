@@ -15,7 +15,15 @@ import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 import { requireFirebaseServices } from "@/lib/firebase";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
-import type { Announcement, JoinRequest, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import type {
+  Announcement,
+  JoinRequest,
+  ScheduleEvent,
+  ScheduleEventType,
+  UserProfile,
+  UserRole,
+  UserStatus,
+} from "@/types/teamSync";
 
 function nowIso() {
   return new Date().toISOString();
@@ -74,6 +82,14 @@ function readAnnouncementTarget(value: unknown): Announcement["targetType"] {
   return "allClub";
 }
 
+function readScheduleEventType(value: unknown): ScheduleEventType {
+  if (value === "match" || value === "meeting") {
+    return value;
+  }
+
+  return "practice";
+}
+
 function readJoinRequestStatus(value: unknown): JoinRequest["status"] {
   if (value === "approved" || value === "rejected") {
     return value;
@@ -113,6 +129,25 @@ function getAnnouncementFromFirestore(snapshot: QueryDocumentSnapshot): Announce
   };
 }
 
+function getScheduleEventFromFirestore(snapshot: QueryDocumentSnapshot): ScheduleEvent {
+  const data = snapshot.data();
+
+  return {
+    id: snapshot.id,
+    clubId: readString(data.clubId),
+    teamId: readOptionalString(data.teamId),
+    title: readString(data.title, "Etkinlik"),
+    type: readScheduleEventType(data.type),
+    startsAt: readTimestampString(data.startsAt),
+    endsAt: readOptionalString(readTimestampString(data.endsAt, "")),
+    location: readString(data.location, "Konum yok"),
+    note: readOptionalString(data.note),
+    createdByUserId: readString(data.createdByUserId),
+    createdAt: readTimestampString(data.createdAt),
+    updatedAt: readOptionalString(readTimestampString(data.updatedAt, "")),
+  };
+}
+
 function getJoinRequestFromFirestore(snapshot: QueryDocumentSnapshot): JoinRequest {
   const data = snapshot.data();
 
@@ -132,6 +167,27 @@ function canManageAnnouncement(role: UserRole) {
   return role === "clubAdmin" || role === "coach";
 }
 
+function uniqueById<T extends { id: string }>(items: T[]) {
+  const seenIds = new Set<string>();
+
+  return items.filter((item) => {
+    if (seenIds.has(item.id)) {
+      return false;
+    }
+
+    seenIds.add(item.id);
+    return true;
+  });
+}
+
+function sortAnnouncements(announcements: Announcement[]) {
+  return uniqueById(announcements).sort((first, second) => second.createdAt.localeCompare(first.createdAt));
+}
+
+function sortScheduleEvents(events: ScheduleEvent[]) {
+  return uniqueById(events).sort((first, second) => new Date(first.startsAt).getTime() - new Date(second.startsAt).getTime());
+}
+
 export const firestoreMaviTeamDataService = {
   async listUsersForClub(clubId: string, maxResults = 200): Promise<UserProfile[]> {
     const { db } = requireFirebaseServices();
@@ -149,23 +205,89 @@ export const firestoreMaviTeamDataService = {
       .sort((firstUser, secondUser) => firstUser.fullName.localeCompare(secondUser.fullName));
   },
 
-  async listAnnouncementsForClub(clubId: string, maxResults = 50): Promise<Announcement[]> {
+  async listVisibleAnnouncementsForCurrentUser(firebaseUser: User, maxResults = 50): Promise<Announcement[]> {
     const { db } = requireFirebaseServices();
+    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (clubId.trim() === "") {
+    if (workspace === null || workspace.club === null) {
       return [];
     }
 
-    const announcementsQuery = query(
+    if (workspace.currentUser.role === "clubAdmin") {
+      const adminQuery = query(
+        collection(db, "announcements"),
+        where("clubId", "==", workspace.club.id),
+        firestoreLimit(maxResults)
+      );
+      const adminSnapshots = await getDocs(adminQuery);
+      return sortAnnouncements(adminSnapshots.docs.map(getAnnouncementFromFirestore));
+    }
+
+    const allClubQuery = query(
       collection(db, "announcements"),
-      where("clubId", "==", clubId),
+      where("clubId", "==", workspace.club.id),
+      where("targetType", "==", "allClub"),
       firestoreLimit(maxResults)
     );
-    const announcementSnapshots = await getDocs(announcementsQuery);
+    const allClubSnapshots = await getDocs(allClubQuery);
+    const announcements = allClubSnapshots.docs.map(getAnnouncementFromFirestore);
+    const teamIds = workspace.currentUser.teamIds.slice(0, 10);
 
-    return announcementSnapshots.docs
-      .map(getAnnouncementFromFirestore)
-      .sort((firstAnnouncement, secondAnnouncement) => secondAnnouncement.createdAt.localeCompare(firstAnnouncement.createdAt));
+    if (teamIds.length > 0) {
+      const teamQuery = query(
+        collection(db, "announcements"),
+        where("clubId", "==", workspace.club.id),
+        where("targetType", "==", "team"),
+        where("targetTeamId", "in", teamIds),
+        firestoreLimit(maxResults)
+      );
+      const teamSnapshots = await getDocs(teamQuery);
+      announcements.push(...teamSnapshots.docs.map(getAnnouncementFromFirestore));
+    }
+
+    return sortAnnouncements(announcements);
+  },
+
+  async listVisibleScheduleEventsForCurrentUser(firebaseUser: User, maxResults = 150): Promise<ScheduleEvent[]> {
+    const { db } = requireFirebaseServices();
+    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      return [];
+    }
+
+    if (workspace.currentUser.role === "clubAdmin") {
+      const adminQuery = query(
+        collection(db, "scheduleEvents"),
+        where("clubId", "==", workspace.club.id),
+        firestoreLimit(maxResults)
+      );
+      const adminSnapshots = await getDocs(adminQuery);
+      return sortScheduleEvents(adminSnapshots.docs.map(getScheduleEventFromFirestore));
+    }
+
+    const clubWideQuery = query(
+      collection(db, "scheduleEvents"),
+      where("clubId", "==", workspace.club.id),
+      where("teamId", "==", null),
+      firestoreLimit(maxResults)
+    );
+    const clubWideSnapshots = await getDocs(clubWideQuery);
+    const events = clubWideSnapshots.docs.map(getScheduleEventFromFirestore);
+    const teamIds = workspace.currentUser.teamIds.slice(0, 10);
+
+    if (teamIds.length > 0) {
+      const teamQuery = query(
+        collection(db, "scheduleEvents"),
+        where("clubId", "==", workspace.club.id),
+        where("teamId", "in", teamIds),
+        firestoreLimit(maxResults)
+      );
+      const teamSnapshots = await getDocs(teamQuery);
+      events.push(...teamSnapshots.docs.map(getScheduleEventFromFirestore));
+    }
+
+    return sortScheduleEvents(events);
   },
 
   async listJoinRequestsForClub(clubId: string, maxResults = 100): Promise<JoinRequest[]> {

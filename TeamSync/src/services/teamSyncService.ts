@@ -59,6 +59,10 @@ type FirestoreDataOverrides = {
   teams?: Team[];
   announcements?: Announcement[];
   scheduleEvents?: ScheduleEvent[];
+  attendanceRecords?: AttendanceRecord[];
+  chatGroups?: ChatGroup[];
+  chatMessages?: ChatMessage[];
+  payments?: Payment[];
   joinRequests?: JoinRequest[];
 };
 
@@ -192,10 +196,10 @@ function mergeFirestoreWorkspaceIntoAppData(
     teams: overrides.teams ?? [],
     announcements: overrides.announcements ?? [],
     scheduleEvents: overrides.scheduleEvents ?? [],
-    attendanceRecords: filterByClubId(localAppData.attendanceRecords, clubId),
-    chatGroups: filterByClubId(localAppData.chatGroups, clubId),
-    chatMessages: filterByClubId(localAppData.chatMessages, clubId),
-    payments: filterByClubId(localAppData.payments, clubId),
+    attendanceRecords: overrides.attendanceRecords ?? filterByClubId(localAppData.attendanceRecords, clubId),
+    chatGroups: overrides.chatGroups ?? filterByClubId(localAppData.chatGroups, clubId),
+    chatMessages: overrides.chatMessages ?? filterByClubId(localAppData.chatMessages, clubId),
+    payments: overrides.payments ?? filterByClubId(localAppData.payments, clubId),
     replays: filterByClubId(localAppData.replays, clubId),
     joinRequests: currentUser.role === "clubAdmin" ? overrides.joinRequests ?? [] : [],
   } satisfies TeamSyncAppData;
@@ -250,19 +254,30 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     ? firestoreMaviTeamDataService.listJoinRequestsForClub(workspace.club.id)
     : Promise.resolve([]);
 
-  const [users, teams, scheduleEvents, announcements, joinRequests] = await Promise.all([
+  const [users, teams, scheduleEvents, announcements, joinRequests, payments, attendanceRecords, chatGroups] = await Promise.all([
     usersPromise,
     firestoreTeamSyncService.listTeamsForClub(workspace.club.id),
     firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser),
     firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser),
     joinRequestsPromise,
+    firestoreMaviTeamDataService.listVisiblePaymentsForCurrentUser(firebaseUser),
+    firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser),
+    firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser),
   ]);
+  const chatMessages = await firestoreMaviTeamDataService.listVisibleChatMessagesForCurrentUser(
+    firebaseUser,
+    chatGroups.map((group) => group.id)
+  );
 
   return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {
     users,
     teams,
     scheduleEvents,
     announcements,
+    attendanceRecords,
+    chatGroups,
+    chatMessages,
+    payments,
     joinRequests,
   });
 }
@@ -652,6 +667,12 @@ export const teamSyncService = {
   },
 
   async createChatGroup(input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreMaviTeamDataService.createChatGroup(firebaseUser, input);
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const createdAt = nowIso();
     const newChatGroup: ChatGroup = { ...input, id: `chat-${Date.now()}`, createdAt, updatedAt: createdAt };
@@ -659,18 +680,36 @@ export const teamSyncService = {
   },
 
   async createChatMessage(input: Omit<ChatMessage, "id" | "createdAt">) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreMaviTeamDataService.createChatMessage(firebaseUser, input);
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const newChatMessage: ChatMessage = { ...input, id: `message-${Date.now()}`, createdAt: nowIso() };
     return saveAppData({ ...data, chatMessages: [...data.chatMessages, newChatMessage] });
   },
 
   async createPayment(input: Omit<Payment, "id" | "updatedAt">) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreMaviTeamDataService.createPayment(firebaseUser, input);
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const newPayment: Payment = { ...input, id: `payment-${Date.now()}`, updatedAt: nowIso() };
     return saveAppData({ ...data, payments: [newPayment, ...data.payments] });
   },
 
   async updatePaymentStatus(paymentId: string, status: PaymentStatus) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreMaviTeamDataService.updatePaymentStatus(firebaseUser, paymentId, status);
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const updatedAt = nowIso();
 
@@ -697,6 +736,12 @@ export const teamSyncService = {
   },
 
   async saveAttendance(input: SaveAttendanceInput) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreMaviTeamDataService.saveAttendance(firebaseUser, input);
+      return loadAppData();
+    }
+
     const data = await loadAppData();
     const recordedAt = nowIso();
     const nextRecords: AttendanceRecord[] = input.records.map((record) => ({

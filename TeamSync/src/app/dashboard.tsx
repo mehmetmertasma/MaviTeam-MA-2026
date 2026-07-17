@@ -4,7 +4,6 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
-import { initialTeamSyncData } from "@/data/initialTeamSyncData";
 import { useTranslation } from "@/localization";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ScheduleEvent, TeamSyncAppData, UserRole } from "@/types/teamSync";
@@ -30,52 +29,6 @@ type QuickAction = {
 };
 
 type AttentionTone = "success" | "warning" | "info";
-
-type DashboardCopy = {
-  appSubtitle: string;
-  loadingLatest: string;
-  ready: string;
-  connectionIssue: string;
-  pageEyebrow: string;
-  welcome: string;
-  userFallback: string;
-  editProfile: string;
-  editProfileAccessLabel: string;
-  heroLabel: string;
-  noTeam: string;
-  activeMember: string;
-  team: string;
-  event: string;
-  athlete: string;
-  announcement: string;
-  approval: string;
-  accessOpen: string;
-  registered: string;
-  organized: string;
-  calendar: string;
-  published: string;
-  pending: string;
-  pendingMembers: string;
-  openPayments: string;
-  upcomingEvents: string;
-  currentRecord: string;
-  quickActionsTitle: string;
-  quickActionsSubtitle: string;
-  todaySummaryTitle: string;
-  todaySummarySubtitle: string;
-  noEvents: string;
-  clubSummaryTitle: string;
-  clubSummarySubtitle: string;
-  club: string;
-  city: string;
-  clubCode: string;
-  operationStatus: string;
-  steady: string;
-  needsAttention: string;
-  open: string;
-  roleHeroText: Record<UserRole, { title: string; subtitle: string }>;
-  quickActionsByRole: Record<UserRole, QuickAction[]>;
-};
 
 function getFirstName(name: string, fallback: string) {
   const trimmedName = name.trim();
@@ -103,191 +56,111 @@ function getUpcomingEvents(events: ScheduleEvent[]) {
     .slice(0, 3);
 }
 
-function getDashboardCopy(language: "tr" | "en"): DashboardCopy {
-  const roleHeroText: Record<UserRole, { title: string; subtitle: string }> = language === "en"
-    ? {
-      superAdmin: { title: "Platform operations center", subtitle: "Monitor clubs, users, and platform activity from one executive view." },
-      clubAdmin: { title: "Club operations center", subtitle: "Manage teams, members, schedules, communication, and payments with a clean professional workflow." },
-      coach: { title: "Team operations dashboard", subtitle: "Manage schedule, attendance, availability, and team communication from one place." },
-      parent: { title: "Team family dashboard", subtitle: "Follow schedule, announcements, messages, and payment updates for your athlete." },
-      athlete: { title: "Team schedule dashboard", subtitle: "Access practices, matches, announcements, messages, and shared content in one place." },
-    }
-    : {
-      superAdmin: { title: "Platform operasyon merkezi", subtitle: "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek yönetici ekranından takip et." },
-      clubAdmin: { title: "Kulüp operasyon merkezi", subtitle: "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı." },
-      coach: { title: "Takım operasyon paneli", subtitle: "Program, yoklama, uygunluk ve takım iletişimini tek yerden yönet." },
-      parent: { title: "Takım takip paneli", subtitle: "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et." },
-      athlete: { title: "Takım program paneli", subtitle: "Antrenman, maç, duyuru, mesaj ve paylaşılan içeriklere tek ekrandan ulaş." },
-    };
-
-  const quickActionsByRole: Record<UserRole, QuickAction[]> = language === "en"
-    ? {
-      superAdmin: [
-        { title: "Club dashboard", meta: "Review club workspace", route: "/dashboard" },
-        { title: "View statistics", meta: "Platform and club summary", route: "/statistics" },
-        { title: "Account center", meta: "Open profile settings", route: "/profile" },
-      ],
-      clubAdmin: [
-        { title: "Manage teams", meta: "Teams and rosters", route: "/teams" },
-        { title: "Pending approvals", meta: "Approve new members", route: "/pending-approvals" },
-        { title: "Publish announcement", meta: "Club and team updates", route: "/announcements" },
-        { title: "Create schedule", meta: "Practices and matches", route: "/schedule" },
-        { title: "Open messages", meta: "Team and direct chats", route: "/messages" },
-        { title: "Review payments", meta: "Membership payment tracking", route: "/payments" },
-      ],
-      coach: [
-        { title: "Manage schedule", meta: "Add practice or match", route: "/schedule" },
-        { title: "Take attendance", meta: "Mark attendance status", route: "/attendance" },
-        { title: "Availability", meta: "Plan participation", route: "/availability" },
-        { title: "Team announcement", meta: "Open announcements", route: "/announcements" },
-        { title: "Open messages", meta: "Team communication", route: "/messages" },
-        { title: "Share replay", meta: "Video and drill content", route: "/replays" },
-      ],
-      parent: [
-        { title: "View schedule", meta: "Practices and matches", route: "/schedule" },
-        { title: "Read announcements", meta: "Club and team updates", route: "/announcements" },
-        { title: "Send message", meta: "Team communication", route: "/messages" },
-        { title: "Set availability", meta: "Submit participation status", route: "/availability" },
-        { title: "Check payments", meta: "Monthly payment details", route: "/payments" },
-      ],
-      athlete: [
-        { title: "View my schedule", meta: "Practices and matches", route: "/schedule" },
-        { title: "Set availability", meta: "Submit participation status", route: "/availability" },
-        { title: "Read announcements", meta: "Team updates", route: "/announcements" },
-        { title: "Send message", meta: "Team communication", route: "/messages" },
-        { title: "Watch replay", meta: "Shared content", route: "/replays" },
-      ],
-    }
-    : {
-      superAdmin: [
-        { title: "Kulüp paneli", meta: "Kulüp verilerini görüntüle", route: "/dashboard" },
-        { title: "İstatistikleri gör", meta: "Platform ve kulüp özeti", route: "/statistics" },
-        { title: "Hesap merkezi", meta: "Profil ayarlarını aç", route: "/profile" },
-      ],
-      clubAdmin: [
-        { title: "Takımları yönet", meta: "Takım listesi ve kadrolar", route: "/teams" },
-        { title: "Bekleyen onaylar", meta: "Yeni üyeleri onayla", route: "/pending-approvals" },
-        { title: "Duyuru yayınla", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-        { title: "Program oluştur", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-        { title: "Mesajları aç", meta: "Takım ve bireysel mesajlar", route: "/messages" },
-        { title: "Ödemeleri kontrol et", meta: "Aidat ve ödeme takibi", route: "/payments" },
-      ],
-      coach: [
-        { title: "Programı yönet", meta: "Antrenman / maç ekle", route: "/schedule" },
-        { title: "Yoklama al", meta: "Katılım durumlarını işaretle", route: "/attendance" },
-        { title: "Uygunluk cevapları", meta: "Katılım planlamasını gör", route: "/availability" },
-        { title: "Takım duyurusu", meta: "Duyuru ekranına git", route: "/announcements" },
-        { title: "Mesajları aç", meta: "Takım iletişimi", route: "/messages" },
-        { title: "Video / drill paylaş", meta: "İçerik ekranına git", route: "/replays" },
-      ],
-      parent: [
-        { title: "Programı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-        { title: "Duyuruları oku", meta: "Kulüp ve takım duyuruları", route: "/announcements" },
-        { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-        { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
-        { title: "Ödeme durumunu kontrol et", meta: "Aylık ödeme bilgileri", route: "/payments" },
-      ],
-      athlete: [
-        { title: "Programımı görüntüle", meta: "Antrenman ve maç takvimi", route: "/schedule" },
-        { title: "Uygunluk bildir", meta: "Katılım durumunu gönder", route: "/availability" },
-        { title: "Duyuruları oku", meta: "Takım duyurularını gör", route: "/announcements" },
-        { title: "Mesaj gönder", meta: "Takım iletişim ekranı", route: "/messages" },
-        { title: "Video / drill izle", meta: "Paylaşılan içerikler", route: "/replays" },
-      ],
-    };
-
-  if (language === "en") {
-    return {
-      appSubtitle: "Club management system",
-      loadingLatest: "Syncing latest data...",
-      ready: "System ready",
-      connectionIssue: "Showing saved data",
-      pageEyebrow: "Operations dashboard",
-      welcome: "Welcome",
-      userFallback: "User",
-      editProfile: "Edit profile",
-      editProfileAccessLabel: "Open profile settings",
-      heroLabel: "Club overview",
-      noTeam: "No team selected",
-      activeMember: "Active members",
-      team: "Teams",
-      event: "Events",
-      athlete: "Athletes",
-      announcement: "Announcements",
-      approval: "Approvals",
-      accessOpen: "Access open",
-      registered: "Registered",
-      organized: "Organized",
-      calendar: "Calendar",
-      published: "Published",
-      pending: "Pending",
-      pendingMembers: "Pending memberships",
-      openPayments: "Open payments",
-      upcomingEvents: "Upcoming events",
-      currentRecord: "Current record",
-      quickActionsTitle: "Priority actions",
-      quickActionsSubtitle: "The most important screens for managing your club.",
-      todaySummaryTitle: "Today’s summary",
-      todaySummarySubtitle: "Items that need quick attention.",
-      noEvents: "No upcoming events yet.",
-      clubSummaryTitle: "Club summary",
-      clubSummarySubtitle: "Workspace and club details.",
-      club: "Club",
-      city: "City",
-      clubCode: "Club code",
-      operationStatus: "Operational status",
-      steady: "On track",
-      needsAttention: "Needs attention",
-      open: "Open",
-      roleHeroText,
-      quickActionsByRole,
-    };
-  }
+function getDashboardCopy(language: "tr" | "en") {
+  const isEnglish = language === "en";
 
   return {
-    appSubtitle: "Kulüp yönetim sistemi",
-    loadingLatest: "Güncel veri eşitleniyor...",
-    ready: "Sistem hazır",
-    connectionIssue: "Kayıtlı veri gösteriliyor",
-    pageEyebrow: "Operasyon paneli",
-    welcome: "Hoş geldin",
-    userFallback: "Kullanıcı",
-    editProfile: "Profili düzenle",
-    editProfileAccessLabel: "Profil ayarlarını aç",
-    heroLabel: "Kulüp özeti",
-    noTeam: "Takım seçilmedi",
-    activeMember: "Aktif üye",
-    team: "Takım",
-    event: "Etkinlik",
-    athlete: "Sporcu",
-    announcement: "Duyuru",
-    approval: "Onay",
-    accessOpen: "Erişim açık",
-    registered: "Kayıtlı",
-    organized: "Organize",
-    calendar: "Takvim",
-    published: "Yayın",
-    pending: "Bekleyen",
-    pendingMembers: "Bekleyen üyelik",
-    openPayments: "Açık ödeme",
-    upcomingEvents: "Yaklaşan etkinlik",
-    currentRecord: "Güncel kayıt",
-    quickActionsTitle: "Öncelikli işlemler",
-    quickActionsSubtitle: "Kulübü yönetmek için en önemli ekranlar.",
-    todaySummaryTitle: "Bugünün özeti",
-    todaySummarySubtitle: "Hızlı takip edilmesi gereken başlıklar.",
-    noEvents: "Henüz etkinlik yok.",
-    clubSummaryTitle: "Kulüp özeti",
-    clubSummarySubtitle: "Çalışma alanı ve kulüp bilgileri.",
-    club: "Kulüp",
-    city: "Şehir",
-    clubCode: "Kulüp kodu",
-    operationStatus: "Operasyon durumu",
-    steady: "Düzenli",
-    needsAttention: "Takip gerekli",
-    open: "Aç",
-    roleHeroText,
-    quickActionsByRole,
+    appSubtitle: isEnglish ? "Club management system" : "Kulüp yönetim sistemi",
+    loading: isEnglish ? "Loading real workspace data..." : "Gerçek çalışma alanı verisi yükleniyor...",
+    ready: isEnglish ? "System ready" : "Sistem hazır",
+    connectionIssue: isEnglish ? "Real workspace data could not be loaded" : "Gerçek çalışma alanı verisi yüklenemedi",
+    loadingTitle: isEnglish ? "Operations dashboard" : "Operasyon paneli",
+    pageEyebrow: isEnglish ? "Operations dashboard" : "Operasyon paneli",
+    welcome: isEnglish ? "Welcome" : "Hoş geldin",
+    userFallback: isEnglish ? "User" : "Kullanıcı",
+    editProfile: isEnglish ? "Edit profile" : "Profili düzenle",
+    editProfileAccessLabel: isEnglish ? "Open profile settings" : "Profil ayarlarını aç",
+    heroLabel: isEnglish ? "Club overview" : "Kulüp özeti",
+    noTeam: isEnglish ? "No team selected" : "Takım seçilmedi",
+    activeMember: isEnglish ? "Active members" : "Aktif üye",
+    team: isEnglish ? "Teams" : "Takım",
+    event: isEnglish ? "Events" : "Etkinlik",
+    athlete: isEnglish ? "Athletes" : "Sporcu",
+    announcement: isEnglish ? "Announcements" : "Duyuru",
+    approval: isEnglish ? "Approvals" : "Onay",
+    accessOpen: isEnglish ? "Access open" : "Erişim açık",
+    registered: isEnglish ? "Registered" : "Kayıtlı",
+    organized: isEnglish ? "Organized" : "Organize",
+    calendar: isEnglish ? "Calendar" : "Takvim",
+    published: isEnglish ? "Published" : "Yayın",
+    pending: isEnglish ? "Pending" : "Bekleyen",
+    pendingMembers: isEnglish ? "Pending memberships" : "Bekleyen üyelik",
+    openPayments: isEnglish ? "Open payments" : "Açık ödeme",
+    upcomingEvents: isEnglish ? "Upcoming events" : "Yaklaşan etkinlik",
+    currentRecord: isEnglish ? "Current record" : "Güncel kayıt",
+    quickActionsTitle: isEnglish ? "Priority actions" : "Öncelikli işlemler",
+    quickActionsSubtitle: isEnglish ? "The most important screens for managing your club." : "Kulübü yönetmek için en önemli ekranlar.",
+    todaySummaryTitle: isEnglish ? "Today’s summary" : "Bugünün özeti",
+    todaySummarySubtitle: isEnglish ? "Items that need quick attention." : "Hızlı takip edilmesi gereken başlıklar.",
+    noEvents: isEnglish ? "No upcoming events yet." : "Henüz etkinlik yok.",
+    clubSummaryTitle: isEnglish ? "Club summary" : "Kulüp özeti",
+    clubSummarySubtitle: isEnglish ? "Workspace and club details." : "Çalışma alanı ve kulüp bilgileri.",
+    club: isEnglish ? "Club" : "Kulüp",
+    city: isEnglish ? "City" : "Şehir",
+    clubCode: isEnglish ? "Club code" : "Kulüp kodu",
+    operationStatus: isEnglish ? "Operational status" : "Operasyon durumu",
+    steady: isEnglish ? "On track" : "Düzenli",
+    needsAttention: isEnglish ? "Needs attention" : "Takip gerekli",
+    open: isEnglish ? "Open" : "Aç",
+    roleHeroText: {
+      superAdmin: {
+        title: isEnglish ? "Platform operations center" : "Platform operasyon merkezi",
+        subtitle: isEnglish ? "Monitor clubs, users, and platform activity from one executive view." : "Kulüp ağını, kullanıcı akışını ve sistem durumunu tek yönetici ekranından takip et.",
+      },
+      clubAdmin: {
+        title: isEnglish ? "Club operations center" : "Kulüp operasyon merkezi",
+        subtitle: isEnglish ? "Manage teams, members, schedules, communication, and payments with a clean professional workflow." : "Takımlar, üyeler, program, iletişim ve ödemeler için profesyonel kontrol alanı.",
+      },
+      coach: {
+        title: isEnglish ? "Team operations dashboard" : "Takım operasyon paneli",
+        subtitle: isEnglish ? "Manage schedule, attendance, availability, and team communication from one place." : "Program, yoklama, uygunluk ve takım iletişimini tek yerden yönet.",
+      },
+      parent: {
+        title: isEnglish ? "Team family dashboard" : "Takım takip paneli",
+        subtitle: isEnglish ? "Follow schedule, announcements, messages, and payment updates for your athlete." : "Program, duyuru, mesaj ve ödeme bilgilerini düzenli şekilde takip et.",
+      },
+      athlete: {
+        title: isEnglish ? "Team schedule dashboard" : "Takım program paneli",
+        subtitle: isEnglish ? "Access practices, matches, announcements, messages, and shared content in one place." : "Antrenman, maç, duyuru, mesaj ve paylaşılan içeriklere tek ekrandan ulaş.",
+      },
+    } satisfies Record<UserRole, { title: string; subtitle: string }>,
+    quickActionsByRole: {
+      superAdmin: [
+        { title: isEnglish ? "Club dashboard" : "Kulüp paneli", meta: isEnglish ? "Review club workspace" : "Kulüp verilerini görüntüle", route: "/dashboard" },
+        { title: isEnglish ? "View statistics" : "İstatistikleri gör", meta: isEnglish ? "Platform and club summary" : "Platform ve kulüp özeti", route: "/statistics" },
+        { title: isEnglish ? "Account center" : "Hesap merkezi", meta: isEnglish ? "Open profile settings" : "Profil ayarlarını aç", route: "/profile" },
+      ],
+      clubAdmin: [
+        { title: isEnglish ? "Manage teams" : "Takımları yönet", meta: isEnglish ? "Teams and rosters" : "Takım listesi ve kadrolar", route: "/teams" },
+        { title: isEnglish ? "Pending approvals" : "Bekleyen onaylar", meta: isEnglish ? "Approve new members" : "Yeni üyeleri onayla", route: "/pending-approvals" },
+        { title: isEnglish ? "Publish announcement" : "Duyuru yayınla", meta: isEnglish ? "Club and team updates" : "Kulüp ve takım duyuruları", route: "/announcements" },
+        { title: isEnglish ? "Create schedule" : "Program oluştur", meta: isEnglish ? "Practices and matches" : "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: isEnglish ? "Open messages" : "Mesajları aç", meta: isEnglish ? "Team and direct chats" : "Takım ve bireysel mesajlar", route: "/messages" },
+        { title: isEnglish ? "Review payments" : "Ödemeleri kontrol et", meta: isEnglish ? "Membership payment tracking" : "Aidat ve ödeme takibi", route: "/payments" },
+      ],
+      coach: [
+        { title: isEnglish ? "Manage schedule" : "Programı yönet", meta: isEnglish ? "Add practice or match" : "Antrenman / maç ekle", route: "/schedule" },
+        { title: isEnglish ? "Take attendance" : "Yoklama al", meta: isEnglish ? "Mark attendance status" : "Katılım durumlarını işaretle", route: "/attendance" },
+        { title: isEnglish ? "Availability" : "Uygunluk cevapları", meta: isEnglish ? "Plan participation" : "Katılım planlamasını gör", route: "/availability" },
+        { title: isEnglish ? "Team announcement" : "Takım duyurusu", meta: isEnglish ? "Open announcements" : "Duyuru ekranına git", route: "/announcements" },
+        { title: isEnglish ? "Open messages" : "Mesajları aç", meta: isEnglish ? "Team communication" : "Takım iletişimi", route: "/messages" },
+        { title: isEnglish ? "Share replay" : "Video / drill paylaş", meta: isEnglish ? "Video and drill content" : "İçerik ekranına git", route: "/replays" },
+      ],
+      parent: [
+        { title: isEnglish ? "View schedule" : "Programı görüntüle", meta: isEnglish ? "Practices and matches" : "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: isEnglish ? "Read announcements" : "Duyuruları oku", meta: isEnglish ? "Club and team updates" : "Kulüp ve takım duyuruları", route: "/announcements" },
+        { title: isEnglish ? "Send message" : "Mesaj gönder", meta: isEnglish ? "Team communication" : "Takım iletişim ekranı", route: "/messages" },
+        { title: isEnglish ? "Set availability" : "Uygunluk bildir", meta: isEnglish ? "Submit participation status" : "Katılım durumunu gönder", route: "/availability" },
+        { title: isEnglish ? "Check payments" : "Ödeme durumunu kontrol et", meta: isEnglish ? "Monthly payment details" : "Aylık ödeme bilgileri", route: "/payments" },
+      ],
+      athlete: [
+        { title: isEnglish ? "View my schedule" : "Programımı görüntüle", meta: isEnglish ? "Practices and matches" : "Antrenman ve maç takvimi", route: "/schedule" },
+        { title: isEnglish ? "Set availability" : "Uygunluk bildir", meta: isEnglish ? "Submit participation status" : "Katılım durumunu gönder", route: "/availability" },
+        { title: isEnglish ? "Read announcements" : "Duyuruları oku", meta: isEnglish ? "Team updates" : "Takım duyurularını gör", route: "/announcements" },
+        { title: isEnglish ? "Send message" : "Mesaj gönder", meta: isEnglish ? "Team communication" : "Takım iletişim ekranı", route: "/messages" },
+        { title: isEnglish ? "Watch replay" : "Video / drill izle", meta: isEnglish ? "Shared content" : "Paylaşılan içerikler", route: "/replays" },
+      ],
+    } satisfies Record<UserRole, QuickAction[]>,
   };
 }
 
@@ -295,18 +168,16 @@ export default function DashboardScreen() {
   const { language } = useTranslation();
   const copy = getDashboardCopy(language);
   const locale = language === "tr" ? "tr-TR" : "en-US";
-  const [appData, setAppData] = useState<TeamSyncAppData>(initialTeamSyncData);
-  const [statusMessage, setStatusMessage] = useState(copy.loadingLatest);
-  const [isRefreshing, setIsRefreshing] = useState(true);
+  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [statusMessage, setStatusMessage] = useState(copy.loading);
 
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
 
-      async function refreshDashboardData() {
+      async function loadDashboardData() {
         try {
-          setIsRefreshing(true);
-          setStatusMessage(copy.loadingLatest);
+          setStatusMessage(copy.loading);
           const loadedAppData = await teamSyncService.getAppData();
 
           if (isActive) {
@@ -315,22 +186,33 @@ export default function DashboardScreen() {
           }
         } catch {
           if (isActive) {
+            setAppData(null);
             setStatusMessage(copy.connectionIssue);
-          }
-        } finally {
-          if (isActive) {
-            setIsRefreshing(false);
           }
         }
       }
 
-      refreshDashboardData();
+      loadDashboardData();
 
       return () => {
         isActive = false;
       };
-    }, [copy.connectionIssue, copy.loadingLatest, copy.ready])
+    }, [copy.connectionIssue, copy.loading, copy.ready])
   );
+
+  if (appData === null) {
+    return (
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+        <View style={styles.container}>
+          <View style={styles.loadingCard}>
+            <Text style={styles.logo}>MaviTeam</Text>
+            <Text style={styles.loadingTitle}>{copy.loadingTitle}</Text>
+            <Text style={styles.loadingText}>{statusMessage}</Text>
+          </View>
+        </View>
+      </ScrollView>
+    );
+  }
 
   const { club, currentUser, users, teams, announcements, scheduleEvents, payments, joinRequests } = appData;
   const activeUsers = users.filter((user) => user.status === "active");
@@ -341,11 +223,6 @@ export default function DashboardScreen() {
   const heroText = copy.roleHeroText[currentUser.role];
   const quickActions = copy.quickActionsByRole[currentUser.role];
   const upcomingEvents = useMemo(() => getUpcomingEvents(scheduleEvents), [scheduleEvents]);
-  const heroMetrics = [
-    { label: copy.activeMember, value: String(activeUsers.length) },
-    { label: copy.team, value: String(teams.length) },
-    { label: copy.event, value: String(scheduleEvents.length) },
-  ];
   const stats = [
     { label: copy.activeMember, value: String(activeUsers.length), hint: copy.accessOpen },
     { label: copy.athlete, value: String(athleteCount), hint: copy.registered },
@@ -375,8 +252,8 @@ export default function DashboardScreen() {
             <Text style={styles.logo}>MaviTeam</Text>
             <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
           </View>
-          <View style={[styles.systemBadge, isRefreshing ? styles.systemBadgeSyncing : null]}>
-            <View style={[styles.systemDot, isRefreshing ? styles.systemDotSyncing : null]} />
+          <View style={styles.systemBadge}>
+            <View style={styles.systemDot} />
             <Text style={styles.systemBadgeText}>{statusMessage}</Text>
           </View>
         </View>
@@ -384,12 +261,9 @@ export default function DashboardScreen() {
         <View style={styles.pageHeader}>
           <View style={styles.pageTitleArea}>
             <Text style={styles.pageEyebrow}>{copy.pageEyebrow}</Text>
-            <Text style={styles.welcome}>
-              {copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}
-            </Text>
+            <Text style={styles.welcome}>{copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}</Text>
             <Text style={styles.subtitle}>{club.name}</Text>
           </View>
-
           <AppButton
             title={copy.editProfile}
             variant="secondary"
@@ -404,22 +278,9 @@ export default function DashboardScreen() {
             <Text style={styles.heroLabel}>{copy.heroLabel}</Text>
             <Text style={styles.heroTitle}>{heroText.title}</Text>
             <Text style={styles.heroSubtitle}>{heroText.subtitle}</Text>
-
-            <View style={styles.heroMetricRow}>
-              {heroMetrics.map((metric) => (
-                <View key={metric.label} style={styles.heroMetricCard}>
-                  <Text style={styles.heroMetricValue}>{metric.value}</Text>
-                  <Text style={styles.heroMetricLabel}>{metric.label}</Text>
-                </View>
-              ))}
-            </View>
           </View>
-
           <View style={styles.workspaceCard}>
-            <Text style={styles.workspaceLabel}>{copy.club}</Text>
-            <Text style={styles.workspaceName}>{club.name}</Text>
-            <View style={styles.workspaceDivider} />
-            <Text style={styles.workspaceMetaLabel}>{copy.clubCode}</Text>
+            <Text style={styles.workspaceLabel}>{copy.clubCode}</Text>
             <Text style={styles.workspaceCode}>{club.code}</Text>
             <Text style={styles.workspaceTeam}>{primaryTeam?.name ?? copy.noTeam}</Text>
           </View>
@@ -436,15 +297,13 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.mainGrid}>
-          <View style={[styles.panel, styles.actionPanel]}>
+          <View style={styles.panel}>
             <View style={styles.panelHeader}>
               <View>
                 <Text style={styles.panelTitle}>{copy.quickActionsTitle}</Text>
                 <Text style={styles.panelSubtitle}>{copy.quickActionsSubtitle}</Text>
               </View>
-              <Text style={styles.panelCount}>{quickActions.length}</Text>
             </View>
-
             <View style={styles.actionGrid}>
               {quickActions.map((action) => (
                 <Pressable
@@ -452,7 +311,6 @@ export default function DashboardScreen() {
                   onPress={() => router.push(action.route as never)}
                   style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}
                 >
-                  <View style={styles.actionAccent} />
                   <View style={styles.actionTextArea}>
                     <Text style={styles.actionText}>{action.title}</Text>
                     <Text style={styles.actionMeta}>{action.meta}</Text>
@@ -463,12 +321,9 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          <View style={[styles.panel, styles.sidePanel]}>
-            <View style={styles.panelHeaderCompact}>
-              <Text style={styles.panelTitle}>{copy.todaySummaryTitle}</Text>
-              <Text style={styles.panelSubtitle}>{copy.todaySummarySubtitle}</Text>
-            </View>
-
+          <View style={styles.panel}>
+            <Text style={styles.panelTitle}>{copy.todaySummaryTitle}</Text>
+            <Text style={styles.panelSubtitle}>{copy.todaySummarySubtitle}</Text>
             <View style={styles.attentionList}>
               {attentionItems.map((item) => (
                 <View key={item.label} style={styles.attentionRow}>
@@ -488,38 +343,26 @@ export default function DashboardScreen() {
                 </View>
               ))}
             </View>
-
             <View style={styles.eventBlock}>
               <Text style={styles.blockTitle}>{copy.upcomingEvents}</Text>
               {upcomingEvents.length === 0 ? (
                 <Text style={styles.emptyText}>{copy.noEvents}</Text>
               ) : (
-                <View style={styles.eventList}>
-                  {upcomingEvents.map((event) => (
-                    <View key={event.id} style={styles.eventCard}>
-                      <View style={styles.eventDateBox}>
-                        <Text style={styles.eventDateText}>{formatEventTime(event.startsAt, locale).split(" ")[0]}</Text>
-                      </View>
-
-                      <View style={styles.eventContent}>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                        <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
-                        <Text style={styles.eventLocation}>{event.location}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </View>
+                upcomingEvents.map((event) => (
+                  <View key={event.id} style={styles.eventCard}>
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
+                    <Text style={styles.eventLocation}>{event.location}</Text>
+                  </View>
+                ))
               )}
             </View>
           </View>
         </View>
 
         <View style={styles.panel}>
-          <View style={styles.panelHeaderCompact}>
-            <Text style={styles.panelTitle}>{copy.clubSummaryTitle}</Text>
-            <Text style={styles.panelSubtitle}>{copy.clubSummarySubtitle}</Text>
-          </View>
-
+          <Text style={styles.panelTitle}>{copy.clubSummaryTitle}</Text>
+          <Text style={styles.panelSubtitle}>{copy.clubSummarySubtitle}</Text>
           <View style={styles.overviewGrid}>
             {overview.map((item) => (
               <View key={item.label} style={styles.infoCard}>
@@ -540,38 +383,60 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.app,
   },
   screen: {
-    flexGrow: 1,
-    backgroundColor: theme.colors.background.app,
-    paddingHorizontal: theme.spacing["2xl"],
-    paddingBottom: theme.spacing["2xl"],
+    padding: theme.spacing.xl,
+    paddingBottom: theme.spacing["4xl"],
   },
   container: {
     width: "100%",
     maxWidth: 1180,
     alignSelf: "center",
+    gap: theme.spacing.xl,
   },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+  loadingCard: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing["3xl"],
+    ...theme.shadows.md,
   },
   logo: {
     color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["2xl"],
+    fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
+  },
+  loadingTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["4xl"],
+    fontWeight: theme.fontWeights.black,
+    marginTop: theme.spacing.xl,
+  },
+  loadingText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.bold,
+    marginTop: theme.spacing.md,
+  },
+  topBar: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.lg,
   },
   topBarSub: {
-    color: theme.colors.text.inverse,
-    opacity: 0.7,
-    fontSize: theme.fontSizes.md,
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
   },
   systemBadge: {
-    backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.background.subtle,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
@@ -580,29 +445,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: theme.spacing.sm,
   },
-  systemBadgeSyncing: {
-    opacity: 0.86,
-  },
   systemDot: {
-    width: 9,
-    height: 9,
+    width: 8,
+    height: 8,
     borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.text.success,
-  },
-  systemDotSyncing: {
-    backgroundColor: theme.colors.brand.primary,
+    backgroundColor: theme.colors.state.success,
   },
   systemBadgeText: {
-    color: theme.colors.text.primary,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.extrabold,
   },
   pageHeader: {
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing["2xl"],
     flexDirection: "row",
-    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: theme.spacing.xl,
-    marginBottom: theme.spacing["2xl"],
   },
   pageTitleArea: {
     flex: 1,
@@ -611,226 +473,149 @@ const styles = StyleSheet.create({
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
-    textTransform: "uppercase",
     marginBottom: theme.spacing.sm,
   },
   welcome: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes["5xl"],
-    fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["5xl"],
-    marginBottom: theme.spacing.sm,
-  },
-  subtitle: {
-    color: theme.colors.text.inverse,
-    opacity: 0.72,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  editProfileButton: {
-    minWidth: 160,
-  },
-  executiveHero: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["3xl"],
-    flexDirection: "row",
-    gap: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    ...theme.shadows.md,
-  },
-  heroMainContent: {
-    flex: 1,
-  },
-  heroLabel: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
-    marginBottom: theme.spacing.lg,
-  },
-  heroTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes["4xl"],
     fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["4xl"],
-    marginBottom: theme.spacing.sm,
   },
-  heroSubtitle: {
+  subtitle: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.lg,
-    lineHeight: theme.lineHeights.xl,
-    fontWeight: theme.fontWeights.semibold,
-    maxWidth: 700,
+    fontWeight: theme.fontWeights.bold,
+    marginTop: theme.spacing.sm,
   },
-  heroMetricRow: {
+  editProfileButton: {
+    alignSelf: "flex-start",
+  },
+  executiveHero: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.xl,
   },
-  heroMetricCard: {
-    minWidth: 120,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
+  heroMainContent: {
+    flex: 1,
+    backgroundColor: theme.colors.brand.primary,
+    borderRadius: theme.radius["2xl"],
+    padding: theme.spacing["2xl"],
   },
-  heroMetricValue: {
-    color: theme.colors.text.primary,
+  heroLabel: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+    opacity: 0.86,
+    marginBottom: theme.spacing.sm,
+  },
+  heroTitle: {
+    color: theme.colors.text.inverse,
     fontSize: theme.fontSizes["3xl"],
     fontWeight: theme.fontWeights.black,
   },
-  heroMetricLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    marginTop: theme.spacing.xs,
+  heroSubtitle: {
+    color: theme.colors.text.inverse,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    lineHeight: theme.lineHeights.md,
+    marginTop: theme.spacing.md,
+    opacity: 0.9,
   },
   workspaceCard: {
     width: 260,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     padding: theme.spacing.xl,
   },
   workspaceLabel: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    textTransform: "uppercase",
-    marginBottom: theme.spacing.sm,
-  },
-  workspaceName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights.xl,
-  },
-  workspaceDivider: {
-    height: 1,
-    backgroundColor: theme.colors.border.default,
-    marginVertical: theme.spacing.lg,
-  },
-  workspaceMetaLabel: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.black,
   },
   workspaceCode: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["2xl"],
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["3xl"],
     fontWeight: theme.fontWeights.black,
-    marginTop: theme.spacing.xs,
+    marginTop: theme.spacing.sm,
   },
   workspaceTeam: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.lg,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.bold,
+    marginTop: theme.spacing.sm,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+    gap: theme.spacing.md,
   },
   statCard: {
     flexGrow: 1,
-    flexBasis: 150,
+    flexBasis: 160,
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    ...theme.shadows.sm,
-  },
-  statHint: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.black,
-    textTransform: "uppercase",
-    marginBottom: theme.spacing.sm,
-  },
-  statValue: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-  },
-  statLabel: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    marginTop: theme.spacing.xs,
-  },
-  mainGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-  },
-  panel: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["2xl"],
-    ...theme.shadows.md,
-  },
-  actionPanel: {
-    flex: 2,
-    minWidth: 360,
-  },
-  sidePanel: {
-    flex: 1,
-    minWidth: 300,
-  },
-  panelHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
-  },
-  panelHeaderCompact: {
-    marginBottom: theme.spacing.xl,
-  },
-  panelTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
-  },
-  panelSubtitle: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-  },
-  panelCount: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-  },
-  actionGrid: {
-    gap: theme.spacing.md,
-  },
-  actionCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     padding: theme.spacing.lg,
   },
-  actionAccent: {
-    width: 5,
-    height: 38,
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.brand.primary,
+  statHint: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.black,
+  },
+  statValue: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes["3xl"],
+    fontWeight: theme.fontWeights.black,
+    marginVertical: theme.spacing.xs,
+  },
+  statLabel: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.bold,
+  },
+  mainGrid: {
+    flexDirection: "row",
+    gap: theme.spacing.xl,
+  },
+  panel: {
+    flex: 1,
+    backgroundColor: theme.colors.background.surface,
+    borderRadius: theme.radius["2xl"],
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.xl,
+    gap: theme.spacing.lg,
+  },
+  panelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+  },
+  panelTitle: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.xl,
+    fontWeight: theme.fontWeights.black,
+  },
+  panelSubtitle: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
+  },
+  actionGrid: {
+    gap: theme.spacing.md,
+  },
+  actionCard: {
+    borderRadius: theme.radius.xl,
+    backgroundColor: theme.colors.background.subtle,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    padding: theme.spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
   },
   actionTextArea: {
     flex: 1,
@@ -839,48 +624,44 @@ const styles = StyleSheet.create({
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
   },
   actionMeta: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
+    marginTop: theme.spacing.xs,
   },
   actionOpenText: {
-    color: theme.colors.text.brand,
+    color: theme.colors.brand.primary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
-  cardPressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.99 }],
-  },
   attentionList: {
-    gap: theme.spacing.md,
+    gap: theme.spacing.sm,
   },
   attentionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing.md,
+    borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: theme.spacing.md,
   },
   attentionLabel: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
   attentionMeta: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.xs,
     fontWeight: theme.fontWeights.semibold,
     marginTop: theme.spacing.xs,
   },
   attentionValue: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes["2xl"],
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.black,
   },
   attentionWarning: {
@@ -890,61 +671,38 @@ const styles = StyleSheet.create({
     color: theme.colors.text.success,
   },
   eventBlock: {
-    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.sm,
   },
   blockTitle: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.lg,
+    fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.md,
   },
   emptyText: {
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
   },
-  eventList: {
-    gap: theme.spacing.md,
-  },
   eventCard: {
-    flexDirection: "row",
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-  },
-  eventDateBox: {
-    width: 44,
-    height: 44,
     borderRadius: theme.radius.lg,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-  },
-  eventDateText: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  eventContent: {
-    flex: 1,
+    backgroundColor: theme.colors.background.subtle,
+    padding: theme.spacing.md,
+    gap: theme.spacing.xs,
   },
   eventTitle: {
     color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.black,
   },
   eventTime: {
+    color: theme.colors.brand.primary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.black,
+  },
+  eventLocation: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
-  },
-  eventLocation: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    marginTop: theme.spacing.xs,
   },
   overviewGrid: {
     flexDirection: "row",
@@ -954,22 +712,23 @@ const styles = StyleSheet.create({
   infoCard: {
     flexGrow: 1,
     flexBasis: 180,
+    borderRadius: theme.radius.lg,
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
+    padding: theme.spacing.md,
   },
   infoLabel: {
-    color: theme.colors.text.muted,
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.xs,
     fontWeight: theme.fontWeights.black,
-    textTransform: "uppercase",
-    marginBottom: theme.spacing.xs,
   },
   infoValue: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.black,
+    marginTop: theme.spacing.xs,
+  },
+  cardPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.99 }],
   },
 });

@@ -149,7 +149,6 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
       }
     }
 
-    setLogoutError("");
     loadDrawerData();
 
     return () => {
@@ -216,10 +215,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
             <Text style={styles.title}>{drawerCopy.menuTitle}</Text>
           </View>
 
-          <Pressable
-            onPress={onClose}
-            style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}
-          >
+          <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}>
             <Text style={styles.closeButtonText}>×</Text>
           </Pressable>
         </View>
@@ -235,35 +231,28 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
           </View>
         </View>
 
-        <ScrollView
-          style={styles.itemsScroll}
-          contentContainerStyle={styles.items}
-          showsVerticalScrollIndicator={false}
-        >
-          {visibleDrawerItems.map((item) => {
-            return (
-              <Pressable
-                key={item.label}
-                disabled={item.isDisabled || isLoggingOut}
-                onPress={() => handleNavigate(item.route, item.isDisabled)}
-                style={({ pressed }) => [
-                  styles.item,
-                  item.isDisabled ? styles.itemDisabled : null,
-                  pressed && !item.isDisabled ? styles.pressed : null,
-                ]}
-              >
-                <View style={styles.itemTextArea}>
-                  <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>{item.label}</Text>
+        <ScrollView style={styles.itemsScroll} contentContainerStyle={styles.items} showsVerticalScrollIndicator={false}>
+          {visibleDrawerItems.map((item) => (
+            <Pressable
+              key={item.label}
+              disabled={item.isDisabled || isLoggingOut}
+              onPress={() => handleNavigate(item.route, item.isDisabled)}
+              style={({ pressed }) => [
+                styles.item,
+                item.isDisabled ? styles.itemDisabled : null,
+                pressed && !item.isDisabled ? styles.pressed : null,
+              ]}
+            >
+              <View style={styles.itemTextArea}>
+                <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>{item.label}</Text>
+                <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>{item.subtitle}</Text>
+              </View>
 
-                  <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>{item.subtitle}</Text>
-                </View>
-
-                <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
-                  {item.isDisabled ? drawerCopy.soon : "›"}
-                </Text>
-              </Pressable>
-            );
-          })}
+              <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
+                {item.isDisabled ? drawerCopy.soon : "›"}
+              </Text>
+            </Pressable>
+          ))}
         </ScrollView>
 
         <View style={styles.logoutArea}>

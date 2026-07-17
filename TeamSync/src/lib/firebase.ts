@@ -41,7 +41,6 @@ function createFirestore(app: FirebaseApp) {
   try {
     return initializeFirestore(app, {
       experimentalForceLongPolling: true,
-      useFetchStreams: false,
       ignoreUndefinedProperties: true,
     });
   } catch {

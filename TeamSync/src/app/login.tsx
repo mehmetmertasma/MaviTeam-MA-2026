@@ -59,7 +59,7 @@ export default function LoginScreen() {
       setError("");
       setStatusMessage(t.auth.loginInProgress);
 
-      const user = await authService.loginWithEmail({ email: trimmedEmail, password });
+      await authService.loginWithEmail({ email: trimmedEmail, password });
       const refreshedUser = await authService.refreshCurrentUser();
 
       await firestoreTeamSyncService.ensureUserProfile({

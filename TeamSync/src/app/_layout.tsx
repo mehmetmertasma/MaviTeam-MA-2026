@@ -176,6 +176,7 @@ function AppContent() {
         <Stack.Screen name="profile" />
         <Stack.Screen name="messages" />
         <Stack.Screen name="pending-approvals" />
+        <Stack.Screen name="members" />
         <Stack.Screen name="teams" />
         <Stack.Screen name="announcements" />
         <Stack.Screen name="schedule" />

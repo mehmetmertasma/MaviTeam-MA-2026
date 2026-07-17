@@ -59,16 +59,15 @@ export default function LoginScreen() {
       setError("");
       setStatusMessage(t.auth.loginInProgress);
 
-      await authService.loginWithEmail({ email: trimmedEmail, password });
-      const refreshedUser = await authService.refreshCurrentUser();
+      const signedInUser = await authService.loginWithEmail({ email: trimmedEmail, password });
 
       await firestoreTeamSyncService.ensureUserProfile({
-        user: refreshedUser,
+        user: signedInUser,
         role: "clubAdmin",
         status: "emailVerified",
       });
 
-      const workspace = await firestoreTeamSyncService.getCurrentWorkspace(refreshedUser);
+      const workspace = await firestoreTeamSyncService.getCurrentWorkspace(signedInUser);
       setStatusMessage(t.auth.loginSuccess);
 
       if (workspace === null || workspace.club === null) {

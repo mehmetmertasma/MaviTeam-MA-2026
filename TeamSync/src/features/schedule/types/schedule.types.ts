@@ -18,6 +18,16 @@ export type CalendarCell = {
   isToday?: boolean;
 };
 
+export type ScheduleFormState = {
+  title: string;
+  selectedType: ScheduleEventType;
+  selectedTeamId: string;
+  selectedDayNumber: string;
+  time: string;
+  location: string;
+  note: string;
+};
+
 export type ScheduleTypeColors = {
   backgroundColor: string;
   borderColor: string;

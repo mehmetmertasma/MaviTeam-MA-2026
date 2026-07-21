@@ -1,24 +1,24 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
-import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData } from "@/types/teamSync";
+import { scheduleRepository } from "../services/schedule.repository";
+import type { ScheduleWorkspaceData } from "../types/schedule.types";
 
 const INITIAL_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklenecek.";
 const SUCCESS_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklendi.";
 const ERROR_STATUS_MESSAGE = "Program yüklenirken bir sorun oluştu.";
 
 type UseScheduleDataResult = {
-  appData: TeamSyncAppData | null;
+  scheduleData: ScheduleWorkspaceData | null;
   isLoading: boolean;
   statusMessage: string;
   loadScheduleData: () => Promise<void>;
-  setAppData: React.Dispatch<React.SetStateAction<TeamSyncAppData | null>>;
+  setScheduleData: React.Dispatch<React.SetStateAction<ScheduleWorkspaceData | null>>;
   setStatusMessage: React.Dispatch<React.SetStateAction<string>>;
 };
 
 export function useScheduleData(): UseScheduleDataResult {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [scheduleData, setScheduleData] = useState<ScheduleWorkspaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState(INITIAL_STATUS_MESSAGE);
 
@@ -26,8 +26,8 @@ export function useScheduleData(): UseScheduleDataResult {
     setIsLoading(true);
 
     try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
+      const loadedScheduleData = await scheduleRepository.getScheduleData();
+      setScheduleData(loadedScheduleData);
       setStatusMessage(SUCCESS_STATUS_MESSAGE);
     } catch {
       setStatusMessage(ERROR_STATUS_MESSAGE);
@@ -43,11 +43,11 @@ export function useScheduleData(): UseScheduleDataResult {
   );
 
   return {
-    appData,
+    scheduleData,
     isLoading,
     statusMessage,
     loadScheduleData,
-    setAppData,
+    setScheduleData,
     setStatusMessage,
   };
 }

@@ -1,4 +1,4 @@
-import type { ScheduleEvent, TeamSyncAppData } from "@/types/teamSync";
+import type { ScheduleEvent, Team } from "@/types/teamSync";
 
 import { getDateKeyFromValue, isEventInMonth } from "./schedule-date.utils";
 
@@ -27,10 +27,10 @@ export function groupScheduleEventsByDate(events: ScheduleEvent[]) {
   }, {});
 }
 
-export function getScheduleTeamLabel(event: ScheduleEvent, appData: TeamSyncAppData) {
+export function getScheduleTeamLabel(event: ScheduleEvent, scheduleData: { teams: Team[] }) {
   if (event.teamId === undefined) {
     return "Tüm Kulüp";
   }
 
-  return appData.teams.find((team) => team.id === event.teamId)?.name ?? "Takım bulunamadı";
+  return scheduleData.teams.find((team) => team.id === event.teamId)?.name ?? "Takım bulunamadı";
 }

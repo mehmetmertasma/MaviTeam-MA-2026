@@ -8,6 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { emailVerificationService } from "@/services/emailVerificationService";
 
 function isValidEmail(value: string) {
   const trimmedValue = value.trim();
@@ -58,7 +59,26 @@ export default function LoginScreen() {
       setError("");
       setStatusMessage(t.auth.loginInProgress);
 
-      await authService.loginWithEmail({ email: trimmedEmail, password });
+      const user = await authService.loginWithEmail({ email: trimmedEmail, password });
+
+      if (!user.emailVerified) {
+        setStatusMessage(t.auth.verificationRequired);
+        const challenge = await emailVerificationService.requestCode({
+          fullName: user.displayName ?? trimmedEmail,
+        });
+
+        router.replace({
+          pathname: "/verify-email",
+          params: {
+            fullName: user.displayName ?? "",
+            email: user.email ?? trimmedEmail,
+            next: "create-club",
+            expiresAt: challenge.expiresAt,
+            ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
+          },
+        } as never);
+        return;
+      }
 
       setStatusMessage(t.auth.loginSuccess);
       router.replace("/dashboard" as never);

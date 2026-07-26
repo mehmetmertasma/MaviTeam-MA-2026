@@ -66,6 +66,11 @@ export default function JoinClubScreen() {
           return;
         }
 
+        if (!firebaseUser.emailVerified) {
+          setError(t.joinClub.validation.emailVerificationRequired);
+          return;
+        }
+
         await firestoreTeamSyncService.requestJoinClub({
           firebaseUser,
           inviteCode: cleanedCode,

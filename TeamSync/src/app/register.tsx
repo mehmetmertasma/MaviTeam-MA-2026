@@ -8,7 +8,7 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
-import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
+import { emailVerificationService } from "@/services/emailVerificationService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -105,19 +105,18 @@ export default function RegisterScreen() {
       });
 
       setStatusMessage(registerCopy.preparingProfile);
-      await firestoreTeamSyncService.ensureUserProfile({
-        user,
-        role: nextRoute === "/create-club" ? "clubAdmin" : "athlete",
-        status: "emailVerified",
-      });
+      const challenge = await emailVerificationService.requestCode({ fullName: trimmedName });
 
       setStatusMessage(registerCopy.readyForNextStep);
 
       router.replace({
-        pathname: nextRoute,
+        pathname: "/verify-email",
         params: {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
+          next: nextRoute === "/join-club" ? "join-club" : "create-club",
+          expiresAt: challenge.expiresAt,
+          ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
         },
       } as never);
     } catch (registerError) {

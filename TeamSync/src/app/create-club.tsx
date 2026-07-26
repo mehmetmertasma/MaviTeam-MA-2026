@@ -72,6 +72,11 @@ export default function CreateClubScreen() {
       return;
     }
 
+    if (authService.isConfigured() && firebaseUser !== null && !firebaseUser.emailVerified) {
+      setError(t.createClub.validation.emailVerificationRequired);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setError("");
@@ -85,12 +90,6 @@ export default function CreateClubScreen() {
       });
 
       if (authService.isConfigured() && firebaseUser !== null) {
-        await firestoreTeamSyncService.ensureUserProfile({
-          user: firebaseUser,
-          role: "clubAdmin",
-          status: "emailVerified",
-        });
-
         await firestoreTeamSyncService.createClubWorkspace({
           firebaseUser,
           clubId: nextData.club.id,

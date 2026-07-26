@@ -62,6 +62,10 @@ function getSetupRouteForSignedInUser(pathname: string) {
   return "/create-club";
 }
 
+function getVerificationNextParam(pathname: string) {
+  return pathname === "/join-club" || pathname === "/join-request-sent" ? "join-club" : "create-club";
+}
+
 function AppContent() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -85,7 +89,26 @@ function AppContent() {
   }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, routeIsPublic]);
 
   useEffect(() => {
+    if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null || user.emailVerified || pathname === "/verify-email") {
+      return;
+    }
+
+    router.replace({
+      pathname: "/verify-email",
+      params: {
+        fullName: user.displayName ?? "",
+        email: user.email ?? "",
+        next: getVerificationNextParam(pathname),
+      },
+    } as never);
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, user]);
+
+  useEffect(() => {
     if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null) {
+      return;
+    }
+
+    if (!user.emailVerified) {
       return;
     }
 

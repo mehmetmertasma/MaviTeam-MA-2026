@@ -44,7 +44,20 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "quality": "npm run lint && npm run typecheck",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "export:web": "expo export --platform web",
+    "deploy:firebase": "npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only firestore,storage,functions,hosting",
+    "deploy:firebase:rules": "npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only firestore:rules,storage",
+    "deploy:firebase:indexes": "npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only firestore:indexes",
+    "deploy:firebase:functions": "npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only functions",
+    "deploy:firebase:hosting": "npm run export:web && npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only hosting",
+    "build:android:production": "npm exec --yes --ignore-scripts --package eas-cli -- eas build --platform android --profile production",
+    "build:ios:production": "npm exec --yes --ignore-scripts --package eas-cli -- eas build --platform ios --profile production",
+    "build:mobile:production": "npm exec --yes --ignore-scripts --package eas-cli -- eas build --platform all --profile production",
+    "submit:android:production": "npm exec --yes --ignore-scripts --package eas-cli -- eas submit --platform android --profile production",
+    "submit:ios:production": "npm exec --yes --ignore-scripts --package eas-cli -- eas submit --platform ios --profile production"
   },
   "private": true
 }

@@ -8,9 +8,14 @@
     "scheme": "maviteam",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.maviteam.app",
+      "buildNumber": "1",
+      "supportsTablet": true,
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.maviteam.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

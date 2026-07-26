@@ -1,86 +1,112 @@
-# TeamSync Firebase Ready Plan
+# MaviTeam Firebase Launch Plan
 
-TeamSync is moving from a local AsyncStorage prototype to a real multi-user Firebase app.
+MaviTeam now uses Firebase as the production data layer for the core launch workflows. This document tracks what is ready, what must be deployed, and what remains after MVP launch.
 
-## Current foundation
+## Ready in Code
 
-The app already has:
+- Firebase bootstrap through Expo public environment variables in `src/lib/firebase.ts`
+- Firebase Auth registration, login, logout, password reset, and session state
+- Email verification code flow through Cloud Functions
+- Firestore-backed club creation and join requests
+- Firestore-backed workspace guard and profile loading
+- Firestore-backed teams, announcements, schedule, attendance, messages, payments, member management, and replay links
+- Firestore Security Rules for role and club isolation
+- Storage Security Rules for profile images, club logos, replay videos, and attachments
+- Firebase Hosting config for the Expo web export
+- EAS build profiles for internal and production mobile builds
 
-- `src/types/teamSync.ts` for shared data types
-- `src/data/initialTeamSyncData.ts` for the initial local workspace shape
-- `src/services/teamSyncService.ts` for the current local service layer
-- `src/lib/firebase.ts` for Firebase bootstrap using Expo public environment variables
+## Firebase Products
 
-For now, screens still use the local service. The next phase is to move service internals to Firebase one feature at a time.
+- Firebase Authentication
+- Cloud Firestore
+- Firebase Storage
+- Cloud Functions
+- Firebase Hosting
+- Optional: Firebase Extensions or a custom worker to send mail records from the `mail` collection
 
-## Firebase products we will use
-
-- Firebase Authentication for sign up, login, logout, password reset, and user sessions
-- Cloud Firestore for clubs, users, teams, announcements, schedule events, attendance, availability, messages, payments, replays, and join requests
-- Firebase Storage for club logos, profile photos, documents, and replay videos
-- Expo Notifications for push notifications, backed by notification records in Firestore
-
-## Recommended Firestore collections
+## Collections
 
 ```text
 clubs/{clubId}
+clubCodes/{clubCode}
 users/{userId}
 teams/{teamId}
 announcements/{announcementId}
 scheduleEvents/{eventId}
 attendanceRecords/{attendanceRecordId}
-availabilityResponses/{availabilityResponseId}
 chatGroups/{groupId}
 chatMessages/{messageId}
 payments/{paymentId}
 replays/{replayId}
 joinRequests/{requestId}
-subscriptions/{subscriptionId}
+emailVerificationCodes/{userId}
+mail/{mailId}
 ```
 
-Every club-owned document should include `clubId` so security rules can separate clubs.
+Every club-owned document should include `clubId`. Security rules use `clubId`, user `role`, user `status`, and user `teamIds` to separate club data.
 
-## Important production rules
+## Required Production Deployment
 
-- Do not store passwords in Firestore or AsyncStorage.
-- Passwords are handled only by Firebase Authentication.
-- Store Firebase config values in `.env`, not directly inside source files.
-- Do not commit real `.env` files.
-- When an admin removes someone, do not delete their history. Set `users/{userId}.status = "removed"` and remove their team access.
-- Admin-only actions must be protected by Firestore Security Rules, not only by hidden UI buttons.
-- Every write should include `createdAt`, `updatedAt`, and `createdByUserId` when useful.
+Run from the `TeamSync` directory after authenticating with Firebase:
 
-## Migration order
+```bash
+npm run deploy:firebase
+```
 
-1. Add Firebase bootstrap and environment config.
-2. Create Auth service for register, login, logout, and current session.
-3. Connect create-club flow to Firebase Auth and Firestore.
-4. Connect join-club flow to Firebase Auth and join requests.
-5. Connect dashboard/profile to real user and club documents.
-6. Connect teams and member approval.
-7. Connect announcements.
-8. Connect schedule and attendance.
-9. Connect messages.
-10. Connect payments.
-11. Add Firebase Storage for logos and replay files.
-12. Add Firestore Security Rules.
-13. Add notifications.
+That deploys:
 
-## Local setup
+- Firestore rules
+- Firestore indexes
+- Storage rules
+- Cloud Functions
+- Firebase Hosting
 
-Create a `.env` file in the `TeamSync` folder and add the Firebase web app config values from Firebase Console.
+If you want to deploy in smaller pieces:
+
+```bash
+npm run deploy:firebase:rules
+npm run deploy:firebase:indexes
+npm run deploy:firebase:functions
+npm run deploy:firebase:hosting
+```
+
+## Email Verification
+
+Firestore rules now require:
 
 ```text
-EXPO_PUBLIC_FIREBASE_API_KEY=your_value_here
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_value_here
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_value_here
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_value_here
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_value_here
-EXPO_PUBLIC_FIREBASE_APP_ID=your_value_here
+request.auth.token.email_verified == true
 ```
 
-Then restart Expo after changing environment values.
+The registration flow creates a Firebase Auth user, sends a verification code through Cloud Functions, opens `/verify-email`, and creates the Firestore user profile only after the code is verified.
 
-```powershell
-npm run web
-```
+Before launch, confirm:
+
+- Cloud Functions are deployed to `us-central1`
+- Firebase Auth is enabled for email/password sign-in
+- A mail delivery system processes documents from the `mail` collection
+- A new user can receive and verify the 6-digit code
+- The verified Firebase Auth token refreshes before the user creates or joins a club
+
+## Manual Launch QA
+
+Use the production Firebase project and a clean browser/device:
+
+1. Register a club admin.
+2. Receive and verify the email code.
+3. Create a club and confirm the club code is saved.
+4. Register a second user.
+5. Verify the second user's email code.
+6. Join the club with the club code.
+7. Approve the join request as the club admin.
+8. Create a team and assign members.
+9. Create schedule events, announcements, attendance records, payment records, chat messages, and replay links.
+10. Confirm unauthorized users cannot read or write another club's data.
+
+## Not Yet Implemented
+
+- Push notifications
+- Real payment processing
+- Native crash reporting
+- Automated Firestore rules tests
+- App Store and Play Store listing assets

@@ -6,11 +6,8 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // MVP test mode: email-code verification infrastructure stays in the repo,
-    // but Firestore should not block app testing while the project is on Spark.
-    // Later, change this back to: signedIn() && request.auth.token.email_verified == true
     function verifiedEmail() {
-      return signedIn();
+      return signedIn() && request.auth.token.email_verified == true;
     }
 
     function isSelf(userId) {

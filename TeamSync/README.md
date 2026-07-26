@@ -87,7 +87,13 @@ Deploy only web hosting:
 npm run deploy:firebase:hosting
 ```
 
-Email verification depends on the `requestEmailVerificationCode` and `verifyEmailCode` Cloud Functions. The functions write email records into the `mail` collection, so the Firebase project must have an email delivery extension or equivalent mail processor connected to that collection.
+Email verification depends on the `requestEmailVerificationCode` and `verifyEmailCode` Cloud Functions. The request function sends verification emails through Resend using the Firebase Secret `RESEND_API_KEY`. Before deploying functions in a new Firebase project, set the secret:
+
+```bash
+npm exec --yes --ignore-scripts --package firebase-tools -- firebase functions:secrets:set RESEND_API_KEY
+```
+
+Resend must also have `maviteam.com` verified so the function can send from `MaviTeam <no-reply@maviteam.com>`.
 
 ## Mobile Release
 

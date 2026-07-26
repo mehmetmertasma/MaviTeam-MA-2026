@@ -87,6 +87,11 @@ export const theme = {
       infoSoft: palette.blue50,
     },
 
+    danger: {
+      soft: palette.rose50,
+      text: palette.rose600,
+    },
+
     overlay: "rgba(2, 6, 23, 0.58)",
   },
 
@@ -218,65 +223,8 @@ export const Colors = {
   background: theme.colors.background.app,
   lightBackground: theme.colors.background.lightApp,
   surface: theme.colors.background.surface,
-  surfaceMuted: theme.colors.background.subtle,
-
-  text: theme.colors.text.primary,
-  textSecondary: theme.colors.text.secondary,
-  textMuted: theme.colors.text.muted,
-  textInverse: theme.colors.text.inverse,
-
-  border: theme.colors.border.default,
-  borderStrong: theme.colors.border.strong,
-
-  success: theme.colors.state.success,
-  successLight: theme.colors.state.successSoft,
-  warning: theme.colors.state.warning,
-  warningLight: theme.colors.state.warningSoft,
-  danger: theme.colors.state.danger,
-  dangerLight: theme.colors.state.dangerSoft,
 } as const;
 
-export type ThemeColor = keyof typeof Colors.light | keyof typeof Colors.dark;
-
-export const Fonts = Platform.select({
-  ios: {
-    sans: "system-ui",
-    serif: "ui-serif",
-    rounded: "ui-rounded",
-    mono: "ui-monospace",
-  },
-  android: {
-    sans: "sans",
-    serif: "serif",
-    rounded: "sans",
-    mono: "monospace",
-  },
-  web: {
-    sans: "system-ui",
-    serif: "serif",
-    rounded: "system-ui",
-    mono: "monospace",
-  },
-  default: {
-    sans: "System",
-    serif: "serif",
-    rounded: "System",
-    mono: "monospace",
-  },
-});
-
-export const Spacing = theme.spacing;
-export const Radius = theme.radius;
-export const FontSizes = theme.fontSizes;
-export const FontWeights = theme.fontWeights;
-export const Shadows = theme.shadows;
-
-export const BottomTabInset =
-  Platform.select({
-    ios: 50,
-    android: 80,
-    default: 0,
-  }) ?? 0;
-
-export const MaxContentWidth = 1180;
-export const ScreenMaxWidth = 520;
+export const platform = {
+  isWeb: Platform.OS === "web",
+} as const;

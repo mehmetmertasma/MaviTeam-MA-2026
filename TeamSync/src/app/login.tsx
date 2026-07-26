@@ -149,7 +149,7 @@ export default function LoginScreen() {
           </View>
         </View>
 
-        {error !== "" && <Text style={styles.errorText}>{error}</Text>}
+        {error !== "" ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <View style={styles.buttonGroup}>
           <AppButton
@@ -184,10 +184,7 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-    backgroundColor: theme.colors.background.app,
-  },
+  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,
     backgroundColor: theme.colors.background.app,
@@ -195,9 +192,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: theme.spacing["2xl"],
   },
-  card: {
-    padding: theme.spacing["3xl"],
-  },
+  card: { padding: theme.spacing["3xl"] },
   logo: {
     fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.black,
@@ -253,13 +248,8 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
   },
-  form: {
-    width: "100%",
-    gap: theme.spacing.lg,
-  },
-  inputGroup: {
-    width: "100%",
-  },
+  form: { width: "100%", gap: theme.spacing.lg },
+  inputGroup: { width: "100%" },
   label: {
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.extrabold,
@@ -291,7 +281,5 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     marginTop: theme.spacing["2xl"],
   },
-  button: {
-    width: "100%",
-  },
+  button: { width: "100%" },
 });

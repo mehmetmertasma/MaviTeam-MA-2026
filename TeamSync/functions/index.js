@@ -1,12 +1,16 @@
 const admin = require("firebase-admin");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const { defineSecret } = require("firebase-functions/params");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1" });
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const RESEND_API_URL = "https://api.resend.com/emails";
+const FROM_EMAIL = "MaviTeam <no-reply@maviteam.com>";
+const resendApiKey = defineSecret("RESEND_API_KEY");
 
 function createVerificationCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -14,6 +18,15 @@ function createVerificationCode() {
 
 function normalizeCode(value) {
   return String(value ?? "").replace(/[^0-9]/g, "").slice(0, 6);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function getAuthenticatedUser(request) {
@@ -35,27 +48,74 @@ function getAuthenticatedUser(request) {
 }
 
 function buildEmailHtml(code, displayName) {
+  const safeDisplayName = escapeHtml(displayName);
+  const safeCode = escapeHtml(code);
+
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
       <h2 style="margin:0 0 12px;color:#2563eb">MaviTeam verification code</h2>
-      <p>Hi ${displayName},</p>
+      <p>Hi ${safeDisplayName},</p>
       <p>Your MaviTeam verification code is:</p>
-      <p style="font-size:32px;font-weight:800;letter-spacing:6px;margin:20px 0;color:#0f172a">${code}</p>
+      <p style="font-size:32px;font-weight:800;letter-spacing:6px;margin:20px 0;color:#0f172a">${safeCode}</p>
       <p>This code expires in 10 minutes.</p>
       <p>If you did not request this code, you can ignore this email.</p>
     </div>
   `;
 }
 
-exports.requestEmailVerificationCode = onCall(async (request) => {
+function buildEmailText(code, displayName) {
+  return `Hi ${displayName}, your MaviTeam verification code is ${code}. This code expires in 10 minutes.`;
+}
+
+async function sendVerificationEmail({ apiKey, to, code, displayName }) {
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "Email delivery is not configured yet.");
+  }
+
+  const response = await fetch(RESEND_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to,
+      subject: "Your MaviTeam verification code",
+      text: buildEmailText(code, displayName),
+      html: buildEmailHtml(code, displayName),
+    }),
+  });
+
+  let body = {};
+
+  try {
+    body = await response.json();
+  } catch (error) {
+    body = { message: "Resend returned a non-JSON response." };
+  }
+
+  if (!response.ok) {
+    console.error("Resend verification email failed", {
+      status: response.status,
+      error: body?.message || body?.error || body,
+    });
+    throw new HttpsError("internal", "We could not send your verification code. Please try again.");
+  }
+
+  return body;
+}
+
+exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async (request) => {
   const user = getAuthenticatedUser(request);
   const db = admin.firestore();
+  const codeRef = db.doc(`emailVerificationCodes/${user.uid}`);
   const code = createVerificationCode();
   const now = admin.firestore.Timestamp.now();
   const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + CODE_TTL_MS);
   const displayName = String(request.data?.fullName || user.name).trim() || "MaviTeam User";
 
-  await db.doc(`emailVerificationCodes/${user.uid}`).set({
+  await codeRef.set({
     uid: user.uid,
     email: user.email,
     code,
@@ -68,16 +128,36 @@ exports.requestEmailVerificationCode = onCall(async (request) => {
     updatedAt: now,
   });
 
-  await db.collection("mail").add({
-    to: user.email,
-    message: {
-      subject: "Your MaviTeam verification code",
-      text: `Hi ${displayName}, your MaviTeam verification code is ${code}. This code expires in 10 minutes.`,
-      html: buildEmailHtml(code, displayName),
-    },
-    verificationOwnerId: user.uid,
-    createdAt: now,
-  });
+  try {
+    const delivery = await sendVerificationEmail({
+      apiKey: resendApiKey.value(),
+      to: user.email,
+      code,
+      displayName,
+    });
+
+    await codeRef.update({
+      emailDelivery: {
+        provider: "resend",
+        status: "sent",
+        messageId: delivery?.id || null,
+        sentAt: admin.firestore.Timestamp.now(),
+      },
+      updatedAt: admin.firestore.Timestamp.now(),
+    });
+  } catch (error) {
+    await codeRef.update({
+      status: "emailFailed",
+      emailDelivery: {
+        provider: "resend",
+        status: "failed",
+        failedAt: admin.firestore.Timestamp.now(),
+      },
+      updatedAt: admin.firestore.Timestamp.now(),
+    });
+
+    throw error;
+  }
 
   const response = {
     ok: true,

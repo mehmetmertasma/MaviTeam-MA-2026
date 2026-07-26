@@ -22,7 +22,7 @@ MaviTeam now uses Firebase as the production data layer for the core launch work
 - Firebase Storage
 - Cloud Functions
 - Firebase Hosting
-- Optional: Firebase Extensions or a custom worker to send mail records from the `mail` collection
+- Resend for verification email delivery through the `RESEND_API_KEY` Firebase Secret
 
 ## Collections
 
@@ -40,7 +40,6 @@ payments/{paymentId}
 replays/{replayId}
 joinRequests/{requestId}
 emailVerificationCodes/{userId}
-mail/{mailId}
 ```
 
 Every club-owned document should include `clubId`. Security rules use `clubId`, user `role`, user `status`, and user `teamIds` to separate club data.
@@ -84,7 +83,8 @@ Before launch, confirm:
 
 - Cloud Functions are deployed to `us-central1`
 - Firebase Auth is enabled for email/password sign-in
-- A mail delivery system processes documents from the `mail` collection
+- The `RESEND_API_KEY` Firebase Secret is set
+- Resend has verified `maviteam.com` for `MaviTeam <no-reply@maviteam.com>`
 - A new user can receive and verify the 6-digit code
 - The verified Firebase Auth token refreshes before the user creates or joins a club
 

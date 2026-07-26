@@ -485,13 +485,14 @@ export const firestoreMaviTeamDataService = {
       throw new Error("ATTENDANCE_PERMISSION_DENIED");
     }
 
+    const clubId = workspace.club.id;
     const recordedAt = nowIso();
     const batch = writeBatch(db);
     const savedRecords = input.records.map((record) => {
       const recordId = `attendance-${createSafeDocumentId([input.teamId ?? "club", record.userId, input.sessionDate])}`;
       const attendanceRecord: AttendanceRecord = {
         id: recordId,
-        clubId: workspace.club.id,
+        clubId,
         teamId: input.teamId,
         userId: record.userId,
         status: record.status,

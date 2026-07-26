@@ -119,7 +119,6 @@ export default function MembersScreen() {
     return sortMembers(users.filter((user) => user.clubId === appData.club.id));
   }, [appData, users]);
 
-  const selectedMember = members.find((member) => member.id === selectedUserId);
   const activeCount = members.filter((member) => member.status === "active").length;
   const coachCount = members.filter((member) => member.role === "coach" && member.status !== "removed").length;
 

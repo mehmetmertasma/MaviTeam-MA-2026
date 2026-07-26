@@ -1,4 +1,4 @@
-﻿import AsyncStorage from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "firebase/auth";
 
 import { initialTeamSyncData } from "@/data/initialTeamSyncData";

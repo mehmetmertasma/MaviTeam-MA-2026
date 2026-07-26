@@ -32,12 +32,12 @@ import {
   getEventsForMonth,
   getScheduleTeamLabel,
 } from "./utils/schedule-selectors.utils";
-import { teamSyncService } from "@/services/teamSyncService";
+import { scheduleRepository } from "./services/schedule.repository";
 import type { ScheduleEventType } from "@/types/teamSync";
 import type { TeamOption } from "./types/schedule.types";
 
 export default function ScheduleScreen() {
-  const { appData, loadScheduleData, setAppData, setStatusMessage, statusMessage } =
+  const { scheduleData, loadScheduleData, setScheduleData, setStatusMessage, statusMessage } =
     useScheduleData();
   const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(new Date()));
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -56,21 +56,21 @@ export default function ScheduleScreen() {
       label: "Tüm Kulüp",
     };
 
-    if (appData === null) {
+    if (scheduleData === null) {
       return [allClubOption];
     }
 
     return [
       allClubOption,
-      ...appData.teams.map((team) => ({
+      ...scheduleData.teams.map((team) => ({
         id: team.id,
         label: team.name,
         teamId: team.id,
       })),
     ];
-  }, [appData]);
+  }, [scheduleData]);
 
-  const scheduleEvents = useMemo(() => appData?.scheduleEvents ?? [], [appData]);
+  const scheduleEvents = useMemo(() => scheduleData?.scheduleEvents ?? [], [scheduleData]);
 
   const visibleMonthEvents = useMemo(() => {
     return getEventsForMonth(scheduleEvents, visibleMonth);
@@ -127,7 +127,7 @@ export default function ScheduleScreen() {
   }
 
   async function handleCreateScheduleItem() {
-    if (appData === null) {
+    if (scheduleData === null) {
       setStatusMessage("Önce merkezi data yüklenmeli.");
       return;
     }
@@ -160,18 +160,18 @@ export default function ScheduleScreen() {
     const selectedTeam = teamOptions.find((team) => team.id === selectedTeamId) ?? teamOptions[0];
 
     try {
-      const nextAppData = await teamSyncService.createScheduleEvent({
-        clubId: appData.club.id,
+      const nextScheduleData = await scheduleRepository.createScheduleEvent({
+        clubId: scheduleData.club.id,
         teamId: selectedTeam.teamId,
         title: title.trim(),
         type: selectedType,
         startsAt,
         location: location.trim(),
         note: note.trim() || "Ek not yok.",
-        createdByUserId: appData.currentUser.id,
+        createdByUserId: scheduleData.currentUser.id,
       });
 
-      setAppData(nextAppData);
+      setScheduleData(nextScheduleData);
       clearForm();
       setShowEventForm(false);
       setStatusMessage("Yeni etkinlik seçili ayın takvimine eklendi.");
@@ -497,7 +497,7 @@ export default function ScheduleScreen() {
           </View>
 
           <View style={styles.eventList}>
-            {appData !== null && visibleMonthEvents.length > 0 ? (
+            {scheduleData !== null && visibleMonthEvents.length > 0 ? (
               visibleMonthEvents.map((event) => {
                 const typeStyles = getScheduleTypeStyles(event.type);
 
@@ -507,7 +507,7 @@ export default function ScheduleScreen() {
 
                     <View style={styles.eventContent}>
                       <Text style={styles.eventType}>
-                        {getScheduleTypeLabel(event.type)} · {getScheduleTeamLabel(event, appData)}
+                        {getScheduleTypeLabel(event.type)} · {getScheduleTeamLabel(event, scheduleData)}
                       </Text>
                       <Text style={styles.eventTitle}>{event.title}</Text>
                       <Text style={styles.eventMeta}>

@@ -13,11 +13,18 @@ export { default as ScheduleScreen } from "./ScheduleScreen";
 
 export { useScheduleData } from "./hooks/useScheduleData";
 
+export { scheduleRepository } from "./services/schedule.repository";
+
+export type { ScheduleRepository } from "./services/schedule.repository";
+
 export type {
   CalendarCell,
+  CreateScheduleEventInput,
   ScheduleFormState,
   ScheduleTypeOption,
+  ScheduleWorkspaceData,
   TeamOption,
+  UpdateScheduleEventInput,
 } from "./types/schedule.types";
 
 export {

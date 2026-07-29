@@ -272,12 +272,23 @@ service cloud.firestore {
     match /clubCodes/{clubCode} {
       allow read: if verifiedEmail();
 
-      allow create, update: if verifiedEmail()
+      allow create: if verifiedEmail()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.clubId is string
-        && request.resource.data.code == clubCode;
+        && request.resource.data.code == clubCode
+        && getAfter(/databases/$(database)/documents/clubs/$(request.resource.data.clubId)).data.ownerId == request.auth.uid;
 
-      allow delete: if false;
+      allow update: if verifiedEmail()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.clubId == resource.data.clubId
+        && request.resource.data.code == clubCode
+        && getAfter(/databases/$(database)/documents/clubs/$(request.resource.data.clubId)).data.ownerId == request.auth.uid;
+
+      allow delete: if verifiedEmail()
+        && resource.data.ownerId == request.auth.uid
+        && resource.data.clubId is string
+        && get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.ownerId == request.auth.uid;
     }
 
     match /teams/{teamId} {

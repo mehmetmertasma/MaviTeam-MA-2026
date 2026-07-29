@@ -1,4 +1,5 @@
 const admin = require("firebase-admin");
+const { randomInt } = require("node:crypto");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -8,16 +9,69 @@ setGlobalOptions({ region: "us-central1" });
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const REQUEST_COOLDOWN_MS = 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+const MAX_CODES_PER_WINDOW = 5;
 const RESEND_API_URL = "https://api.resend.com/emails";
 const FROM_EMAIL = "MaviTeam <no-reply@maviteam.com>";
 const resendApiKey = defineSecret("RESEND_API_KEY");
 
 function createVerificationCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 function normalizeCode(value) {
   return String(value ?? "").replace(/[^0-9]/g, "").slice(0, 6);
+}
+
+function timestampToMillis(value) {
+  if (value && typeof value.toMillis === "function") {
+    return value.toMillis();
+  }
+
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  return 0;
+}
+
+function getNextRateLimitState(data, nowMillis) {
+  const lastRequestedAtMillis = timestampToMillis(data?.requestedAt || data?.updatedAt || data?.createdAt);
+
+  if (
+    data?.status === "pending" &&
+    lastRequestedAtMillis > 0 &&
+    nowMillis - lastRequestedAtMillis < REQUEST_COOLDOWN_MS
+  ) {
+    throw new HttpsError("resource-exhausted", "Please wait before requesting another verification code.");
+  }
+
+  const rateLimit = data?.rateLimit || {};
+  const windowStartedAtMillis = timestampToMillis(rateLimit.windowStartedAt);
+
+  if (windowStartedAtMillis <= 0 || nowMillis - windowStartedAtMillis >= RATE_LIMIT_WINDOW_MS) {
+    return {
+      windowStartedAt: admin.firestore.Timestamp.fromMillis(nowMillis),
+      count: 1,
+    };
+  }
+
+  const currentCount = typeof rateLimit.count === "number" ? rateLimit.count : 0;
+
+  if (currentCount >= MAX_CODES_PER_WINDOW) {
+    throw new HttpsError("resource-exhausted", "Too many verification code requests. Please try again later.");
+  }
+
+  return {
+    windowStartedAt: rateLimit.windowStartedAt,
+    count: currentCount + 1,
+  };
 }
 
 function escapeHtml(value) {
@@ -111,21 +165,29 @@ exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async
   const db = admin.firestore();
   const codeRef = db.doc(`emailVerificationCodes/${user.uid}`);
   const code = createVerificationCode();
-  const now = admin.firestore.Timestamp.now();
-  const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + CODE_TTL_MS);
+  const nowMillis = Date.now();
+  const now = admin.firestore.Timestamp.fromMillis(nowMillis);
+  const expiresAt = admin.firestore.Timestamp.fromMillis(nowMillis + CODE_TTL_MS);
   const displayName = String(request.data?.fullName || user.name).trim() || "MaviTeam User";
 
-  await codeRef.set({
-    uid: user.uid,
-    email: user.email,
-    code,
-    attempts: 0,
-    maxAttempts: MAX_ATTEMPTS,
-    purpose: "emailVerification",
-    status: "pending",
-    expiresAt,
-    createdAt: now,
-    updatedAt: now,
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(codeRef);
+    const rateLimit = getNextRateLimitState(snapshot.exists ? snapshot.data() : null, nowMillis);
+
+    transaction.set(codeRef, {
+      uid: user.uid,
+      email: user.email,
+      code,
+      attempts: 0,
+      maxAttempts: MAX_ATTEMPTS,
+      purpose: "emailVerification",
+      status: "pending",
+      requestedAt: now,
+      expiresAt,
+      rateLimit,
+      createdAt: now,
+      updatedAt: now,
+    });
   });
 
   try {

@@ -52,6 +52,8 @@ function getErrorCode(error: unknown) {
     if (error.message === "AUTH_USER_MISSING") return "AUTH_USER_MISSING";
     if (error.message === "WORKSPACE_PROFILE_MISSING") return "WORKSPACE_PROFILE_MISSING";
     if (error.message === "WORKSPACE_SETUP_REQUIRED") return "WORKSPACE_SETUP_REQUIRED";
+    if (error.message === "CLUB_CODE_ALREADY_EXISTS") return "CLUB_CODE_ALREADY_EXISTS";
+    if (error.message === "CLUB_CODE_REQUIRED") return "CLUB_CODE_REQUIRED";
   }
 
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -81,6 +83,10 @@ export function getAuthErrorMessage(error: unknown) {
       return "Giriş başarılı ama kullanıcı profili Firestore içinde bulunamadı. Tekrar giriş yap veya hesabı yeniden oluştur.";
     case "WORKSPACE_SETUP_REQUIRED":
       return "Giriş başarılı. Bu hesap için henüz gerçek kulüp kurulumu yok.";
+    case "CLUB_CODE_ALREADY_EXISTS":
+      return "Bu kulüp kodu zaten kullanılıyor. Kulüp adını biraz değiştirip tekrar dene.";
+    case "CLUB_CODE_REQUIRED":
+      return "Kulüp kodu oluşturulamadı. Kulüp adını kontrol edip tekrar dene.";
     case "auth/invalid-email":
       return "Lütfen geçerli bir e-posta adresi gir.";
     case "auth/user-disabled":
@@ -97,6 +103,27 @@ export function getAuthErrorMessage(error: unknown) {
       return "Ağ bağlantısı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.";
     case "auth/too-many-requests":
       return "Çok fazla deneme yapıldı. Bir süre bekleyip tekrar dene.";
+    case "functions/resource-exhausted":
+    case "resource-exhausted":
+      return "Çok fazla doğrulama kodu istendi. Biraz bekleyip tekrar dene.";
+    case "functions/failed-precondition":
+    case "failed-precondition":
+      return "E-posta doğrulama servisi henüz hazır değil. Lütfen daha sonra tekrar dene.";
+    case "functions/internal":
+    case "internal":
+      return "Doğrulama emaili gönderilemedi. Biraz bekleyip tekrar dene.";
+    case "functions/invalid-argument":
+    case "invalid-argument":
+      return "Doğrulama kodu hatalı veya eksik. 6 haneli kodu kontrol et.";
+    case "functions/not-found":
+    case "not-found":
+      return "Aktif doğrulama kodu bulunamadı. Yeni kod iste.";
+    case "functions/deadline-exceeded":
+      return "Doğrulama kodunun süresi doldu. Yeni kod iste.";
+    case "functions/permission-denied":
+      return "Bu doğrulama kodu bu hesaba ait değil. Hesabını kontrol edip tekrar dene.";
+    case "functions/unauthenticated":
+      return "Doğrulama için tekrar giriş yapman gerekiyor.";
     case "permission-denied":
     case "firestore/permission-denied":
       return "Firestore izin hatası var. Firestore rules veya kullanıcı club/status alanları bu işlem için izin vermiyor.";

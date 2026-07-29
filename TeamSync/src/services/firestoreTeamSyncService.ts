@@ -407,6 +407,16 @@ export const firestoreTeamSyncService = {
     const clubCodeRef = doc(db, "clubCodes", normalizedClubCode);
     const userRef = doc(db, "users", input.firebaseUser.uid);
 
+    if (normalizedClubCode === "") {
+      throw new Error("CLUB_CODE_REQUIRED");
+    }
+
+    const existingClubCode = await getDoc(clubCodeRef);
+
+    if (existingClubCode.exists()) {
+      throw new Error("CLUB_CODE_ALREADY_EXISTS");
+    }
+
     const batch = writeBatch(db);
 
     batch.set(clubRef, {
@@ -916,9 +926,30 @@ export const firestoreTeamSyncService = {
 
     const now = serverTimestamp();
     const normalizedClubCode = normalizeClubCode(input.clubCode);
+    const currentClubCode = normalizeClubCode(workspace.club.code);
+    const nextClubCode = normalizedClubCode || currentClubCode;
     const userRef = doc(db, "users", input.firebaseUser.uid);
     const clubRef = doc(db, "clubs", workspace.club.id);
-    const clubCodeRef = doc(db, "clubCodes", normalizedClubCode);
+    const nextClubCodeRef = normalizedClubCode === "" ? null : doc(db, "clubCodes", normalizedClubCode);
+    const previousClubCodeRef = nextClubCodeRef !== null && currentClubCode !== "" && currentClubCode !== normalizedClubCode
+      ? doc(db, "clubCodes", currentClubCode)
+      : null;
+    let shouldDeletePreviousClubCode = false;
+
+    if (nextClubCodeRef !== null) {
+      const existingClubCode = await getDoc(nextClubCodeRef);
+
+      if (existingClubCode.exists() && readString(existingClubCode.data().clubId) !== workspace.club.id) {
+        throw new Error("CLUB_CODE_ALREADY_EXISTS");
+      }
+    }
+
+    if (previousClubCodeRef !== null) {
+      const previousClubCode = await getDoc(previousClubCodeRef);
+      shouldDeletePreviousClubCode = previousClubCode.exists()
+        && readString(previousClubCode.data().clubId) === workspace.club.id;
+    }
+
     const batch = writeBatch(db);
 
     batch.set(
@@ -938,15 +969,15 @@ export const firestoreTeamSyncService = {
         name: input.clubName.trim() || workspace.club.name,
         sport: input.clubSport.trim() || workspace.club.sport,
         city: input.clubCity.trim() || workspace.club.city,
-        code: normalizedClubCode || workspace.club.code,
+        code: nextClubCode || workspace.club.code,
         updatedAt: now,
       },
       { merge: true }
     );
 
-    if (normalizedClubCode !== "") {
+    if (nextClubCodeRef !== null) {
       batch.set(
-        clubCodeRef,
+        nextClubCodeRef,
         {
           code: normalizedClubCode,
           clubId: workspace.club.id,
@@ -956,6 +987,10 @@ export const firestoreTeamSyncService = {
         },
         { merge: true }
       );
+
+      if (shouldDeletePreviousClubCode && previousClubCodeRef !== null) {
+        batch.delete(previousClubCodeRef);
+      }
     }
 
     await batch.commit();

@@ -132,7 +132,9 @@ export default function ProfileScreen() {
             setDraftProfileData(getFormDataFromAppData(loadedAppData));
             setStatusMessage(t.profile.messages.loaded);
           }
-        } catch {
+        } catch (error) {
+          console.error("Failed to load profile data:", error);
+
           if (isActive) {
             setStatusMessage(t.profile.messages.failedToLoad);
           }

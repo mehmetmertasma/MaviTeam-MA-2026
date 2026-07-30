@@ -117,7 +117,7 @@ export default function ProfileScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(t.profile.messages.loaded);
+  const [statusMessage, setStatusMessage] = useState(t.common.loading);
 
   useFocusEffect(
     useCallback(() => {

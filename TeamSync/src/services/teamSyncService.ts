@@ -223,6 +223,13 @@ async function loadLocalAppData(): Promise<TeamSyncAppData> {
   return initialTeamSyncData;
 }
 
+function tagError<T>(label: string, promise: Promise<T>): Promise<T> {
+  return promise.catch((error) => {
+    console.error(`[loadAppData] ${label} failed:`, error);
+    throw error;
+  });
+}
+
 async function loadAppData(): Promise<TeamSyncAppData> {
   const localAppData = await loadLocalAppData();
 
@@ -236,7 +243,7 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     return localAppData;
   }
 
-  const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
+  const workspace = await tagError("getCurrentWorkspace", firestoreTeamSyncService.getCurrentWorkspace(firebaseUser));
 
   if (workspace === null) {
     return createEmptyAppData(createUserProfileFromFirebase(firebaseUser));
@@ -255,18 +262,21 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     : Promise.resolve([]);
 
   const [users, teams, scheduleEvents, announcements, joinRequests, payments, attendanceRecords, chatGroups] = await Promise.all([
-    usersPromise,
-    firestoreTeamSyncService.listTeamsForClub(workspace.club.id),
-    firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser),
-    firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser),
-    joinRequestsPromise,
-    firestoreMaviTeamDataService.listVisiblePaymentsForCurrentUser(firebaseUser),
-    firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser),
-    firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser),
+    tagError("users", usersPromise),
+    tagError("teams", firestoreTeamSyncService.listTeamsForClub(workspace.club.id)),
+    tagError("scheduleEvents", firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser)),
+    tagError("announcements", firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser)),
+    tagError("joinRequests", joinRequestsPromise),
+    tagError("payments", firestoreMaviTeamDataService.listVisiblePaymentsForCurrentUser(firebaseUser)),
+    tagError("attendanceRecords", firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser)),
+    tagError("chatGroups", firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser)),
   ]);
-  const chatMessages = await firestoreMaviTeamDataService.listVisibleChatMessagesForCurrentUser(
-    firebaseUser,
-    chatGroups.map((group) => group.id)
+  const chatMessages = await tagError(
+    "chatMessages",
+    firestoreMaviTeamDataService.listVisibleChatMessagesForCurrentUser(
+      firebaseUser,
+      chatGroups.map((group) => group.id)
+    )
   );
 
   return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {

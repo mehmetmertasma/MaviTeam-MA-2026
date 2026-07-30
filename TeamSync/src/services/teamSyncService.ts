@@ -271,13 +271,17 @@ async function loadAppData(): Promise<TeamSyncAppData> {
     tagError("attendanceRecords", firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser)),
     tagError("chatGroups", firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser)),
   ]);
-  const chatMessages = await tagError(
-    "chatMessages",
-    firestoreMaviTeamDataService.listVisibleChatMessagesForCurrentUser(
-      firebaseUser,
-      chatGroups.map((group) => group.id)
-    )
-  );
+  // Chat messages are not required for the rest of the app to function, and a
+  // single denied read here (a known firestore.rules bug on group messages,
+  // see canReadChatMessage) must never block loading the user's own
+  // profile/club data, so this failure is swallowed rather than propagated
+  // like the reads above.
+  const chatMessages = await firestoreMaviTeamDataService
+    .listVisibleChatMessagesForCurrentUser(firebaseUser, chatGroups.map((group) => group.id))
+    .catch((error) => {
+      console.warn("[loadAppData] chatMessages unavailable:", error.message ?? error);
+      return [];
+    });
 
   return mergeFirestoreWorkspaceIntoAppData(localAppData, workspace, {
     users,

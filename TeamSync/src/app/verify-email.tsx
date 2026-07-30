@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
@@ -28,6 +28,10 @@ function getNextRoute(value: string | string[] | undefined) {
   return "/create-club";
 }
 
+function getCodeSentMessage(displayEmail: string) {
+  return `${displayEmail || "E-posta adresine"} 6 haneli doğrulama kodu gönderildi.`;
+}
+
 function getExpirationText(expiresAt: string) {
   if (!expiresAt) {
     return "Kod 10 dakika içinde geçerlidir.";
@@ -50,6 +54,7 @@ export default function VerifyEmailScreen() {
   const displayName = getFirstParam(fullName);
   const expiresAtText = getFirstParam(expiresAt);
   const developmentCode = getFirstParam(devCode);
+  const hasChallengeFromRoute = expiresAtText !== "" || developmentCode !== "";
 
   const [code, setCode] = useState("");
   const [isChecking, setIsChecking] = useState(false);
@@ -57,9 +62,57 @@ export default function VerifyEmailScreen() {
   const [statusMessage, setStatusMessage] = useState(
     developmentCode
       ? `Geliştirme kodu: ${developmentCode}`
-      : `${displayEmail || "E-posta adresine"} 6 haneli doğrulama kodu gönderildi.`
+      : hasChallengeFromRoute
+        ? getCodeSentMessage(displayEmail)
+        : "Doğrulama kodu gönderiliyor..."
   );
   const [expirationMessage, setExpirationMessage] = useState(getExpirationText(expiresAtText));
+
+  function getRequestDisplayName() {
+    return displayName || authService.getCurrentUser()?.displayName || displayEmail || "MaviTeam User";
+  }
+
+  useEffect(() => {
+    if (hasChallengeFromRoute) {
+      return;
+    }
+
+    let isActive = true;
+
+    async function requestInitialCode() {
+      try {
+        setIsResending(true);
+        setStatusMessage("Doğrulama kodu gönderiliyor...");
+
+        const challenge = await emailVerificationService.requestCode({ fullName: getRequestDisplayName() });
+
+        if (!isActive) {
+          return;
+        }
+
+        setExpirationMessage(getExpirationText(challenge.expiresAt));
+        setStatusMessage(
+          challenge.devCode
+            ? `Geliştirme kodu: ${challenge.devCode}`
+            : `${getCodeSentMessage(displayEmail)} Spam/Junk klasörünü de kontrol et.`
+        );
+      } catch (error) {
+        if (isActive) {
+          setStatusMessage(getAuthErrorMessage(error));
+        }
+      } finally {
+        if (isActive) {
+          setIsResending(false);
+        }
+      }
+    }
+
+    requestInitialCode();
+
+    return () => {
+      isActive = false;
+    };
+  }, [displayEmail, displayName, hasChallengeFromRoute]);
 
   async function handleCheckVerification() {
     const cleanCode = code.trim();
@@ -103,7 +156,7 @@ export default function VerifyEmailScreen() {
       setIsResending(true);
       setStatusMessage("Yeni doğrulama kodu gönderiliyor...");
 
-      const challenge = await emailVerificationService.requestCode({ fullName: displayName });
+      const challenge = await emailVerificationService.requestCode({ fullName: getRequestDisplayName() });
 
       setExpirationMessage(getExpirationText(challenge.expiresAt));
       setStatusMessage(

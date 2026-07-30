@@ -1,15 +1,25 @@
-import { Link, useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { authService } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
 
 export default function JoinRequestSentScreen() {
   const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleLoadedAppData = useCallback((loadedAppData: TeamSyncAppData) => {
+    setAppData(loadedAppData);
+
+    if (loadedAppData.currentUser.status === "active" && loadedAppData.currentUser.clubId !== "") {
+      router.replace("/dashboard" as never);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -20,7 +30,7 @@ export default function JoinRequestSentScreen() {
           const loadedAppData = await teamSyncService.getAppData();
 
           if (isActive) {
-            setAppData(loadedAppData);
+            handleLoadedAppData(loadedAppData);
           }
         } catch {
           if (isActive) {
@@ -34,7 +44,7 @@ export default function JoinRequestSentScreen() {
       return () => {
         isActive = false;
       };
-    }, [])
+    }, [handleLoadedAppData])
   );
 
   const currentUser = appData?.currentUser;
@@ -43,11 +53,37 @@ export default function JoinRequestSentScreen() {
     (request) => request.userId === currentUser?.id && request.status === "pending"
   );
 
+  function handleRetryCode() {
+    router.replace("/join-club" as never);
+  }
+
+  async function handleRefreshStatus() {
+    try {
+      setIsRefreshing(true);
+      const loadedAppData = await teamSyncService.getAppData();
+      handleLoadedAppData(loadedAppData);
+    } catch {
+      setAppData(null);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  async function handleBackHome() {
+    try {
+      if (authService.isConfigured()) {
+        await authService.logout();
+      }
+    } finally {
+      router.replace("/" as never);
+    }
+  }
+
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.card}>
-          <AppBackButton fallbackHref="/" />
+          <AppBackButton label="Koda dön" fallbackHref="/join-club" onPress={handleRetryCode} />
 
           <Text style={styles.logo}>TeamSync</Text>
 
@@ -80,23 +116,29 @@ export default function JoinRequestSentScreen() {
           </View>
 
           <View style={styles.buttonGroup}>
-            <Link href="/join-club" asChild>
-              <AppButton
-                title="Kodu yeniden gir"
-                variant="secondary"
-                accessibilityLabel="Takım kodunu yeniden gir"
-                style={styles.button}
-              />
-            </Link>
+            <AppButton
+              title={isRefreshing ? "Kontrol ediliyor..." : "Durumu yenile"}
+              onPress={handleRefreshStatus}
+              disabled={isRefreshing}
+              accessibilityLabel="Onay durumunu yenile"
+              style={styles.button}
+            />
 
-            <Link href="/" asChild>
-              <AppButton
-                title="Ana sayfaya dön"
-                variant="ghost"
-                accessibilityLabel="Ana sayfaya dön"
-                style={styles.button}
-              />
-            </Link>
+            <AppButton
+              title="Kodu yeniden gir"
+              variant="secondary"
+              onPress={handleRetryCode}
+              accessibilityLabel="Takım kodunu yeniden gir"
+              style={styles.button}
+            />
+
+            <AppButton
+              title="Çıkış yap ve ana sayfaya dön"
+              variant="ghost"
+              onPress={handleBackHome}
+              accessibilityLabel="Çıkış yap ve ana sayfaya dön"
+              style={styles.button}
+            />
           </View>
         </View>
       </View>

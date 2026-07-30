@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Team as TeamRecord, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
@@ -61,6 +62,7 @@ export default function TeamsScreen() {
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [coachName, setCoachName] = useState("");
+  const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklenecek.");
 
   const loadTeamsData = useCallback(async () => {
@@ -73,8 +75,9 @@ export default function TeamsScreen() {
       });
       setPendingRemoveTeamId("");
       setStatusMessage("Takımlar merkezi TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Takımlar yüklenirken bir sorun oluştu.");
+    } catch (loadError) {
+      console.warn("Teams data could not be loaded.", loadError);
+      setStatusMessage(getAuthErrorMessage(loadError));
     }
   }, []);
 
@@ -120,20 +123,30 @@ export default function TeamsScreen() {
       return;
     }
 
-    if (teamName.trim() === "" || ageGroup.trim() === "") {
-      setStatusMessage("Takım adı ve yaş grubu boş bırakılamaz.");
+    const cleanTeamName = teamName.trim();
+    const cleanAgeGroup = ageGroup.trim() || "Genel";
+    const cleanCoachName = coachName.trim().toLowerCase();
+
+    if (cleanTeamName === "") {
+      setStatusMessage("Takım adı boş bırakılamaz.");
       return;
     }
 
-    const matchingCoach = users.find((user) => {
-      return user.role === "coach" && user.fullName.toLowerCase() === coachName.trim().toLowerCase();
-    });
+    const matchingCoach =
+      cleanCoachName === ""
+        ? undefined
+        : users.find((user) => {
+            return user.role === "coach" && user.fullName.toLowerCase() === cleanCoachName;
+          });
 
     try {
+      setIsCreatingTeam(true);
+      setStatusMessage("Takım merkezi dataya kaydediliyor...");
+
       const nextAppData = await teamSyncService.createTeam({
         clubId: appData.club.id,
-        name: teamName.trim(),
-        ageGroup: ageGroup.trim(),
+        name: cleanTeamName,
+        ageGroup: cleanAgeGroup,
         coachIds: matchingCoach ? [matchingCoach.id] : [],
         memberIds: [],
       });
@@ -149,8 +162,11 @@ export default function TeamsScreen() {
           ? "Yeni takım merkezi dataya kaydedildi ve koç atandı."
           : "Yeni takım merkezi dataya kaydedildi. Koç daha sonra atanabilir."
       );
-    } catch {
-      setStatusMessage("Takım oluşturulurken bir sorun oluştu.");
+    } catch (createTeamError) {
+      console.warn("Team creation failed.", createTeamError);
+      setStatusMessage(getAuthErrorMessage(createTeamError));
+    } finally {
+      setIsCreatingTeam(false);
     }
   }
 
@@ -229,7 +245,7 @@ export default function TeamsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Yeni takım oluştur</Text>
             <Text style={styles.sectionSubtitle}>
-              Takım adı ve yaş grubunu gir. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.
+              Takım adını gir. Yaş grubu boş kalırsa Genel kullanılır. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.
             </Text>
 
             <Text style={styles.label}>Takım adı</Text>
@@ -243,10 +259,10 @@ export default function TeamsScreen() {
 
             <View style={styles.formGrid}>
               <View style={styles.formField}>
-                <Text style={styles.label}>Yaş grubu</Text>
+                <Text style={styles.label}>Yaş grubu opsiyonel</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Örn. U16"
+                  placeholder="Örn. U16 veya Genel"
                   placeholderTextColor={theme.colors.text.muted}
                   value={ageGroup}
                   onChangeText={setAgeGroup}
@@ -265,7 +281,12 @@ export default function TeamsScreen() {
             </View>
 
             <View style={styles.topActions}>
-              <AppButton title="Takımı oluştur" onPress={createTeam} style={styles.actionButton} />
+              <AppButton
+                title={isCreatingTeam ? "Oluşturuluyor..." : "Takımı oluştur"}
+                onPress={createTeam}
+                disabled={isCreatingTeam}
+                style={styles.actionButton}
+              />
               <AppButton
                 title="Vazgeç"
                 variant="ghost"

@@ -1,16 +1,15 @@
+import { forwardRef } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import type { StyleProp, TextStyle, ViewStyle } from "react-native";
+import type { ComponentRef } from "react";
+import type { PressableProps, StyleProp, TextStyle, ViewStyle } from "react-native";
 
 import { theme } from "@/constants/theme";
 
 type AppButtonVariant = "primary" | "secondary" | "ghost";
 
-type AppButtonProps = {
+type AppButtonProps = Omit<PressableProps, "children" | "style"> & {
   title: string;
-  onPress?: () => void;
   variant?: AppButtonVariant;
-  disabled?: boolean;
-  accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 };
@@ -65,29 +64,35 @@ const variantStyles: Record<
   },
 };
 
-export function AppButton({
+export const AppButton = forwardRef<ComponentRef<typeof Pressable>, AppButtonProps>(function AppButton({
   title,
   onPress,
   variant = "primary",
   disabled = false,
   accessibilityLabel,
+  accessibilityRole,
+  accessibilityState,
   style,
   textStyle,
-}: AppButtonProps) {
+  ...pressableProps
+}, ref) {
   const selectedVariant = variantStyles[variant];
+  const isDisabled = disabled === true;
 
   return (
     <Pressable
-      accessibilityRole="button"
+      {...pressableProps}
+      ref={ref}
+      accessibilityRole={accessibilityRole ?? "button"}
       accessibilityLabel={accessibilityLabel ?? title}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityState={{ ...accessibilityState, disabled: isDisabled }}
+      disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         selectedVariant.button,
-        pressed && !disabled ? [styles.pressed, selectedVariant.pressed] : null,
-        disabled ? styles.disabled : null,
+        pressed && !isDisabled ? [styles.pressed, selectedVariant.pressed] : null,
+        isDisabled ? styles.disabled : null,
         style,
       ]}
     >
@@ -95,7 +100,7 @@ export function AppButton({
         style={[
           styles.text,
           selectedVariant.text,
-          disabled ? styles.disabledText : null,
+          isDisabled ? styles.disabledText : null,
           textStyle,
         ]}
       >
@@ -103,7 +108,9 @@ export function AppButton({
       </Text>
     </Pressable>
   );
-}
+});
+
+AppButton.displayName = "AppButton";
 
 export default AppButton;
 

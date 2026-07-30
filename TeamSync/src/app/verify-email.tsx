@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
@@ -68,9 +68,9 @@ export default function VerifyEmailScreen() {
   );
   const [expirationMessage, setExpirationMessage] = useState(getExpirationText(expiresAtText));
 
-  function getRequestDisplayName() {
+  const getRequestDisplayName = useCallback(() => {
     return displayName || authService.getCurrentUser()?.displayName || displayEmail || "MaviTeam User";
-  }
+  }, [displayEmail, displayName]);
 
   useEffect(() => {
     if (hasChallengeFromRoute) {
@@ -112,7 +112,7 @@ export default function VerifyEmailScreen() {
     return () => {
       isActive = false;
     };
-  }, [displayEmail, displayName, hasChallengeFromRoute]);
+  }, [displayEmail, getRequestDisplayName, hasChallengeFromRoute]);
 
   async function handleCheckVerification() {
     const cleanCode = code.trim();

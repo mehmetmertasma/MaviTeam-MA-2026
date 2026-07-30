@@ -87,6 +87,12 @@ export function getAuthErrorMessage(error: unknown) {
       return "Bu kulüp kodu zaten kullanılıyor. Kulüp adını biraz değiştirip tekrar dene.";
     case "CLUB_CODE_REQUIRED":
       return "Kulüp kodu oluşturulamadı. Kulüp adını kontrol edip tekrar dene.";
+    case "FIRESTORE_WORKSPACE_MISSING":
+      return "Kulüp çalışma alanı yüklenemedi. Oturumunu yenileyip tekrar dene.";
+    case "TEAM_PERMISSION_DENIED":
+      return "Takım oluşturmak için aktif kulüp admin yetkisi gerekiyor.";
+    case "TEAM_REQUIRED_FIELDS_MISSING":
+      return "Takım adı boş bırakılamaz.";
     case "auth/invalid-email":
       return "Lütfen geçerli bir e-posta adresi gir.";
     case "auth/user-disabled":

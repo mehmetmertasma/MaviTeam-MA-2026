@@ -65,36 +65,36 @@ function getDrawerCopy(language: "tr" | "en") {
   }
 
   return {
-    menuTitle: "MenÃ¼",
-    userFallback: "MaviTeam KullanÄ±cÄ±",
-    loadingProfile: "Profil bilgileri yÃ¼kleniyor",
-    noClub: "KulÃ¼p yok",
-    soon: "YakÄ±nda",
-    logout: "Ã‡Ä±kÄ±ÅŸ yap",
-    logoutSubtitle: "Bu oturumu gÃ¼venli ÅŸekilde kapat",
-    loggingOut: "Ã‡Ä±kÄ±ÅŸ yapÄ±lÄ±yor...",
-    logoutFailed: "Ã‡Ä±kÄ±ÅŸ yapÄ±lamadÄ±. LÃ¼tfen tekrar dene.",
+    menuTitle: "Menü",
+    userFallback: "MaviTeam Kullanıcı",
+    loadingProfile: "Profil bilgileri yükleniyor",
+    noClub: "Kulüp yok",
+    soon: "Yakında",
+    logout: "Çıkış yap",
+    logoutSubtitle: "Bu oturumu güvenli şekilde kapat",
+    loggingOut: "Çıkış yapılıyor...",
+    logoutFailed: "Çıkış yapılamadı. Lütfen tekrar dene.",
     roleLabels: {
-      superAdmin: "Platform yÃ¶neticisi",
-      clubAdmin: "KulÃ¼p yÃ¶neticisi",
-      coach: "KoÃ§",
+      superAdmin: "Platform yöneticisi",
+      clubAdmin: "Kulüp yöneticisi",
+      coach: "Koç",
       parent: "Veli",
       athlete: "Sporcu",
     } satisfies Record<UserRole, string>,
     items: [
-      { label: "Panel", subtitle: "KulÃ¼p kontrol merkezi", route: "/dashboard", allowedRoles: allRoles },
-      { label: "TakÄ±mlar", subtitle: "TakÄ±m yÃ¶netimi", route: "/teams", allowedRoles: staffRoles },
-      { label: "Ãœyeler", subtitle: "Rol, durum ve takÄ±m eriÅŸimi", route: "/members", allowedRoles: adminRoles },
-      { label: "Onaylar", subtitle: "Bekleyen katÄ±lÄ±m istekleri", route: "/pending-approvals", allowedRoles: adminRoles },
-      { label: "Program", subtitle: "Antrenman ve maÃ§ takvimi", route: "/schedule", allowedRoles: allRoles },
-      { label: "Yoklama", subtitle: "KatÄ±lÄ±m takibi", route: "/attendance", allowedRoles: staffRoles },
+      { label: "Panel", subtitle: "Kulüp kontrol merkezi", route: "/dashboard", allowedRoles: allRoles },
+      { label: "Takımlar", subtitle: "Takım yönetimi", route: "/teams", allowedRoles: staffRoles },
+      { label: "Üyeler", subtitle: "Rol, durum ve takım erişimi", route: "/members", allowedRoles: adminRoles },
+      { label: "Onaylar", subtitle: "Bekleyen katılım istekleri", route: "/pending-approvals", allowedRoles: adminRoles },
+      { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule", allowedRoles: allRoles },
+      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance", allowedRoles: staffRoles },
       { label: "Uygunluk", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability", allowedRoles: allRoles },
-      { label: "Mesajlar", subtitle: "TakÄ±m ve bireysel mesajlar", route: "/messages", allowedRoles: allRoles },
-      { label: "Duyurular", subtitle: "KulÃ¼p ve takÄ±m duyurularÄ±", route: "/announcements", allowedRoles: allRoles },
-      { label: "Ã–demeler", subtitle: "Ã–deme takibi", route: "/payments", allowedRoles: paymentRoles },
-      { label: "Ä°statistikler", subtitle: "Performans ve katÄ±lÄ±m Ã¶zeti", route: "/statistics", allowedRoles: staffRoles },
-      { label: "Videolar", subtitle: "Video ve drill iÃ§erikleri", route: "/replays", allowedRoles: allRoles },
-      { label: "Profil", subtitle: "Hesap ve kulÃ¼p bilgileri", route: "/profile", allowedRoles: allRoles },
+      { label: "Mesajlar", subtitle: "Takım ve bireysel mesajlar", route: "/messages", allowedRoles: allRoles },
+      { label: "Duyurular", subtitle: "Kulüp ve takım duyuruları", route: "/announcements", allowedRoles: allRoles },
+      { label: "Ödemeler", subtitle: "Ödeme takibi", route: "/payments", allowedRoles: paymentRoles },
+      { label: "İstatistikler", subtitle: "Performans ve katılım özeti", route: "/statistics", allowedRoles: staffRoles },
+      { label: "Videolar", subtitle: "Video ve drill içerikleri", route: "/replays", allowedRoles: allRoles },
+      { label: "Profil", subtitle: "Hesap ve kulüp bilgileri", route: "/profile", allowedRoles: allRoles },
       { label: "Ayarlar", subtitle: "Uygulama tercihleri", isDisabled: true, allowedRoles: allRoles },
     ] satisfies DrawerItem[],
   };
@@ -170,7 +170,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
   const profileName = currentUser?.fullName ?? drawerCopy.userFallback;
   const profileInitials = getInitials(profileName);
   const profileSubtitle = currentUser
-    ? `${drawerCopy.roleLabels[currentUser.role]} Â· ${primaryTeam?.name ?? currentClub?.name ?? drawerCopy.noClub}`
+    ? `${drawerCopy.roleLabels[currentUser.role]} · ${primaryTeam?.name ?? currentClub?.name ?? drawerCopy.noClub}`
     : drawerCopy.loadingProfile;
 
   function handleNavigate(route?: string, isDisabled?: boolean) {
@@ -216,7 +216,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
           </View>
 
           <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}>
-            <Text style={styles.closeButtonText}>Ã—</Text>
+            <Text style={styles.closeButtonText}>×</Text>
           </Pressable>
         </View>
 
@@ -249,7 +249,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
               </View>
 
               <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
-                {item.isDisabled ? drawerCopy.soon : "â€º"}
+                {item.isDisabled ? drawerCopy.soon : "›"}
               </Text>
             </Pressable>
           ))}
@@ -273,7 +273,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
               <Text style={styles.logoutTitle}>{isLoggingOut ? drawerCopy.loggingOut : drawerCopy.logout}</Text>
               <Text style={styles.logoutSubtitle}>{drawerCopy.logoutSubtitle}</Text>
             </View>
-            <Text style={styles.logoutArrow}>â†—</Text>
+            <Text style={styles.logoutArrow}>↗</Text>
           </Pressable>
         </View>
       </View>

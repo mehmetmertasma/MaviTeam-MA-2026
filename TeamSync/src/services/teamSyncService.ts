@@ -287,20 +287,43 @@ async function saveAppData(data: TeamSyncAppData) {
   return data;
 }
 
-async function syncCurrentWorkspaceToFirestore(data: TeamSyncAppData) {
+// Every club member may update their own name, regardless of role, so this
+// sync is intentionally independent of the club-settings sync below. It
+// must never be bundled into the same write as club data (see the comment
+// on firestoreTeamSyncService.updateCurrentUserProfile for why).
+async function syncCurrentUserToFirestore(data: TeamSyncAppData) {
   if (!authService.isConfigured()) {
     return;
   }
 
   const firebaseUser = authService.getCurrentUser();
 
-  if (firebaseUser === null || data.club.id.trim() === "") {
+  if (firebaseUser === null) {
     return;
   }
 
-  await firestoreTeamSyncService.updateCurrentWorkspace({
+  await firestoreTeamSyncService.updateCurrentUserProfile({
     firebaseUser,
     fullName: data.currentUser.fullName,
+  });
+}
+
+// Only a clubAdmin can write club-wide settings (enforced by
+// firestore.rules). Non-admins skip this entirely rather than attempting a
+// write that would fail.
+async function syncCurrentClubToFirestore(data: TeamSyncAppData) {
+  if (!authService.isConfigured()) {
+    return;
+  }
+
+  const firebaseUser = authService.getCurrentUser();
+
+  if (firebaseUser === null || data.club.id.trim() === "" || data.currentUser.role !== "clubAdmin") {
+    return;
+  }
+
+  await firestoreTeamSyncService.updateCurrentClubSettings({
+    firebaseUser,
     clubName: data.club.name,
     clubSport: data.club.sport,
     clubCity: data.club.city,
@@ -498,7 +521,7 @@ export const teamSyncService = {
       users: data.users.map((user) => (user.id === nextCurrentUser.id ? nextCurrentUser : user)),
     });
 
-    await syncCurrentWorkspaceToFirestore(nextAppData);
+    await syncCurrentUserToFirestore(nextAppData);
 
     return nextAppData;
   },
@@ -507,7 +530,7 @@ export const teamSyncService = {
     const data = await loadAppData();
     const nextAppData = await saveAppData({ ...data, club: { ...data.club, ...updates, updatedAt: nowIso() } });
 
-    await syncCurrentWorkspaceToFirestore(nextAppData);
+    await syncCurrentClubToFirestore(nextAppData);
 
     return nextAppData;
   },

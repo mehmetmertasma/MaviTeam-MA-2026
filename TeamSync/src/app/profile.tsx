@@ -166,18 +166,28 @@ export default function ProfileScreen() {
   }
 
   async function saveProfile() {
+    if (appData === null) {
+      return;
+    }
+
     try {
-      await teamSyncService.updateCurrentUser({
+      // Every member can rename themselves. Note: email is intentionally
+      // never sent here — it's tied to the Firebase Auth account, can't be
+      // changed via this form, and the field below is read-only.
+      let nextAppData = await teamSyncService.updateCurrentUser({
         fullName: draftProfileData.fullName.trim() || copy.defaultUser,
-        email: draftProfileData.email.trim().toLowerCase(),
       });
 
-      const nextAppData = await teamSyncService.updateCurrentClub({
-        name: draftProfileData.clubName.trim() || copy.defaultClub,
-        sport: draftProfileData.clubSport.trim() || t.common.volleyball,
-        city: draftProfileData.clubCity.trim() || copy.defaultCity,
-        code: draftProfileData.clubCode.trim().toUpperCase() || "MAVITEAM",
-      });
+      // Club-wide settings can only be changed by the club admin — the
+      // fields aren't even shown to other roles (see the form below).
+      if (appData.currentUser.role === "clubAdmin") {
+        nextAppData = await teamSyncService.updateCurrentClub({
+          name: draftProfileData.clubName.trim() || copy.defaultClub,
+          sport: draftProfileData.clubSport.trim() || t.common.volleyball,
+          city: draftProfileData.clubCity.trim() || copy.defaultCity,
+          code: draftProfileData.clubCode.trim().toUpperCase() || "MAVITEAM",
+        });
+      }
 
       setAppData(nextAppData);
       setDraftProfileData(getFormDataFromAppData(nextAppData));
@@ -332,66 +342,64 @@ export default function ProfileScreen() {
 
                 <View style={styles.formField}>
                   <Text style={styles.inputLabel}>{t.profile.email}</Text>
-                  <TextInput
-                    value={draftProfileData.email}
-                    onChangeText={(value) => updateDraftProfile("email", value)}
-                    placeholder={t.profile.email}
-                    placeholderTextColor={theme.colors.text.muted}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={styles.input}
-                  />
+                  <Text style={[styles.input, styles.readOnlyInput]}>
+                    {draftProfileData.email || copy.noEmail}
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.formGrid}>
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>{t.profile.club}</Text>
-                  <TextInput
-                    value={draftProfileData.clubName}
-                    onChangeText={(value) => updateDraftProfile("clubName", value)}
-                    placeholder={t.profile.club}
-                    placeholderTextColor={theme.colors.text.muted}
-                    style={styles.input}
-                  />
-                </View>
+              {currentUser.role === "clubAdmin" ? (
+                <>
+                  <View style={styles.formGrid}>
+                    <View style={styles.formField}>
+                      <Text style={styles.inputLabel}>{t.profile.club}</Text>
+                      <TextInput
+                        value={draftProfileData.clubName}
+                        onChangeText={(value) => updateDraftProfile("clubName", value)}
+                        placeholder={t.profile.club}
+                        placeholderTextColor={theme.colors.text.muted}
+                        style={styles.input}
+                      />
+                    </View>
 
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>{t.common.volleyball}</Text>
-                  <TextInput
-                    value={draftProfileData.clubSport}
-                    onChangeText={(value) => updateDraftProfile("clubSport", value)}
-                    placeholder={t.common.volleyball}
-                    placeholderTextColor={theme.colors.text.muted}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+                    <View style={styles.formField}>
+                      <Text style={styles.inputLabel}>{t.common.volleyball}</Text>
+                      <TextInput
+                        value={draftProfileData.clubSport}
+                        onChangeText={(value) => updateDraftProfile("clubSport", value)}
+                        placeholder={t.common.volleyball}
+                        placeholderTextColor={theme.colors.text.muted}
+                        style={styles.input}
+                      />
+                    </View>
+                  </View>
 
-              <View style={styles.formGrid}>
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>{copy.city}</Text>
-                  <TextInput
-                    value={draftProfileData.clubCity}
-                    onChangeText={(value) => updateDraftProfile("clubCity", value)}
-                    placeholder={copy.city}
-                    placeholderTextColor={theme.colors.text.muted}
-                    style={styles.input}
-                  />
-                </View>
+                  <View style={styles.formGrid}>
+                    <View style={styles.formField}>
+                      <Text style={styles.inputLabel}>{copy.city}</Text>
+                      <TextInput
+                        value={draftProfileData.clubCity}
+                        onChangeText={(value) => updateDraftProfile("clubCity", value)}
+                        placeholder={copy.city}
+                        placeholderTextColor={theme.colors.text.muted}
+                        style={styles.input}
+                      />
+                    </View>
 
-                <View style={styles.formField}>
-                  <Text style={styles.inputLabel}>{t.profile.clubCode}</Text>
-                  <TextInput
-                    value={draftProfileData.clubCode}
-                    onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())}
-                    placeholder={t.profile.clubCode}
-                    placeholderTextColor={theme.colors.text.muted}
-                    autoCapitalize="characters"
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+                    <View style={styles.formField}>
+                      <Text style={styles.inputLabel}>{t.profile.clubCode}</Text>
+                      <TextInput
+                        value={draftProfileData.clubCode}
+                        onChangeText={(value) => updateDraftProfile("clubCode", value.toUpperCase())}
+                        placeholder={t.profile.clubCode}
+                        placeholderTextColor={theme.colors.text.muted}
+                        autoCapitalize="characters"
+                        style={styles.input}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : null}
             </View>
           ) : (
             <View style={styles.infoList}>
@@ -512,6 +520,7 @@ const styles = StyleSheet.create({
   formField: { flex: 1, minWidth: 240 },
   inputLabel: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm },
   input: { minHeight: 52, borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.surface, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.lg },
+  readOnlyInput: { backgroundColor: theme.colors.background.app, color: theme.colors.text.muted, textAlignVertical: "center" },
   infoList: { width: "100%" },
   infoRow: { borderBottomWidth: 1, borderBottomColor: theme.colors.border.default, paddingVertical: theme.spacing.lg, gap: theme.spacing.sm },
   infoRowLast: { paddingTop: theme.spacing.lg, gap: theme.spacing.sm },

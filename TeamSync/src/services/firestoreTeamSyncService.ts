@@ -46,9 +46,13 @@ type CreateClubWorkspaceInput = {
   clubCode: string;
 };
 
-type UpdateCurrentWorkspaceInput = {
+type UpdateCurrentUserProfileInput = {
   firebaseUser: User;
   fullName: string;
+};
+
+type UpdateCurrentClubSettingsInput = {
+  firebaseUser: User;
   clubName: string;
   clubSport: string;
   clubCity: string;
@@ -916,7 +920,33 @@ export const firestoreTeamSyncService = {
     await deleteDoc(announcementRef);
   },
 
-  async updateCurrentWorkspace(input: UpdateCurrentWorkspaceInput) {
+  // Writes only the signed-in user's own document. Every club member (any
+  // role) is allowed to update their own fullName, so this must never be
+  // bundled into the same write as a club-document update — a bundled
+  // write is only as permissive as its most restrictive part, and the
+  // club document can only be written by a clubAdmin (see firestore.rules).
+  // Keeping this isolated means a coach/athlete/parent editing their own
+  // name can never be blocked by club-level permission checks.
+  async updateCurrentUserProfile(input: UpdateCurrentUserProfileInput) {
+    const { db } = requireFirebaseServices();
+    const userRef = doc(db, "users", input.firebaseUser.uid);
+
+    await setDoc(
+      userRef,
+      {
+        fullName: input.fullName.trim() || getDisplayName(input.firebaseUser),
+        email: input.firebaseUser.email ?? "",
+        emailVerified: input.firebaseUser.emailVerified,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  },
+
+  // Writes club-wide settings. Only a clubAdmin may do this (enforced both
+  // here, for a clean error before hitting the network, and by
+  // firestore.rules as the source of truth).
+  async updateCurrentClubSettings(input: UpdateCurrentClubSettingsInput) {
     const { db } = requireFirebaseServices();
     const workspace = await this.getCurrentWorkspace(input.firebaseUser);
 
@@ -924,11 +954,14 @@ export const firestoreTeamSyncService = {
       throw new Error("FIRESTORE_WORKSPACE_MISSING");
     }
 
+    if (workspace.currentUser.role !== "clubAdmin") {
+      throw new Error("CLUB_SETTINGS_PERMISSION_DENIED");
+    }
+
     const now = serverTimestamp();
     const normalizedClubCode = normalizeClubCode(input.clubCode);
     const currentClubCode = normalizeClubCode(workspace.club.code);
     const nextClubCode = normalizedClubCode || currentClubCode;
-    const userRef = doc(db, "users", input.firebaseUser.uid);
     const clubRef = doc(db, "clubs", workspace.club.id);
     const nextClubCodeRef = normalizedClubCode === "" ? null : doc(db, "clubCodes", normalizedClubCode);
     const previousClubCodeRef = nextClubCodeRef !== null && currentClubCode !== "" && currentClubCode !== normalizedClubCode
@@ -951,17 +984,6 @@ export const firestoreTeamSyncService = {
     }
 
     const batch = writeBatch(db);
-
-    batch.set(
-      userRef,
-      {
-        fullName: input.fullName.trim() || getDisplayName(input.firebaseUser),
-        email: input.firebaseUser.email ?? workspace.currentUser.email,
-        emailVerified: input.firebaseUser.emailVerified,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
 
     batch.set(
       clubRef,

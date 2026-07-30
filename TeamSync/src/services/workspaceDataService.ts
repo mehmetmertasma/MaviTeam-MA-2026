@@ -67,10 +67,22 @@ export const workspaceDataService = {
     const firebaseUser = authService.getCurrentUser();
 
     if (authService.isConfigured() && firebaseUser !== null && firebaseUser.emailVerified) {
-      await firestoreTeamSyncService.updateCurrentWorkspace({
+      await firestoreTeamSyncService.updateCurrentUserProfile({
         firebaseUser,
-        ...input,
+        fullName: input.fullName,
       });
+
+      const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
+
+      if (workspace?.currentUser.role === "clubAdmin") {
+        await firestoreTeamSyncService.updateCurrentClubSettings({
+          firebaseUser,
+          clubName: input.clubName,
+          clubSport: input.clubSport,
+          clubCity: input.clubCity,
+          clubCode: input.clubCode,
+        });
+      }
     }
 
     await teamSyncService.updateCurrentUser({

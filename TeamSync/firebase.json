@@ -10,6 +10,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "teamsync-29ea1",
     "public": "dist",
     "ignore": [
       "firebase.json",

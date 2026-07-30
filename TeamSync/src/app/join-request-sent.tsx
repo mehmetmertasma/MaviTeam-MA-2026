@@ -83,7 +83,7 @@ export default function JoinRequestSentScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
       <View style={styles.container}>
         <View style={styles.card}>
-          <AppBackButton label="Koda dön" fallbackHref="/join-club" onPress={handleRetryCode} />
+          <AppBackButton label="Geri dön" fallbackHref="/join-club" onPress={handleRetryCode} />
 
           <Text style={styles.logo}>TeamSync</Text>
 

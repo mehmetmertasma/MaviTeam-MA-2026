@@ -240,6 +240,7 @@ function getChatMessageFromFirestore(snapshot: QueryDocumentSnapshot): ChatMessa
     clubId: readString(data.clubId),
     groupId: readOptionalString(data.groupId),
     directUserIds: readStringArray(data.directUserIds),
+    visibleUserIds: readStringArray(data.visibleUserIds),
     senderUserId: readString(data.senderUserId),
     text: readString(data.text),
     createdAt: readTimestampString(data.createdAt),
@@ -615,6 +616,22 @@ export const firestoreMaviTeamDataService = {
       throw new Error("CHAT_PERMISSION_DENIED");
     }
 
+    // Denormalize the target group's visibleUserIds onto the message itself so
+    // firestore.rules can authorize reads without a per-document lookup (see
+    // canReadChatMessage) — a list query can't safely use a get() keyed off a
+    // field on the very documents it's evaluating.
+    let visibleUserIds: string[] | undefined;
+
+    if (input.groupId !== undefined) {
+      const groupSnapshot = await getDoc(doc(db, "chatGroups", input.groupId));
+
+      if (!groupSnapshot.exists()) {
+        throw new Error("CHAT_PERMISSION_DENIED");
+      }
+
+      visibleUserIds = readStringArray(groupSnapshot.data().visibleUserIds);
+    }
+
     const createdAt = nowIso();
     const messageId = `message-${Date.now()}`;
     const directUserIds = input.directUserIds === undefined ? undefined : Array.from(new Set([firebaseUser.uid, ...input.directUserIds]));
@@ -623,6 +640,7 @@ export const firestoreMaviTeamDataService = {
       id: messageId,
       clubId: workspace.club.id,
       directUserIds,
+      visibleUserIds,
       text: input.text.trim(),
       createdAt,
     };
@@ -632,6 +650,7 @@ export const firestoreMaviTeamDataService = {
       clubId: message.clubId,
       groupId: message.groupId ?? null,
       directUserIds: message.directUserIds ?? null,
+      visibleUserIds: message.visibleUserIds ?? null,
       senderUserId: message.senderUserId,
       text: message.text,
       createdAt: serverTimestamp(),

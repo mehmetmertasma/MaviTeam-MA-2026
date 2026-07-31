@@ -1,16 +1,19 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { User } from "firebase/auth";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService } from "@/services/authService";
+import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import type { Club, ScheduleEvent, Team, UserProfile, UserRole } from "@/types/teamSync";
 
 type AppRoute =
   | "/teams"
+  | "/members"
   | "/pending-approvals"
   | "/announcements"
   | "/messages"
@@ -83,6 +86,7 @@ function getCopy(language: "tr" | "en") {
     ],
     clubAdmin: [
       { title: en ? "Teams" : "Takımlar", meta: en ? "Manage teams" : "Takımları yönet", route: "/teams" },
+      { title: en ? "Members" : "Üyeler", meta: en ? "Roles and team access" : "Rol ve takım erişimi", route: "/members" },
       { title: en ? "Approvals" : "Onaylar", meta: en ? "Approve members" : "Üyeleri onayla", route: "/pending-approvals" },
       { title: en ? "Schedule" : "Program", meta: en ? "Practices and matches" : "Antrenman ve maçlar", route: "/schedule" },
       { title: en ? "Announcements" : "Duyurular", meta: en ? "Club updates" : "Kulüp güncellemeleri", route: "/announcements" },
@@ -148,9 +152,9 @@ async function safeLoadTeams(clubId: string) {
   }
 }
 
-async function safeLoadScheduleEvents(clubId: string) {
+async function safeLoadScheduleEvents(firebaseUser: User) {
   try {
-    return await withTimeout(firestoreTeamSyncService.listScheduleEventsForClub(clubId), 3500, "SCHEDULE_LOAD");
+    return await withTimeout(firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser), 3500, "SCHEDULE_LOAD");
   } catch (error) {
     console.warn("Dashboard schedule could not be loaded.", error);
     return [];
@@ -203,7 +207,7 @@ export default function DashboardScreen() {
 
         const [teams, scheduleEvents] = await Promise.all([
           safeLoadTeams(workspace.club.id),
-          safeLoadScheduleEvents(workspace.club.id),
+          safeLoadScheduleEvents(firebaseUser),
         ]);
 
         if (!isActive) return;

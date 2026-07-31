@@ -157,12 +157,18 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/chatGroups/$(groupId)).data;
     }
 
+    // Group-message visibility is read from data.visibleUserIds directly rather
+    // than looking up the chatGroups doc (see canCreateChatMessage, which is the
+    // only place that trusts that field): a list query can't statically prove a
+    // get() keyed off a field on the very documents it's evaluating is safe, so
+    // Firestore denies the whole query rather than filtering per-document.
     function canReadChatMessage(data) {
       return belongsToCurrentUsersClub(data.clubId)
         && (
-          data.senderUserId == request.auth.uid
+          currentUserIsClubAdmin()
+          || data.senderUserId == request.auth.uid
           || (('directUserIds' in data) && data.directUserIds is list && request.auth.uid in data.directUserIds)
-          || (('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId)))
+          || (('visibleUserIds' in data) && data.visibleUserIds is list && request.auth.uid in data.visibleUserIds)
         );
     }
 
@@ -173,7 +179,10 @@ service cloud.firestore {
         && data.senderUserId == request.auth.uid
         && (
           (('directUserIds' in data) && data.directUserIds is list && request.auth.uid in data.directUserIds)
-          || (('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId)))
+          || (
+            ('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId))
+            && data.visibleUserIds == chatGroupData(data.groupId).visibleUserIds
+          )
         );
     }
 

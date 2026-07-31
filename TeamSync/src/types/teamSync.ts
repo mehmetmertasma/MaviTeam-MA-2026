@@ -108,6 +108,10 @@ export type ChatMessage = {
   clubId: string;
   groupId?: string;
   directUserIds?: string[];
+  // Denormalized copy of the target chat group's visibleUserIds at send time,
+  // so the read rule can authorize group messages without a per-document
+  // Firestore lookup (see canReadChatMessage in firestore.rules).
+  visibleUserIds?: string[];
   senderUserId: string;
   text: string;
   createdAt: TimestampString;

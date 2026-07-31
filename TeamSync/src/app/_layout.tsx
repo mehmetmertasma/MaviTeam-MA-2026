@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { AppDataProvider } from "@/providers/AppDataProvider";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
@@ -219,8 +220,10 @@ function AppContent() {
 
 export default function RootLayout() {
   return (
-    <AppProviders>
-      <AppContent />
-    </AppProviders>
+    <AppErrorBoundary>
+      <AppProviders>
+        <AppContent />
+      </AppProviders>
+    </AppErrorBoundary>
   );
 }

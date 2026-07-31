@@ -6,6 +6,7 @@ import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Announcement, TeamSyncAppData, UserRole } from "@/types/teamSync";
@@ -54,9 +55,10 @@ export default function AnnouncementsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklendi.");
 
-  // Admins need the full club announcement list, not just the ones visible
-  // to the current user, so this overlays a dedicated Firestore fetch on top
-  // of the shared appData rather than pulling announcements from it directly.
+  // Overlays a dedicated, targeted Firestore fetch on top of the shared
+  // appData instead of pulling announcements from it directly, so this
+  // screen can refresh just this one collection without re-triggering the
+  // full app-data load.
   const appData = useMemo(() => {
     if (contextAppData === null) return null;
     if (firestoreAnnouncements === null) return contextAppData;
@@ -73,7 +75,7 @@ export default function AnnouncementsScreen() {
           return;
         }
 
-        const fetchedAnnouncements = await firestoreTeamSyncService.listAnnouncementsForCurrentClub(firebaseUser);
+        const fetchedAnnouncements = await firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser);
         setFirestoreAnnouncements(fetchedAnnouncements);
         setStatusMessage("Duyurular Firestore kulüp datasından yüklendi.");
         return;

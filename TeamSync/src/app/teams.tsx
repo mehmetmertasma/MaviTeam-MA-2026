@@ -5,9 +5,22 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
-import { getAuthErrorMessage } from "@/services/authService";
+import { authService, getAuthErrorMessage } from "@/services/authService";
+import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Team as TeamRecord, UserProfile } from "@/types/teamSync";
+
+function getTeamMembershipErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message === "MEMBER_SELF_EDIT_DENIED") return "Kendi takım üyeliğini buradan değiştiremezsin.";
+  if (message === "MEMBER_OWNER_EDIT_DENIED") return "Kulüp sahibinin takım üyeliği buradan değiştirilemez.";
+  if (message === "MEMBER_PERMISSION_DENIED") return "Bu işlem için kulüp admin yetkisi gerekli.";
+  if (message === "MEMBER_TEAM_MISSING") return "Seçilen takım artık mevcut değil.";
+  if (message === "MEMBER_MISSING") return "Kullanıcı bulunamadı.";
+
+  return "Takım üyeliği güncellenirken bir sorun oluştu.";
+}
 
 const EMPTY_TEAMS: TeamRecord[] = [];
 const EMPTY_USERS: UserProfile[] = [];
@@ -65,10 +78,51 @@ export default function TeamsScreen() {
   const [coachName, setCoachName] = useState("");
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklendi.");
+  const [addMemberOpenTeamId, setAddMemberOpenTeamId] = useState("");
+  const [updatingMemberId, setUpdatingMemberId] = useState("");
 
   const teams = appData?.teams ?? EMPTY_TEAMS;
   const users = appData?.users ?? EMPTY_USERS;
   const selectedTeamId = teams.some((team) => team.id === selectedTeamIdState) ? selectedTeamIdState : "";
+  const currentUser = appData?.currentUser;
+  const clubOwnerId = appData?.club.ownerId ?? "";
+  const userCanManageTeamRoster = currentUser?.role === "clubAdmin";
+
+  async function setTeamMembership(team: TeamRecord, member: UserProfile, isAdding: boolean) {
+    if (!authService.isConfigured()) {
+      setStatusMessage("Takım üyeliği yönetimi için Firebase girişi gerekli.");
+      return;
+    }
+
+    const firebaseUser = authService.getCurrentUser();
+
+    if (firebaseUser === null || member.role === "superAdmin") {
+      setStatusMessage("Bu kullanıcı için takım üyeliği değiştirilemez.");
+      return;
+    }
+
+    const nextTeamIds = isAdding
+      ? Array.from(new Set([...member.teamIds, team.id]))
+      : member.teamIds.filter((teamId) => teamId !== team.id);
+
+    try {
+      setUpdatingMemberId(member.id);
+
+      await firestoreMemberManagementService.updateClubMember(firebaseUser, {
+        targetUserId: member.id,
+        role: member.role,
+        status: member.status,
+        teamIds: nextTeamIds,
+      });
+
+      await refresh();
+      setStatusMessage(isAdding ? `${member.fullName} ${team.name} takımına eklendi.` : `${member.fullName} ${team.name} takımından çıkarıldı.`);
+    } catch (membershipError) {
+      setStatusMessage(getTeamMembershipErrorMessage(membershipError));
+    } finally {
+      setUpdatingMemberId("");
+    }
+  }
 
   async function refreshTeamsData() {
     try {
@@ -345,32 +399,96 @@ export default function TeamsScreen() {
                         </View>
 
                         <View style={styles.memberBlock}>
-                          <Text style={styles.memberBlockTitle}>Takım içi kişiler</Text>
+                          <View style={styles.memberBlockHeaderRow}>
+                            <Text style={styles.memberBlockTitle}>Takım içi kişiler</Text>
+                            {userCanManageTeamRoster ? (
+                              <Pressable
+                                onPress={() => setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id)}
+                                style={({ pressed }) => [styles.addMemberToggle, pressed ? styles.pressed : null]}
+                              >
+                                <Text style={styles.addMemberToggleText}>
+                                  {addMemberOpenTeamId === team.id ? "Kapat" : "Kişi ekle"}
+                                </Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+
                           {teamUsers.length === 0 ? (
                             <View style={styles.emptyBoxCompact}>
                               <Text style={styles.emptyText}>Bu takımda henüz kişi yok.</Text>
                             </View>
                           ) : (
                             <View style={styles.memberList}>
-                              {teamUsers.map((member) => (
-                                <View key={member.id} style={styles.memberCard}>
-                                  <View style={styles.avatar}>
-                                    <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                              {teamUsers.map((member) => {
+                                const isProtectedMember =
+                                  member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
+                                const isUpdatingThisMember = updatingMemberId === member.id;
+
+                                return (
+                                  <View key={member.id} style={styles.memberCard}>
+                                    <View style={styles.avatar}>
+                                      <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                                    </View>
+                                    <View style={styles.memberInfo}>
+                                      <Text style={styles.memberName}>{member.fullName}</Text>
+                                      <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
+                                    </View>
+                                    <AppButton
+                                      title="Mesaj"
+                                      variant="secondary"
+                                      onPress={() => openMessages(member.fullName)}
+                                      style={styles.memberButton}
+                                    />
+                                    {userCanManageTeamRoster && !isProtectedMember ? (
+                                      <AppButton
+                                        title={isUpdatingThisMember ? "..." : "Çıkar"}
+                                        variant="ghost"
+                                        disabled={isUpdatingThisMember}
+                                        onPress={() => setTeamMembership(team, member, false)}
+                                        style={styles.memberButton}
+                                      />
+                                    ) : null}
                                   </View>
-                                  <View style={styles.memberInfo}>
-                                    <Text style={styles.memberName}>{member.fullName}</Text>
-                                    <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
-                                  </View>
-                                  <AppButton
-                                    title="Mesaj"
-                                    variant="secondary"
-                                    onPress={() => openMessages(member.fullName)}
-                                    style={styles.memberButton}
-                                  />
-                                </View>
-                              ))}
+                                );
+                              })}
                             </View>
                           )}
+
+                          {userCanManageTeamRoster && addMemberOpenTeamId === team.id ? (
+                            <View style={styles.addMemberPanel}>
+                              {(() => {
+                                const availableUsers = users.filter(
+                                  (user) =>
+                                    user.status === "active" &&
+                                    user.role !== "superAdmin" &&
+                                    !teamUsers.some((member) => member.id === user.id)
+                                );
+
+                                if (availableUsers.length === 0) {
+                                  return <Text style={styles.emptyText}>Eklenebilecek başka aktif üye yok.</Text>;
+                                }
+
+                                return availableUsers.map((user) => {
+                                  const isUpdatingThisUser = updatingMemberId === user.id;
+
+                                  return (
+                                    <View key={user.id} style={styles.addMemberRow}>
+                                      <View style={styles.memberInfo}>
+                                        <Text style={styles.memberName}>{user.fullName}</Text>
+                                        <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
+                                      </View>
+                                      <AppButton
+                                        title={isUpdatingThisUser ? "..." : "Ekle"}
+                                        disabled={isUpdatingThisUser}
+                                        onPress={() => setTeamMembership(team, user, true)}
+                                        style={styles.memberButton}
+                                      />
+                                    </View>
+                                  );
+                                });
+                              })()}
+                            </View>
+                          ) : null}
                         </View>
 
                         {isPendingRemove ? (
@@ -536,7 +654,10 @@ const styles = StyleSheet.create({
   detailLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.xs },
   detailValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
   memberBlock: { gap: theme.spacing.md },
+  memberBlockHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
   memberBlockTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
+  addMemberToggle: { borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primarySoft, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
+  addMemberToggleText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   memberList: { gap: theme.spacing.md },
   memberCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default, flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
   avatar: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
@@ -545,6 +666,8 @@ const styles = StyleSheet.create({
   memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
   memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   memberButton: { minWidth: 96 },
+  addMemberPanel: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg, gap: theme.spacing.md },
+  addMemberRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
   confirmBox: { backgroundColor: theme.colors.state.warningSoft, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.state.warning },
   confirmTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
   confirmText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },

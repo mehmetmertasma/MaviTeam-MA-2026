@@ -1,15 +1,16 @@
 import { forwardRef } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
 import type { ComponentRef } from "react";
 import type { PressableProps, StyleProp, TextStyle, ViewStyle } from "react-native";
 
 import { theme } from "@/constants/theme";
 
-type AppButtonVariant = "primary" | "secondary" | "ghost";
+type AppButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 type AppButtonProps = Omit<PressableProps, "children" | "style"> & {
   title: string;
   variant?: AppButtonVariant;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 };
@@ -20,6 +21,7 @@ const variantStyles: Record<
     button: ViewStyle;
     pressed: ViewStyle;
     text: TextStyle;
+    spinnerColor: string;
   }
 > = {
   primary: {
@@ -35,6 +37,7 @@ const variantStyles: Record<
     text: {
       color: theme.colors.text.inverse,
     },
+    spinnerColor: theme.colors.text.inverse,
   },
   secondary: {
     button: {
@@ -48,6 +51,7 @@ const variantStyles: Record<
     text: {
       color: theme.colors.text.brand,
     },
+    spinnerColor: theme.colors.text.brand,
   },
   ghost: {
     button: {
@@ -61,6 +65,21 @@ const variantStyles: Record<
     text: {
       color: theme.colors.text.brand,
     },
+    spinnerColor: theme.colors.text.brand,
+  },
+  danger: {
+    button: {
+      backgroundColor: theme.colors.state.dangerSoft,
+      borderColor: "rgba(225, 29, 72, 0.28)",
+    },
+    pressed: {
+      backgroundColor: "rgba(254, 205, 211, 0.9)",
+      borderColor: theme.colors.state.danger,
+    },
+    text: {
+      color: theme.colors.text.danger,
+    },
+    spinnerColor: theme.colors.text.danger,
   },
 };
 
@@ -69,6 +88,7 @@ export const AppButton = forwardRef<ComponentRef<typeof Pressable>, AppButtonPro
   onPress,
   variant = "primary",
   disabled = false,
+  loading = false,
   accessibilityLabel,
   accessibilityRole,
   accessibilityState,
@@ -77,7 +97,7 @@ export const AppButton = forwardRef<ComponentRef<typeof Pressable>, AppButtonPro
   ...pressableProps
 }, ref) {
   const selectedVariant = variantStyles[variant];
-  const isDisabled = disabled === true;
+  const isDisabled = disabled === true || loading === true;
 
   return (
     <Pressable
@@ -85,7 +105,7 @@ export const AppButton = forwardRef<ComponentRef<typeof Pressable>, AppButtonPro
       ref={ref}
       accessibilityRole={accessibilityRole ?? "button"}
       accessibilityLabel={accessibilityLabel ?? title}
-      accessibilityState={{ ...accessibilityState, disabled: isDisabled }}
+      accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}
       disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -96,16 +116,20 @@ export const AppButton = forwardRef<ComponentRef<typeof Pressable>, AppButtonPro
         style,
       ]}
     >
-      <Text
-        style={[
-          styles.text,
-          selectedVariant.text,
-          isDisabled ? styles.disabledText : null,
-          textStyle,
-        ]}
-      >
-        {title}
-      </Text>
+      {loading ? (
+        <ActivityIndicator size="small" color={selectedVariant.spinnerColor} />
+      ) : (
+        <Text
+          style={[
+            styles.text,
+            selectedVariant.text,
+            isDisabled ? styles.disabledText : null,
+            textStyle,
+          ]}
+        >
+          {title}
+        </Text>
+      )}
     </Pressable>
   );
 });

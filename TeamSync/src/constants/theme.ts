@@ -92,6 +92,14 @@ export const theme = {
       text: palette.rose600,
     },
 
+    disabled: {
+      background: palette.slate200,
+      text: palette.slate400,
+      border: palette.slate300,
+    },
+
+    divider: palette.slate200,
+
     overlay: "rgba(2, 6, 23, 0.58)",
   },
 
@@ -276,6 +284,24 @@ export const FontSizes = theme.fontSizes;
 export const FontWeights = theme.fontWeights;
 export const Shadows = theme.shadows;
 
+// Named text styles covering the hierarchy a screen actually needs, so
+// components can write `Typography.pageTitle` instead of re-combining
+// fontSize + fontWeight + lineHeight by hand every time (and drifting out
+// of sync with each other screen that does the same thing slightly
+// differently). Existing per-field theme usage still works unchanged.
+export const Typography = {
+  displayTitle: { fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"] },
+  pageTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["4xl"] },
+  sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["2xl"] },
+  cardTitle: { fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.xl },
+  body: { fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.lg },
+  supporting: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  label: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.md },
+  button: { fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.lg },
+  caption: { fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.sm },
+  statNumber: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["4xl"] },
+} as const;
+
 export const BottomTabInset =
   Platform.select({
     ios: 50,
@@ -285,6 +311,12 @@ export const BottomTabInset =
 
 export const MaxContentWidth = 1180;
 export const ScreenMaxWidth = 520;
+export const ContentMaxWidth = 980;
+
+export const Breakpoints = {
+  tablet: 768,
+  desktop: 1024,
+} as const;
 
 export const platform = {
   isWeb: Platform.OS === "web",

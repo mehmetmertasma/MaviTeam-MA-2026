@@ -1,15 +1,19 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import type { User } from "firebase/auth";
+import { useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorState } from "@/components/ErrorState";
+import { LoadingState } from "@/components/LoadingState";
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useTranslation } from "@/localization";
-import { authService } from "@/services/authService";
-import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataService";
-import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
-import type { Club, ScheduleEvent, Team, UserProfile, UserRole } from "@/types/teamSync";
+import { useAppDataContext } from "@/providers/AppDataProvider";
+import type { UserRole } from "@/types/teamSync";
 
 type AppRoute =
   | "/teams"
@@ -25,13 +29,6 @@ type AppRoute =
   | "/payments"
   | "/profile";
 
-type DashboardState = {
-  club: Club;
-  currentUser: UserProfile;
-  teams: Team[];
-  scheduleEvents: ScheduleEvent[];
-};
-
 type QuickAction = {
   title: string;
   meta: string;
@@ -43,29 +40,7 @@ function getFirstName(name: string, fallback: string) {
   return trimmedName.length === 0 ? fallback : trimmedName.split(" ")[0];
 }
 
-function getErrorCode(error: unknown) {
-  if (typeof error === "object" && error !== null && "code" in error) {
-    const code = (error as { code?: unknown }).code;
-    if (typeof code === "string") return code;
-  }
-
-  if (error instanceof Error && error.message.trim() !== "") {
-    return error.message;
-  }
-
-  return "UNKNOWN_FIRESTORE_ERROR";
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), timeoutMs);
-  });
-
-  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
-}
-
-function getUpcomingEvents(events: ScheduleEvent[]) {
+function getUpcomingEvents<T extends { startsAt: string }>(events: T[]) {
   return [...events]
     .sort((firstEvent, secondEvent) => new Date(firstEvent.startsAt).getTime() - new Date(secondEvent.startsAt).getTime())
     .slice(0, 3);
@@ -75,6 +50,12 @@ function formatEventTime(value: string, locale: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return locale === "tr-TR" ? "Tarih yok" : "No date";
   return date.toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatAnnouncementDate(value: string, locale: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(locale, { day: "2-digit", month: "short" });
 }
 
 function getCopy(language: "tr" | "en") {
@@ -114,16 +95,26 @@ function getCopy(language: "tr" | "en") {
     ],
   };
 
+  const roleLabels: Record<UserRole, string> = {
+    superAdmin: en ? "Platform admin" : "Platform yöneticisi",
+    clubAdmin: en ? "Club admin" : "Kulüp yöneticisi",
+    coach: en ? "Coach" : "Koç",
+    parent: en ? "Parent" : "Veli",
+    athlete: en ? "Athlete" : "Sporcu",
+  };
+
   return {
     appSubtitle: en ? "Club management system" : "Kulüp yönetim sistemi",
     loading: en ? "Loading workspace..." : "Çalışma alanı yükleniyor...",
     ready: en ? "System ready" : "Sistem hazır",
     error: en ? "Workspace could not be loaded." : "Çalışma alanı yüklenemedi.",
+    errorDescription: en
+      ? "Check your connection and try again."
+      : "Bağlantını kontrol edip tekrar dene.",
     setup: en ? "Workspace setup required" : "Kulüp kurulumu gerekli",
-    setupText: en ? "This account does not have a club yet." : "Bu hesapta henüz gerçek kulüp yok.",
+    setupText: en ? "This account does not have a club yet." : "Bu hesapta henüz bir kulüp yok.",
     createClub: en ? "Create club" : "Kulüp oluştur",
     retry: en ? "Try again" : "Tekrar dene",
-    details: en ? "Details" : "Detay",
     pageTitle: en ? "Operations dashboard" : "Operasyon paneli",
     welcome: en ? "Welcome" : "Hoş geldin",
     userFallback: en ? "User" : "Kullanıcı",
@@ -139,243 +130,264 @@ function getCopy(language: "tr" | "en") {
     clubCode: en ? "Club code" : "Kulüp kodu",
     city: en ? "City" : "Şehir",
     noCity: en ? "No city" : "Şehir yok",
+    pendingApprovals: en ? "Pending approvals" : "Bekleyen onaylar",
+    pendingApprovalsMeta: en ? "Waiting for your review" : "İncelemeni bekliyor",
+    outstandingPayments: en ? "Outstanding payments" : "Bekleyen ödemeler",
+    outstandingPaymentsMeta: en ? "Needs attention" : "İlgilenmen gerekiyor",
+    latestAnnouncement: en ? "Latest announcement" : "Son duyuru",
+    noAnnouncements: en ? "No announcements yet." : "Henüz duyuru yok.",
+    viewAll: en ? "View all" : "Tümünü gör",
     quickActionsByRole,
+    roleLabels,
   };
-}
-
-async function safeLoadTeams(clubId: string) {
-  try {
-    return await withTimeout(firestoreTeamSyncService.listTeamsForClub(clubId), 3500, "TEAMS_LOAD");
-  } catch (error) {
-    console.warn("Dashboard teams could not be loaded.", error);
-    return [];
-  }
-}
-
-async function safeLoadScheduleEvents(firebaseUser: User) {
-  try {
-    return await withTimeout(firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser), 3500, "SCHEDULE_LOAD");
-  } catch (error) {
-    console.warn("Dashboard schedule could not be loaded.", error);
-    return [];
-  }
 }
 
 export default function DashboardScreen() {
   const { language } = useTranslation();
   const copy = useMemo(() => getCopy(language), [language]);
   const locale = language === "tr" ? "tr-TR" : "en-US";
-  const [dashboardData, setDashboardData] = useState<DashboardState | null>(null);
-  const [statusMessage, setStatusMessage] = useState(copy.loading);
-  const [errorDetail, setErrorDetail] = useState("");
-  const [needsSetup, setNeedsSetup] = useState(false);
-  const [loadVersion, setLoadVersion] = useState(0);
+  const { isDesktop } = useResponsive();
+  const { appData, isLoading, error: appDataError, refresh } = useAppDataContext();
 
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadDashboard() {
-      setStatusMessage(copy.loading);
-      setErrorDetail("");
-      setNeedsSetup(false);
-
-      try {
-        const firebaseUser = authService.getCurrentUser();
-        if (authService.isConfigured() && firebaseUser === null) {
-          router.replace("/login" as never);
-          return;
-        }
-
-        if (firebaseUser === null) {
-          throw new Error("AUTH_USER_MISSING");
-        }
-
-        const workspace = await withTimeout(
-          firestoreTeamSyncService.getCurrentWorkspace(firebaseUser),
-          4500,
-          "WORKSPACE_LOAD"
-        );
-
-        if (!isActive) return;
-
-        if (workspace === null || workspace.club === null) {
-          setDashboardData(null);
-          setNeedsSetup(true);
-          setStatusMessage(copy.setup);
-          return;
-        }
-
-        const [teams, scheduleEvents] = await Promise.all([
-          safeLoadTeams(workspace.club.id),
-          safeLoadScheduleEvents(firebaseUser),
-        ]);
-
-        if (!isActive) return;
-
-        setDashboardData({
-          club: workspace.club,
-          currentUser: workspace.currentUser,
-          teams,
-          scheduleEvents,
-        });
-        setStatusMessage(copy.ready);
-      } catch (error) {
-        const detail = getErrorCode(error);
-        console.warn("Dashboard workspace could not be loaded.", error);
-        if (isActive) {
-          setDashboardData(null);
-          setStatusMessage(copy.error);
-          setErrorDetail(detail);
-        }
-      }
-    }
-
-    loadDashboard();
-
-    return () => {
-      isActive = false;
-    };
-  }, [copy, loadVersion]);
-
-  if (dashboardData === null) {
+  if (appData === null && isLoading) {
     return (
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-        <View style={styles.container}>
-          <View style={styles.loadingCard}>
-            <Text style={styles.logo}>MaviTeam</Text>
-            <Text style={styles.loadingTitle}>{needsSetup ? copy.setup : copy.pageTitle}</Text>
-            <Text style={styles.loadingText}>{needsSetup ? copy.setupText : statusMessage}</Text>
-            {errorDetail !== "" && <Text style={styles.errorDetail}>{copy.details}: {errorDetail}</Text>}
-            <View style={styles.loadingActions}>
-              <AppButton title={copy.retry} onPress={() => setLoadVersion((value) => value + 1)} />
-              <AppButton title={copy.createClub} variant="secondary" onPress={() => router.replace("/create-club" as never)} />
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+      <AppScreenLayout variant="wide">
+        <LoadingState label={copy.loading} />
+      </AppScreenLayout>
     );
   }
 
-  const { club, currentUser, teams, scheduleEvents } = dashboardData;
+  if (appData === null && appDataError !== null) {
+    return (
+      <AppScreenLayout variant="wide">
+        <ErrorState
+          title={copy.error}
+          description={copy.errorDescription}
+          retryLabel={copy.retry}
+          onRetry={() => {
+            refresh().catch(() => {});
+          }}
+        />
+      </AppScreenLayout>
+    );
+  }
+
+  if (appData === null) {
+    return (
+      <AppScreenLayout variant="wide">
+        <LoadingState label={copy.loading} />
+      </AppScreenLayout>
+    );
+  }
+
+  if (appData.club.id === "") {
+    return (
+      <AppScreenLayout variant="wide">
+        <EmptyState
+          title={copy.setup}
+          description={copy.setupText}
+          actionLabel={copy.createClub}
+          onAction={() => router.replace("/create-club" as never)}
+        />
+      </AppScreenLayout>
+    );
+  }
+
+  const { club, currentUser, teams, scheduleEvents, payments, joinRequests, announcements } = appData;
   const upcomingEvents = getUpcomingEvents(scheduleEvents);
   const quickActions = copy.quickActionsByRole[currentUser.role];
 
+  const pendingApprovalsCount = joinRequests.filter((request) => request.status === "pending").length;
+  const myOutstandingPaymentsCount = payments.filter(
+    (payment) => payment.userId === currentUser.id && payment.status !== "paid"
+  ).length;
+  const showPendingApprovals = (currentUser.role === "clubAdmin" || currentUser.role === "superAdmin") && pendingApprovalsCount > 0;
+  const showOutstandingPayments = myOutstandingPaymentsCount > 0;
+
+  const latestAnnouncement = [...announcements].sort(
+    (first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+  )[0];
+
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.topBar}>
-          <View>
-            <Text style={styles.logo}>MaviTeam</Text>
-            <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
-          </View>
-          <View style={styles.systemBadge}>
-            <View style={styles.systemDot} />
-            <Text style={styles.systemBadgeText}>{statusMessage}</Text>
-          </View>
+    <AppScreenLayout variant="wide">
+      <View style={styles.topBar}>
+        <View>
+          <Text style={styles.logo}>MaviTeam</Text>
+          <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
         </View>
-
-        <View style={styles.pageHeader}>
-          <View style={styles.pageTitleArea}>
-            <Text style={styles.pageEyebrow}>{copy.pageTitle}</Text>
-            <Text style={styles.welcome}>{copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}</Text>
-            <Text style={styles.subtitle}>{club.name}</Text>
-          </View>
-          <AppButton title={copy.editProfile} variant="secondary" style={styles.editProfileButton} onPress={() => router.push("/profile" as never)} />
-        </View>
-
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}><Text style={styles.statHint}>{copy.activeClub}</Text><Text style={styles.statValue}>1</Text><Text style={styles.statLabel}>{club.name}</Text></View>
-          <View style={styles.statCard}><Text style={styles.statHint}>{copy.teams}</Text><Text style={styles.statValue}>{teams.length}</Text><Text style={styles.statLabel}>{copy.teams}</Text></View>
-          <View style={styles.statCard}><Text style={styles.statHint}>{copy.events}</Text><Text style={styles.statValue}>{scheduleEvents.length}</Text><Text style={styles.statLabel}>{copy.events}</Text></View>
-          <View style={styles.statCard}><Text style={styles.statHint}>{copy.role}</Text><Text style={styles.statValueSmall}>{currentUser.role}</Text><Text style={styles.statLabel}>{currentUser.status}</Text></View>
-        </View>
-
-        <View style={styles.mainGrid}>
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>{copy.quickActions}</Text>
-            <View style={styles.actionGrid}>
-              {quickActions.map((action) => (
-                <Pressable key={action.title} onPress={() => router.push(action.route as never)} style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}>
-                  <View style={styles.actionTextArea}>
-                    <Text style={styles.actionText}>{action.title}</Text>
-                    <Text style={styles.actionMeta}>{action.meta}</Text>
-                  </View>
-                  <Text style={styles.actionOpenText}>{copy.open}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>{copy.upcomingEvents}</Text>
-            {upcomingEvents.length === 0 ? (
-              <Text style={styles.emptyText}>{copy.noEvents}</Text>
-            ) : upcomingEvents.map((event) => (
-              <View key={event.id} style={styles.eventCard}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
-                <Text style={styles.eventLocation}>{event.location}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.panel}>
-          <Text style={styles.panelTitle}>{copy.activeClub}</Text>
-          <View style={styles.overviewGrid}>
-            <View style={styles.infoCard}><Text style={styles.infoLabel}>{copy.clubCode}</Text><Text style={styles.infoValue}>{club.code}</Text></View>
-            <View style={styles.infoCard}><Text style={styles.infoLabel}>{copy.city}</Text><Text style={styles.infoValue}>{club.city || copy.noCity}</Text></View>
-          </View>
+        <View style={styles.systemBadge}>
+          <View style={styles.systemDot} />
+          <Text style={styles.systemBadgeText}>{copy.ready}</Text>
         </View>
       </View>
-    </ScrollView>
+
+      <Card style={styles.pageHeader}>
+        <View style={styles.pageTitleArea}>
+          <Text style={styles.pageEyebrow}>{copy.pageTitle}</Text>
+          <Text style={styles.welcome}>{copy.welcome}, {getFirstName(currentUser.fullName, copy.userFallback)}</Text>
+          <Text style={styles.subtitle}>{club.name}</Text>
+          <StatusBadge label={copy.roleLabels[currentUser.role]} tone="info" style={styles.roleBadge} />
+        </View>
+        <AppButton title={copy.editProfile} variant="secondary" style={styles.editProfileButton} onPress={() => router.push("/profile" as never)} />
+      </Card>
+
+      {showPendingApprovals || showOutstandingPayments ? (
+        <View style={[styles.highlightRow, isDesktop ? null : styles.highlightRowStacked]}>
+          {showPendingApprovals ? (
+            <Pressable onPress={() => router.push("/pending-approvals" as never)} style={({ pressed }) => [styles.highlightCardWrapper, pressed ? styles.cardPressed : null]}>
+              <Card variant="elevated" style={styles.highlightCard}>
+                <StatusBadge label={copy.pendingApprovals} tone="warning" />
+                <Text style={styles.highlightValue}>{pendingApprovalsCount}</Text>
+                <Text style={styles.highlightMeta}>{copy.pendingApprovalsMeta}</Text>
+              </Card>
+            </Pressable>
+          ) : null}
+
+          {showOutstandingPayments ? (
+            <Pressable onPress={() => router.push("/payments" as never)} style={({ pressed }) => [styles.highlightCardWrapper, pressed ? styles.cardPressed : null]}>
+              <Card variant="elevated" style={styles.highlightCard}>
+                <StatusBadge label={copy.outstandingPayments} tone="danger" />
+                <Text style={styles.highlightValue}>{myOutstandingPaymentsCount}</Text>
+                <Text style={styles.highlightMeta}>{copy.outstandingPaymentsMeta}</Text>
+              </Card>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      <View style={styles.statsGrid}>
+        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.activeClub}</Text><Text style={styles.statValue}>1</Text><Text style={styles.statLabel}>{club.name}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.teams}</Text><Text style={styles.statValue}>{teams.length}</Text><Text style={styles.statLabel}>{copy.teams}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.events}</Text><Text style={styles.statValue}>{scheduleEvents.length}</Text><Text style={styles.statLabel}>{copy.events}</Text></Card>
+        <Card style={styles.statCard}>
+          <Text style={styles.statHint}>{copy.role}</Text>
+          <StatusBadge label={copy.roleLabels[currentUser.role]} tone="neutral" style={styles.statRoleBadge} />
+        </Card>
+      </View>
+
+      <View style={[styles.mainGrid, isDesktop ? null : styles.mainGridStacked]}>
+        <Card style={styles.panel}>
+          <Text style={styles.panelTitle}>{copy.quickActions}</Text>
+          <View style={styles.actionGrid}>
+            {quickActions.map((action) => (
+              <Pressable key={action.title} onPress={() => router.push(action.route as never)} style={({ pressed }) => [styles.actionCard, pressed ? styles.cardPressed : null]}>
+                <View style={styles.actionTextArea}>
+                  <Text style={styles.actionText}>{action.title}</Text>
+                  <Text style={styles.actionMeta}>{action.meta}</Text>
+                </View>
+                <Text style={styles.actionOpenText}>{copy.open}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Card>
+
+        <Card style={styles.panel}>
+          <Text style={styles.panelTitle}>{copy.upcomingEvents}</Text>
+          {upcomingEvents.length === 0 ? (
+            <Text style={styles.emptyText}>{copy.noEvents}</Text>
+          ) : upcomingEvents.map((event) => (
+            <View key={event.id} style={styles.eventCard}>
+              <Text style={styles.eventTitle}>{event.title}</Text>
+              <Text style={styles.eventTime}>{formatEventTime(event.startsAt, locale)}</Text>
+              <Text style={styles.eventLocation}>{event.location}</Text>
+            </View>
+          ))}
+        </Card>
+      </View>
+
+      <Card style={styles.panel}>
+        <View style={styles.panelHeaderRow}>
+          <Text style={styles.panelTitle}>{copy.latestAnnouncement}</Text>
+          <Pressable onPress={() => router.push("/announcements" as never)}>
+            <Text style={styles.viewAllText}>{copy.viewAll}</Text>
+          </Pressable>
+        </View>
+
+        {latestAnnouncement === undefined ? (
+          <Text style={styles.emptyText}>{copy.noAnnouncements}</Text>
+        ) : (
+          <Pressable onPress={() => router.push("/announcements" as never)} style={({ pressed }) => [styles.announcementCard, pressed ? styles.cardPressed : null]}>
+            <View style={styles.announcementHeaderRow}>
+              <Text style={styles.announcementTitle} numberOfLines={1}>{latestAnnouncement.title}</Text>
+              <Text style={styles.announcementDate}>{formatAnnouncementDate(latestAnnouncement.createdAt, locale)}</Text>
+            </View>
+            <Text style={styles.announcementMessage} numberOfLines={2}>{latestAnnouncement.message}</Text>
+          </Pressable>
+        )}
+      </Card>
+
+      <Card style={styles.panel}>
+        <Text style={styles.panelTitle}>{copy.activeClub}</Text>
+        <View style={styles.overviewGrid}>
+          <View style={styles.infoCard}><Text style={styles.infoLabel}>{copy.clubCode}</Text><Text style={styles.infoValue}>{club.code}</Text></View>
+          <View style={styles.infoCard}><Text style={styles.infoLabel}>{copy.city}</Text><Text style={styles.infoValue}>{club.city || copy.noCity}</Text></View>
+        </View>
+      </Card>
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: { padding: theme.spacing.xl, paddingBottom: theme.spacing["4xl"] },
-  container: { width: "100%", maxWidth: 1180, alignSelf: "center", gap: theme.spacing.xl },
-  loadingCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing["3xl"], ...theme.shadows.md },
-  loadingTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xl },
-  loadingText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.bold, marginTop: theme.spacing.md },
-  errorDetail: { color: theme.colors.text.danger, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginTop: theme.spacing.md },
-  loadingActions: { marginTop: theme.spacing.xl, alignSelf: "flex-start", gap: theme.spacing.md },
+  topBar: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
   logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
-  topBar: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg },
   topBarSub: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
   systemBadge: { borderRadius: theme.radius.full, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
   systemDot: { width: 8, height: 8, borderRadius: theme.radius.full, backgroundColor: theme.colors.state.success },
   systemBadgeText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
-  pageHeader: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing["2xl"], flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.xl },
-  pageTitleArea: { flex: 1 },
-  pageEyebrow: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+
+  pageHeader: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  pageTitleArea: { flex: 1, gap: theme.spacing.sm },
+  pageEyebrow: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   welcome: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black },
-  subtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.bold, marginTop: theme.spacing.sm },
+  subtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.bold },
+  roleBadge: { marginTop: theme.spacing.xs },
   editProfileButton: { alignSelf: "flex-start" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  statCard: { flexGrow: 1, flexBasis: 160, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg },
+
+  highlightRow: { flexDirection: "row", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  highlightRowStacked: { flexDirection: "column" },
+  highlightCardWrapper: { flex: 1 },
+  highlightCard: { gap: theme.spacing.sm },
+  highlightValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black },
+  highlightMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing.xl },
+  statCard: { flexGrow: 1, flexBasis: 160, padding: theme.spacing.lg },
   statHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black },
   statValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black, marginVertical: theme.spacing.xs },
-  statValueSmall: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginVertical: theme.spacing.sm },
   statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.bold },
-  mainGrid: { flexDirection: "row", gap: theme.spacing.xl },
-  panel: { flex: 1, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, gap: theme.spacing.lg },
+  statRoleBadge: { marginTop: theme.spacing.sm },
+
+  mainGrid: { flexDirection: "row", gap: theme.spacing.xl, marginBottom: theme.spacing.xl },
+  mainGridStacked: { flexDirection: "column" },
+  panel: { flex: 1, gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  panelHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   panelTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
+  viewAllText: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+
   actionGrid: { gap: theme.spacing.md },
   actionCard: { borderRadius: theme.radius.xl, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
   actionTextArea: { flex: 1 },
   actionText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
   actionMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xs },
   actionOpenText: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+
   eventCard: { borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.md, gap: theme.spacing.xs },
   eventTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   eventTime: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
   eventLocation: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+
+  announcementCard: { borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.lg, gap: theme.spacing.xs },
+  announcementHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: theme.spacing.md },
+  announcementTitle: { flex: 1, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  announcementDate: { color: theme.colors.text.muted, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.bold },
+  announcementMessage: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.sm },
+
   emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+
   overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
   infoCard: { flexGrow: 1, flexBasis: 180, borderRadius: theme.radius.lg, backgroundColor: theme.colors.background.subtle, padding: theme.spacing.md },
   infoLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black },
   infoValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginTop: theme.spacing.xs },
+
   cardPressed: { opacity: 0.72 },
 });

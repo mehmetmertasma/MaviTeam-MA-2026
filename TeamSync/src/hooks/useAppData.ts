@@ -53,6 +53,8 @@ export function useAppData(enabled: boolean, identityKey: string) {
 
       return nextAppData;
     } catch (error) {
+      console.error("[TeamSync] Shared app data fetch failed:", error);
+
       if (isMountedRef.current) {
         setState((current) => ({ ...current, isLoading: false, error }));
       }

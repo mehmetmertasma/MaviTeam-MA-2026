@@ -1,10 +1,9 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
-import { teamSyncService } from "@/services/teamSyncService";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import type { ScheduleEvent, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
 type AvailabilityStatus = "available" | "notAvailable" | "notAnswered";
@@ -49,32 +48,18 @@ function getVisibleUsersForEvent(event: ScheduleEvent | undefined, users: UserPr
 }
 
 export default function AvailabilityScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
-  const [selectedEventId, setSelectedEventId] = useState("");
+  const { appData } = useAppDataContext();
+  const [selectedEventIdState, setSelectedEventId] = useState("");
   const [statusByUserId, setStatusByUserId] = useState<Record<string, AvailabilityStatus>>({});
   const [noteByUserId, setNoteByUserId] = useState<Record<string, string>>({});
-  const [myNote, setMyNote] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Uygunluk bilgileri merkezi TeamSync datasından yüklenecek.");
+  const [myNoteState, setMyNote] = useState("");
+  const [statusMessage, setStatusMessage] = useState("Uygunluk bilgileri merkezi TeamSync datasından yüklendi.");
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
-
-  const loadAvailabilityData = useCallback(async () => {
-    try {
-      const loadedAppData = await teamSyncService.getAppData();
-      const firstEventId = loadedAppData.scheduleEvents[0]?.id ?? "";
-
-      setAppData(loadedAppData);
-      setSelectedEventId((currentEventId) => currentEventId || firstEventId);
-      setMyNote((currentNote) => currentNote || noteByUserId[loadedAppData.currentUser.id] || "");
-      setStatusMessage("Uygunluk bilgileri merkezi TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Uygunluk bilgileri yüklenirken bir sorun oluştu.");
-    }
-  }, [noteByUserId]);
-
-  useFocusEffect(useCallback(() => { loadAvailabilityData(); }, [loadAvailabilityData]));
 
   const events = appData?.scheduleEvents ?? EMPTY_EVENTS;
   const users = appData?.users ?? EMPTY_USERS;
+  const selectedEventId = selectedEventIdState || events[0]?.id || "";
+  const myNote = myNoteState || (appData !== null ? noteByUserId[appData.currentUser.id] ?? "" : "");
   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? events[0];
   const visibleUsers = getVisibleUsersForEvent(selectedEvent, users, appData);
   const userCanViewTeamList = canViewTeamList(appData);

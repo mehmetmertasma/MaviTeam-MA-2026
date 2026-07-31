@@ -1,12 +1,11 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
-import { teamSyncService } from "@/services/teamSyncService";
-import type { Team, TeamSyncAppData, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import type { Team, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
 
 type EditableRole = Exclude<UserRole, "superAdmin">;
 
@@ -83,30 +82,23 @@ function getMemberErrorMessage(error: unknown) {
 }
 
 export default function MembersScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, refresh } = useAppDataContext();
   const [selectedUserId, setSelectedUserId] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
   const [draftRole, setDraftRole] = useState<EditableRole>("athlete");
   const [draftStatus, setDraftStatus] = useState<UserStatus>("active");
   const [draftTeamIds, setDraftTeamIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Üyeler MaviTeam kulüp datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState("Üyeler MaviTeam kulüp datasından yüklendi.");
 
-  const loadMembersData = useCallback(async () => {
+  async function refreshMembersData() {
     try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
+      await refresh();
       setStatusMessage("Üyeler MaviTeam kulüp datasından yüklendi.");
     } catch {
       setStatusMessage("Üyeler yüklenirken bir sorun oluştu.");
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadMembersData();
-    }, [loadMembersData])
-  );
+  }
 
   const users = appData?.users ?? EMPTY_USERS;
   const teams = appData?.teams ?? EMPTY_TEAMS;
@@ -184,8 +176,7 @@ export default function MembersScreen() {
         teamIds: draftStatus === "removed" ? [] : draftTeamIds,
       });
 
-      const refreshedData = await teamSyncService.getAppData();
-      setAppData(refreshedData);
+      await refresh();
       setEditingUserId("");
       setStatusMessage(`${member.fullName} bilgileri kaydedildi.`);
     } catch (memberError) {
@@ -222,7 +213,7 @@ export default function MembersScreen() {
               <Text style={styles.sectionTitle}>Kulüp üyeleri</Text>
               <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
             </View>
-            <Pressable onPress={loadMembersData} style={({ pressed }) => [styles.refreshButton, pressed ? styles.pressed : null]}>
+            <Pressable onPress={refreshMembersData} style={({ pressed }) => [styles.refreshButton, pressed ? styles.pressed : null]}>
               <Text style={styles.refreshButtonText}>Yenile</Text>
             </Pressable>
           </View>

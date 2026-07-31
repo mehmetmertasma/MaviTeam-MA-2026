@@ -4,10 +4,11 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { JoinRequest, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import type { JoinRequest, UserProfile } from "@/types/teamSync";
 
 type RequestRow = {
   request: JoinRequest;
@@ -42,7 +43,7 @@ function formatDate(value: string) {
 }
 
 export default function PendingApprovalsScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, refresh, setAppData } = useAppDataContext();
   const [firestoreRows, setFirestoreRows] = useState<RequestRow[] | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet."
@@ -61,19 +62,17 @@ export default function PendingApprovalsScreen() {
 
         const rows = await firestoreTeamSyncService.listJoinRequestRowsForCurrentClub(firebaseUser);
         setFirestoreRows(rows);
-        setAppData(null);
         setStatusMessage("Bekleyen istekler Firestore kulüp datasından yüklendi.");
         return;
       }
 
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
+      await refresh();
       setFirestoreRows(null);
       setStatusMessage("Bekleyen istekler local TeamSync datasından yüklendi.");
     } catch (approvalError) {
       setStatusMessage(getAuthErrorMessage(approvalError));
     }
-  }, []);
+  }, [refresh]);
 
   useFocusEffect(
     useCallback(() => {

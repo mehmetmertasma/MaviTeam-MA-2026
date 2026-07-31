@@ -6,6 +6,7 @@ import { Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
+import { AppDataProvider } from "@/providers/AppDataProvider";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 import { LanguageProvider, useTranslation } from "@/localization";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
@@ -36,7 +37,9 @@ function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
       <LanguageProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <AppDataProvider>{children}</AppDataProvider>
+        </AuthProvider>
       </LanguageProvider>
     </SafeAreaProvider>
   );

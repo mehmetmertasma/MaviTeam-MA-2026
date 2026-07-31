@@ -6,6 +6,7 @@ import { AppButton } from "@/components/AppButton";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
@@ -111,7 +112,7 @@ function getProfileCopy(language: "tr" | "en") {
 export default function ProfileScreen() {
   const { t, language } = useTranslation();
   const copy = getProfileCopy(language === "tr" ? "tr" : "en");
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, error: appDataError, setAppData } = useAppDataContext();
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -121,32 +122,13 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-
-      async function loadProfileData() {
-        try {
-          const loadedAppData = await teamSyncService.getAppData();
-
-          if (isActive) {
-            setAppData(loadedAppData);
-            setDraftProfileData(getFormDataFromAppData(loadedAppData));
-            setStatusMessage(t.profile.messages.loaded);
-          }
-        } catch (error) {
-          console.error("Failed to load profile data:", error);
-
-          if (isActive) {
-            setStatusMessage(t.profile.messages.failedToLoad);
-          }
-        }
+      if (appData !== null) {
+        setStatusMessage(t.profile.messages.loaded);
+      } else if (appDataError !== null) {
+        console.error("Failed to load profile data:", appDataError);
+        setStatusMessage(t.profile.messages.failedToLoad);
       }
-
-      loadProfileData();
-
-      return () => {
-        isActive = false;
-      };
-    }, [t.profile.messages.failedToLoad, t.profile.messages.loaded])
+    }, [appData, appDataError, t.profile.messages.failedToLoad, t.profile.messages.loaded])
   );
 
   function startEditing() {
@@ -214,8 +196,8 @@ export default function ProfileScreen() {
         await authService.logout();
       }
 
-      await teamSyncService.resetAppData();
-      setAppData(null);
+      const resetData = await teamSyncService.resetAppData();
+      setAppData(resetData);
       setDraftProfileData(emptyFormData);
       router.replace("/login" as never);
     } catch (logoutError) {

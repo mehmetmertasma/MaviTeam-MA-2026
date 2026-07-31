@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
@@ -44,38 +45,40 @@ function canPublishAnnouncements(role: UserRole) {
 }
 
 export default function AnnouncementsScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData: contextAppData, setAppData: setContextAppData } = useAppDataContext();
+  const [firestoreAnnouncements, setFirestoreAnnouncements] = useState<Announcement[] | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklendi.");
+
+  // Admins need the full club announcement list, not just the ones visible
+  // to the current user, so this overlays a dedicated Firestore fetch on top
+  // of the shared appData rather than pulling announcements from it directly.
+  const appData = useMemo(() => {
+    if (contextAppData === null) return null;
+    if (firestoreAnnouncements === null) return contextAppData;
+    return { ...contextAppData, announcements: firestoreAnnouncements };
+  }, [contextAppData, firestoreAnnouncements]);
 
   const loadAnnouncementsData = useCallback(async () => {
     try {
-      const loadedAppData = await teamSyncService.getAppData();
-
       if (authService.isConfigured()) {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setAppData(loadedAppData);
           setStatusMessage("Duyuruları görmek için giriş yapmalısın.");
           return;
         }
 
-        const firestoreAnnouncements = await firestoreTeamSyncService.listAnnouncementsForCurrentClub(firebaseUser);
-
-        setAppData({
-          ...loadedAppData,
-          announcements: firestoreAnnouncements,
-        });
+        const fetchedAnnouncements = await firestoreTeamSyncService.listAnnouncementsForCurrentClub(firebaseUser);
+        setFirestoreAnnouncements(fetchedAnnouncements);
         setStatusMessage("Duyurular Firestore kulüp datasından yüklendi.");
         return;
       }
 
-      setAppData(loadedAppData);
       setStatusMessage("Duyurular local TeamSync datasından yüklendi.");
     } catch (loadError) {
       setStatusMessage(getAuthErrorMessage(loadError));
@@ -174,7 +177,7 @@ export default function AnnouncementsScreen() {
         createdByUserId: appData.currentUser.id,
       });
 
-      setAppData(nextAppData);
+      setContextAppData(nextAppData);
       clearForm();
       setShowCreateForm(false);
       setStatusMessage("Duyuru local data service içine yayınlandı.");
@@ -207,7 +210,7 @@ export default function AnnouncementsScreen() {
       }
 
       const nextAppData = await teamSyncService.removeAnnouncement(announcementId);
-      setAppData(nextAppData);
+      setContextAppData(nextAppData);
       setStatusMessage("Duyuru local datadan silindi.");
     } catch (deleteError) {
       setStatusMessage(getAuthErrorMessage(deleteError));

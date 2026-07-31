@@ -1,9 +1,9 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Payment, PaymentStatus, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
@@ -62,32 +62,29 @@ function parseAmountToCents(amountText: string) {
 }
 
 export default function PaymentsScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, refresh, setAppData } = useAppDataContext();
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedUserIdState, setSelectedUserId] = useState("");
   const [paymentTitle, setPaymentTitle] = useState("");
   const [amountText, setAmountText] = useState("");
   const [dueDateText, setDueDateText] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Ödeme kayıtları merkezi TeamSync datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState("Ödeme kayıtları merkezi TeamSync datasından yüklendi.");
 
-  const loadPaymentsData = useCallback(async () => {
+  const users = appData?.users ?? EMPTY_USERS;
+  const selectedUserId = users.some((user) => user.id === selectedUserIdState && user.status !== "removed")
+    ? selectedUserIdState
+    : users.find((user) => user.status !== "removed")?.id ?? "";
+
+  async function refreshPaymentsData() {
     try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
-      setSelectedUserId((currentUserId) => {
-        const currentStillExists = loadedAppData.users.some((user) => user.id === currentUserId && user.status !== "removed");
-        return currentStillExists ? currentUserId : loadedAppData.users.find((user) => user.status !== "removed")?.id ?? "";
-      });
+      await refresh();
       setStatusMessage("Ödeme kayıtları merkezi TeamSync datasından yüklendi.");
     } catch {
       setStatusMessage("Ödemeler yüklenirken bir sorun oluştu.");
     }
-  }, []);
-
-  useFocusEffect(useCallback(() => { loadPaymentsData(); }, [loadPaymentsData]));
+  }
 
   const payments = appData?.payments ?? EMPTY_PAYMENTS;
-  const users = appData?.users ?? EMPTY_USERS;
   const activeUsers = users.filter((user) => user.status !== "removed");
   const userCanManagePayments = canManagePayments(appData);
   const visiblePayments = userCanManagePayments || appData === null ? payments : payments.filter((payment) => payment.userId === appData.currentUser.id);
@@ -170,7 +167,7 @@ export default function PaymentsScreen() {
         {userCanManagePayments ? (
           <View style={styles.topActions}>
             <AppButton title={showCreateForm ? "Form açık" : "Yeni ödeme oluştur"} onPress={() => { setShowCreateForm(true); setStatusMessage("Yeni ödeme bilgilerini doldurabilirsin."); }} disabled={showCreateForm} style={styles.actionButton} />
-            <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={loadPaymentsData} style={styles.actionButton} />
+            <AppButton title="Merkezi datayı yenile" variant="ghost" onPress={refreshPaymentsData} style={styles.actionButton} />
           </View>
         ) : null}
 

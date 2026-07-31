@@ -1,12 +1,13 @@
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { router } from "expo-router";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { Team as TeamRecord, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import type { Team as TeamRecord, UserProfile } from "@/types/teamSync";
 
 const EMPTY_TEAMS: TeamRecord[] = [];
 const EMPTY_USERS: UserProfile[] = [];
@@ -55,40 +56,30 @@ function getAthleteCount(team: TeamRecord, users: UserProfile[]) {
 }
 
 export default function TeamsScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState("");
+  const { appData, refresh, setAppData } = useAppDataContext();
+  const [selectedTeamIdState, setSelectedTeamId] = useState("");
   const [pendingRemoveTeamId, setPendingRemoveTeamId] = useState("");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
   const [coachName, setCoachName] = useState("");
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklendi.");
 
-  const loadTeamsData = useCallback(async () => {
+  const teams = appData?.teams ?? EMPTY_TEAMS;
+  const users = appData?.users ?? EMPTY_USERS;
+  const selectedTeamId = teams.some((team) => team.id === selectedTeamIdState) ? selectedTeamIdState : "";
+
+  async function refreshTeamsData() {
     try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
-      setSelectedTeamId((currentTeamId) => {
-        const currentStillExists = loadedAppData.teams.some((team) => team.id === currentTeamId);
-        return currentStillExists ? currentTeamId : "";
-      });
+      await refresh();
       setPendingRemoveTeamId("");
       setStatusMessage("Takımlar merkezi TeamSync datasından yüklendi.");
     } catch (loadError) {
       console.warn("Teams data could not be loaded.", loadError);
       setStatusMessage(getAuthErrorMessage(loadError));
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadTeamsData();
-    }, [loadTeamsData])
-  );
-
-  const teams = appData?.teams ?? EMPTY_TEAMS;
-  const users = appData?.users ?? EMPTY_USERS;
+  }
 
   const totalMembers = useMemo(() => {
     return teams.reduce((total, team) => total + getTeamUsers(team, users).length, 0);
@@ -236,7 +227,7 @@ export default function TeamsScreen() {
           <AppButton
             title="Merkezi datayı yenile"
             variant="ghost"
-            onPress={loadTeamsData}
+            onPress={refreshTeamsData}
             style={styles.actionButton}
           />
         </View>

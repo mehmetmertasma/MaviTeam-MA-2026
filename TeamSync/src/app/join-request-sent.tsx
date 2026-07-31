@@ -1,51 +1,22 @@
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
-import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData } from "@/types/teamSync";
 
 export default function JoinRequestSentScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, refresh } = useAppDataContext();
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleLoadedAppData = useCallback((loadedAppData: TeamSyncAppData) => {
-    setAppData(loadedAppData);
-
-    if (loadedAppData.currentUser.status === "active" && loadedAppData.currentUser.clubId !== "") {
+  useEffect(() => {
+    if (appData !== null && appData.currentUser.status === "active" && appData.currentUser.clubId !== "") {
       router.replace("/dashboard" as never);
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-
-      async function loadRequestData() {
-        try {
-          const loadedAppData = await teamSyncService.getAppData();
-
-          if (isActive) {
-            handleLoadedAppData(loadedAppData);
-          }
-        } catch {
-          if (isActive) {
-            setAppData(null);
-          }
-        }
-      }
-
-      loadRequestData();
-
-      return () => {
-        isActive = false;
-      };
-    }, [handleLoadedAppData])
-  );
+  }, [appData]);
 
   const currentUser = appData?.currentUser;
   const currentClub = appData?.club;
@@ -60,10 +31,9 @@ export default function JoinRequestSentScreen() {
   async function handleRefreshStatus() {
     try {
       setIsRefreshing(true);
-      const loadedAppData = await teamSyncService.getAppData();
-      handleLoadedAppData(loadedAppData);
+      await refresh();
     } catch {
-      setAppData(null);
+      // Keep showing the last known status; the button stays available to retry.
     } finally {
       setIsRefreshing(false);
     }

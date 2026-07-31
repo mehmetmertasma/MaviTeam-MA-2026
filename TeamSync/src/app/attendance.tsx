@@ -1,9 +1,9 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { AttendanceStatus, ScheduleEvent, Team, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
@@ -96,43 +96,18 @@ function getSavedStatus(appData: TeamSyncAppData | null, userId: string, teamId:
 }
 
 export default function AttendanceScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
-  const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState("");
+  const { appData, setAppData } = useAppDataContext();
+  const [selectedTeamIdState, setSelectedTeamId] = useState("");
+  const [selectedEventIdState, setSelectedEventId] = useState("");
   const [attendanceDraft, setAttendanceDraft] = useState<Record<string, AttendanceStatus>>({});
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
   const [statusMessage, setStatusMessage] = useState("Önce takım ve antrenman seçerek yoklama alabilirsin.");
 
-  const loadAttendanceData = useCallback(async () => {
-    try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
-
-      setSelectedTeamId((currentTeamId) => {
-        const currentStillExists = loadedAppData.teams.some((team) => team.id === currentTeamId);
-        return currentStillExists ? currentTeamId : loadedAppData.teams[0]?.id ?? "";
-      });
-
-      setSelectedEventId((currentEventId) => {
-        const currentStillExists = loadedAppData.scheduleEvents.some((event) => event.id === currentEventId);
-        return currentStillExists ? currentEventId : "";
-      });
-
-      setStatusMessage("Takımlar ve program TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Yoklama datası yüklenirken bir sorun oluştu.");
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadAttendanceData();
-    }, [loadAttendanceData])
-  );
-
   const teams = appData?.teams ?? EMPTY_TEAMS;
   const users = appData?.users ?? EMPTY_USERS;
   const scheduleEvents = appData?.scheduleEvents ?? EMPTY_EVENTS;
+  const selectedTeamId = teams.some((team) => team.id === selectedTeamIdState) ? selectedTeamIdState : teams[0]?.id ?? "";
+  const selectedEventId = scheduleEvents.some((event) => event.id === selectedEventIdState) ? selectedEventIdState : "";
 
   const selectedTeam = useMemo(() => {
     return teams.find((team) => team.id === selectedTeamId);

@@ -1,5 +1,5 @@
 import { router, usePathname } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -7,7 +7,7 @@ import { AppDataDrawer } from "@/components/AppDataDrawer";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
-import { teamSyncService } from "@/services/teamSyncService";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 
 const routesWithoutTopControls = [
   "/",
@@ -37,32 +37,9 @@ export function AppGlobalNavigation() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const { appData } = useAppDataContext();
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
-  const [profileInitials, setProfileInitials] = useState("MT");
-
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadProfileInitials() {
-      try {
-        const currentUser = await teamSyncService.getCurrentUser();
-
-        if (isActive) {
-          setProfileInitials(getInitials(currentUser.fullName));
-        }
-      } catch {
-        if (isActive) {
-          setProfileInitials("MT");
-        }
-      }
-    }
-
-    loadProfileInitials();
-
-    return () => {
-      isActive = false;
-    };
-  }, [pathname]);
+  const profileInitials = getInitials(appData?.currentUser.fullName ?? "");
 
   if (routesWithoutTopControls.includes(pathname)) {
     return null;

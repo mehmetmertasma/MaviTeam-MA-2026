@@ -1,5 +1,4 @@
-import { useFocusEffect } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +13,7 @@ import {
 import { AppButton } from "@/components/AppButton";
 import { GroupMemberBubble, type GroupMember } from "@/components/GroupMemberBubble";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 
@@ -97,7 +97,7 @@ function toGroupMembers(group: ChatGroup, appData: TeamSyncAppData): GroupMember
 }
 
 export default function MessagesScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData, setAppData } = useAppDataContext();
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [draftText, setDraftText] = useState("");
   const [showDirectPicker, setShowDirectPicker] = useState(false);
@@ -106,23 +106,7 @@ export default function MessagesScreen() {
   const [newConversationTargetId, setNewConversationTargetId] = useState("all-club");
   const [newConversationMessage, setNewConversationMessage] = useState("");
   const [openMemberListGroupId, setOpenMemberListGroupId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Mesajlar merkezi TeamSync datasından yüklenecek.");
-
-  const loadMessagesData = useCallback(async () => {
-    try {
-      const loadedAppData = await teamSyncService.getAppData();
-      setAppData(loadedAppData);
-      setStatusMessage("Mesajlar merkezi TeamSync datasından yüklendi.");
-    } catch {
-      setStatusMessage("Mesajlar yüklenirken bir sorun oluştu.");
-    }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadMessagesData();
-    }, [loadMessagesData])
-  );
+  const [statusMessage, setStatusMessage] = useState("Mesajlar merkezi TeamSync datasından yüklendi.");
 
   const chatGroups = appData?.chatGroups ?? EMPTY_CHAT_GROUPS;
   const chatMessages = appData?.chatMessages ?? EMPTY_CHAT_MESSAGES;

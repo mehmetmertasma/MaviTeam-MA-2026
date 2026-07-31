@@ -4,6 +4,7 @@ import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } fro
 
 import { AppButton } from "@/components/AppButton";
 import { theme } from "@/constants/theme";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 import { firestoreReplayLinkService } from "@/services/firestoreReplayLinkService";
 import { teamSyncService } from "@/services/teamSyncService";
@@ -88,7 +89,8 @@ function getAllowedTargetOptions(appData: TeamSyncAppData | null): TargetOption[
 }
 
 export default function ReplaysScreen() {
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const { appData: contextAppData, setAppData: setContextAppData } = useAppDataContext();
+  const [replaysOverride, setReplaysOverride] = useState<Replay[] | null>(null);
   const [activeFilter, setActiveFilter] = useState<ReplayFilter>("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -96,18 +98,24 @@ export default function ReplaysScreen() {
   const [replayUrl, setReplayUrl] = useState("");
   const [selectedType, setSelectedType] = useState<ReplayType>("match");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
-  const [statusMessage, setStatusMessage] = useState("Replay linkleri MaviTeam datasından yüklenecek.");
+  const [statusMessage, setStatusMessage] = useState("Replay linkleri MaviTeam datasından yüklendi.");
+
+  // Firestore-backed replay visibility (visibleUserIds) is more precise than
+  // the shared appData's copy, so this overlays a dedicated fetch on top of
+  // the shared appData instead of reading replays from it directly.
+  const appData = useMemo(() => {
+    if (contextAppData === null) return null;
+    if (replaysOverride === null) return contextAppData;
+    return { ...contextAppData, replays: replaysOverride };
+  }, [contextAppData, replaysOverride]);
 
   const loadReplayData = useCallback(async () => {
     try {
-      const loadedAppData = await teamSyncService.getAppData();
       const firebaseUser = authService.getCurrentUser();
 
       if (authService.isConfigured() && firebaseUser !== null) {
         const firestoreReplays = await firestoreReplayLinkService.listVisibleReplaysForCurrentUser(firebaseUser);
-        setAppData({ ...loadedAppData, replays: firestoreReplays });
-      } else {
-        setAppData(loadedAppData);
+        setReplaysOverride(firestoreReplays);
       }
 
       setStatusMessage("Replay linkleri MaviTeam datasından yüklendi.");
@@ -116,7 +124,11 @@ export default function ReplaysScreen() {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { loadReplayData(); }, [loadReplayData]));
+  useFocusEffect(
+    useCallback(() => {
+      loadReplayData();
+    }, [loadReplayData])
+  );
 
   const replays = appData?.replays ?? EMPTY_REPLAYS;
   const users = appData?.users ?? EMPTY_USERS;
@@ -197,7 +209,7 @@ export default function ReplaysScreen() {
           visibleUserIds,
           createdByUserId: appData.currentUser.id,
         });
-        setAppData(nextAppData);
+        setContextAppData(nextAppData);
       }
 
       clearForm();
@@ -218,7 +230,7 @@ export default function ReplaysScreen() {
         await loadReplayData();
       } else {
         const nextAppData = await teamSyncService.removeReplay(replayId);
-        setAppData(nextAppData);
+        setContextAppData(nextAppData);
       }
 
       setStatusMessage("Replay linki kaldırıldı.");

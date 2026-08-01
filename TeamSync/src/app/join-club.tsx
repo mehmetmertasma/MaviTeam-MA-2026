@@ -1,11 +1,13 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { theme } from "@/constants/theme";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
+import { Typography, theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
@@ -103,7 +105,7 @@ export default function JoinClubScreen() {
         <AppBackButton fallbackHref="/" />
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.badge}>{t.joinClub.badge}</Text>
+        <StatusBadge label={t.joinClub.badge} tone="info" style={styles.badge} />
 
         <Text style={styles.title}>{t.joinClub.title}</Text>
 
@@ -121,19 +123,14 @@ export default function JoinClubScreen() {
         </View>
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.joinClub.invitationCodeLabel}</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder={t.joinClub.invitationCodePlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              value={inviteCode}
-              onChangeText={handleInviteCodeChange}
-              autoCapitalize="characters"
-              accessibilityLabel={t.joinClub.accessibility.invitationCode}
-            />
-          </View>
+          <TextField
+            label={t.joinClub.invitationCodeLabel}
+            placeholder={t.joinClub.invitationCodePlaceholder}
+            value={inviteCode}
+            onChangeText={handleInviteCodeChange}
+            autoCapitalize="characters"
+            accessibilityLabel={t.joinClub.accessibility.invitationCode}
+          />
         </View>
 
         {error !== "" && <Text style={styles.errorText}>{error}</Text>}
@@ -172,37 +169,25 @@ const styles = StyleSheet.create({
   },
   card: { padding: theme.spacing["3xl"] },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
     alignSelf: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.pageTitle,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    ...Typography.body,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
   },
   infoBox: {
@@ -215,44 +200,20 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   infoTitle: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.label,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   infoText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   form: { width: "100%", gap: theme.spacing.lg },
-  inputGroup: { width: "100%" },
-  label: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  input: {
-    width: "100%",
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.fontSizes.lg,
-    color: theme.colors.text.primary,
-  },
   errorText: {
+    ...Typography.supporting,
     marginTop: theme.spacing.lg,
     color: theme.colors.text.danger,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
-    lineHeight: theme.lineHeights.md,
   },
   buttonGroup: {
     width: "100%",

@@ -75,6 +75,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
 });

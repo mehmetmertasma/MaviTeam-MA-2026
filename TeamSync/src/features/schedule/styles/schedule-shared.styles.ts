@@ -22,24 +22,15 @@ export const scheduleSharedStyles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
   sectionSubtitle: {
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-  },
-  statusPill: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
   },
   actionRow: {
     flexDirection: "row",

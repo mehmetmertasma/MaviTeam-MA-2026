@@ -49,14 +49,14 @@ const styles = StyleSheet.create({
   icon: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
     textAlignVertical: "center",
   },
   label: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
     textAlignVertical: "center",
   },

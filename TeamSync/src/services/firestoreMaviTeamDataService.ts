@@ -463,10 +463,10 @@ export const firestoreMaviTeamDataService = {
       return sortNewestFirst(adminSnapshots.docs.map(getAttendanceRecordFromFirestore));
     }
 
-    if (workspace.currentUser.role === "coach" && workspace.currentUser.teamIds.length > 0) {
-      const coachQuery = query(collection(db, "attendanceRecords"), where("clubId", "==", workspace.club.id), where("teamId", "in", workspace.currentUser.teamIds.slice(0, 10)), firestoreLimit(maxResults));
-      const coachSnapshots = await getDocs(coachQuery);
-      return sortNewestFirst(coachSnapshots.docs.map(getAttendanceRecordFromFirestore));
+    if (workspace.currentUser.teamIds.length > 0) {
+      const teamQuery = query(collection(db, "attendanceRecords"), where("clubId", "==", workspace.club.id), where("teamId", "in", workspace.currentUser.teamIds.slice(0, 10)), firestoreLimit(maxResults));
+      const teamSnapshots = await getDocs(teamQuery);
+      return sortNewestFirst(teamSnapshots.docs.map(getAttendanceRecordFromFirestore));
     }
 
     const selfQuery = query(collection(db, "attendanceRecords"), where("clubId", "==", workspace.club.id), where("userId", "==", firebaseUser.uid), firestoreLimit(maxResults));

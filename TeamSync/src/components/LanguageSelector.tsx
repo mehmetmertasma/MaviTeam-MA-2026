@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   title: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   subtitle: {
     color: theme.colors.text.secondary,
@@ -106,14 +106,14 @@ const styles = StyleSheet.create({
   metaLabel: {
     color: theme.colors.text.muted,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.medium,
     textTransform: "uppercase",
     marginBottom: 2,
   },
   toggleText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   compactToggleText: {
     fontSize: theme.fontSizes.sm,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   nextPillText: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   pressed: {
     opacity: 0.84,

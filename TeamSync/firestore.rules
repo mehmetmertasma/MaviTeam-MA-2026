@@ -110,7 +110,7 @@ service cloud.firestore {
         && (
           currentUserIsClubAdmin()
           || data.userId == request.auth.uid
-          || (currentUserIsCoach() && isCurrentUsersTeamData(data))
+          || isCurrentUsersTeamData(data)
         );
     }
 

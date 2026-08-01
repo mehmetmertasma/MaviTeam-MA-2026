@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
   menuIcon: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginTop: -2,
   },
   backButton: {
@@ -170,14 +170,14 @@ const styles = StyleSheet.create({
   backIcon: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
     textAlignVertical: "center",
   },
   backText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
     textAlignVertical: "center",
   },
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   profileText: {
     color: theme.colors.text.inverse,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   profileSpacer: {
     width: 44,

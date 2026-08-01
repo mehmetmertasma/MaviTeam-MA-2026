@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { theme } from "@/constants/theme";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
+import { Typography, theme } from "@/constants/theme";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { emailVerificationService } from "@/services/emailVerificationService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
@@ -187,7 +189,7 @@ export default function VerifyEmailScreen() {
         <AppBackButton fallbackHref="/login" />
 
         <Text style={styles.logo}>MaviTeam</Text>
-        <Text style={styles.badge}>Kod doğrulama</Text>
+        <StatusBadge label="Kod doğrulama" tone="info" style={styles.badge} />
         <Text style={styles.title}>Doğrulama kodunu gir</Text>
 
         <Text style={styles.subtitle}>
@@ -202,19 +204,16 @@ export default function VerifyEmailScreen() {
           <Text style={styles.infoText}>{expirationMessage}</Text>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Doğrulama kodu</Text>
-          <TextInput
-            value={code}
-            onChangeText={(value) => setCode(value.replace(/[^0-9]/g, "").slice(0, 6))}
-            placeholder="123456"
-            placeholderTextColor={theme.colors.text.muted}
-            keyboardType="number-pad"
-            textContentType="oneTimeCode"
-            style={styles.input}
-            accessibilityLabel="Doğrulama kodu"
-          />
-        </View>
+        <TextField
+          label="Doğrulama kodu"
+          value={code}
+          onChangeText={(value) => setCode(value.replace(/[^0-9]/g, "").slice(0, 6))}
+          placeholder="123456"
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          accessibilityLabel="Doğrulama kodu"
+          containerStyle={styles.inputGroup}
+        />
 
         <Text style={styles.statusText}>{statusMessage}</Text>
 
@@ -260,37 +259,25 @@ const styles = StyleSheet.create({
   },
   card: { padding: theme.spacing["3xl"] },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
     alignSelf: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.pageTitle,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    ...Typography.body,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
   },
   infoBox: {
@@ -303,49 +290,23 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   infoTitle: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.label,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   infoText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   inputGroup: {
     width: "100%",
     marginTop: theme.spacing["2xl"],
   },
-  inputLabel: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    marginBottom: theme.spacing.sm,
-  },
-  input: {
-    width: "100%",
-    minHeight: 56,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    letterSpacing: 6,
-    textAlign: "center",
-  },
   statusText: {
+    ...Typography.supporting,
     marginTop: theme.spacing.lg,
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
-    lineHeight: theme.lineHeights.md,
   },
   buttonGroup: {
     width: "100%",

@@ -1,11 +1,13 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { theme } from "@/constants/theme";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
+import { Typography, theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
@@ -115,7 +117,7 @@ export default function CreateClubScreen() {
 
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.badge}>{t.createClub.badge}</Text>
+        <StatusBadge label={t.createClub.badge} tone="info" style={styles.badge} />
 
         <Text style={styles.title}>{t.createClub.title}</Text>
 
@@ -128,44 +130,29 @@ export default function CreateClubScreen() {
         </View>
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.clubNameLabel}</Text>
+          <TextField
+            label={t.createClub.clubNameLabel}
+            placeholder={t.createClub.clubNamePlaceholder}
+            value={clubName}
+            onChangeText={setClubName}
+            accessibilityLabel={t.createClub.accessibility.clubName}
+          />
 
-            <TextInput
-              style={styles.input}
-              placeholder={t.createClub.clubNamePlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              value={clubName}
-              onChangeText={setClubName}
-              accessibilityLabel={t.createClub.accessibility.clubName}
-            />
-          </View>
+          <TextField
+            label={t.createClub.sportLabel}
+            placeholder={t.createClub.sportPlaceholder}
+            value={sport}
+            onChangeText={setSport}
+            accessibilityLabel={t.createClub.accessibility.sport}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.sportLabel}</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder={t.createClub.sportPlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              value={sport}
-              onChangeText={setSport}
-              accessibilityLabel={t.createClub.accessibility.sport}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.createClub.cityLabel}</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder={t.createClub.cityPlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              value={city}
-              onChangeText={setCity}
-              accessibilityLabel={t.createClub.accessibility.city}
-            />
-          </View>
+          <TextField
+            label={t.createClub.cityLabel}
+            placeholder={t.createClub.cityPlaceholder}
+            value={city}
+            onChangeText={setCity}
+            accessibilityLabel={t.createClub.accessibility.city}
+          />
         </View>
 
         <View style={styles.codePreviewBox}>
@@ -215,37 +202,25 @@ const styles = StyleSheet.create({
     padding: theme.spacing["3xl"],
   },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
     alignSelf: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.pageTitle,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    ...Typography.body,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
   },
   ownerBox: {
@@ -258,37 +233,15 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   ownerLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.label,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   ownerText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   form: { width: "100%", gap: theme.spacing.lg },
-  inputGroup: { width: "100%" },
-  label: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  input: {
-    width: "100%",
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.fontSizes.lg,
-    color: theme.colors.text.primary,
-  },
   codePreviewBox: {
     width: "100%",
     backgroundColor: theme.colors.state.infoSoft,
@@ -299,31 +252,26 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   codePreviewLabel: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.caption,
     color: theme.colors.text.brand,
     marginBottom: theme.spacing.xs,
   },
   codePreviewValue: {
     fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.bold,
     color: theme.colors.text.primary,
     letterSpacing: 1,
     marginBottom: theme.spacing.xs,
   },
   codePreviewHint: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.caption,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   errorText: {
+    ...Typography.supporting,
     marginTop: theme.spacing.lg,
     color: theme.colors.text.danger,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
-    lineHeight: theme.lineHeights.md,
   },
   buttonGroup: {
     width: "100%",

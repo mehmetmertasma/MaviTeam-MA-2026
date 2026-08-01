@@ -19,7 +19,7 @@ const variantStyles: Record<CardVariant, ViewStyle> = {
     backgroundColor: theme.colors.background.surface,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    ...theme.shadows.sm,
+    ...theme.shadows.none,
   },
   elevated: {
     backgroundColor: theme.colors.background.surface,

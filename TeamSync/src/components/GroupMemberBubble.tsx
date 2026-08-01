@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   titleArea: { flex: 1 },
-  title: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
+  title: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
   subtitle: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginTop: -2,
   },
   memberList: { maxHeight: 280 },
@@ -143,10 +143,10 @@ const styles = StyleSheet.create({
   avatarText: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   memberInfo: { flex: 1 },
-  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   memberMeta: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   quickButtonText: {
     color: theme.colors.text.inverse,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

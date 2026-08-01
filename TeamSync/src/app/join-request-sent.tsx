@@ -4,7 +4,9 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
-import { theme } from "@/constants/theme";
+import { ScreenCard } from "@/components/ScreenCard";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Typography, theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 
@@ -51,67 +53,68 @@ export default function JoinRequestSentScreen() {
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.card}>
-          <AppBackButton label="Geri dön" fallbackHref="/join-club" onPress={handleRetryCode} />
+      <ScreenCard style={styles.card}>
+        <AppBackButton label="Geri dön" fallbackHref="/join-club" onPress={handleRetryCode} />
 
-          <Text style={styles.logo}>TeamSync</Text>
+        <Text style={styles.logo}>TeamSync</Text>
 
-          <Text style={styles.badge}>İstek gönderildi</Text>
+        <StatusBadge label="İstek gönderildi" tone="warning" style={styles.badge} />
 
-          <Text style={styles.title}>Admin onayı bekleniyor</Text>
+        <Text style={styles.title}>Admin onayı bekleniyor</Text>
 
-          <Text style={styles.subtitle}>
-            Katılma isteğin merkezi TeamSync datasına pending olarak kaydedildi. Kulüp yöneticisi onayladıktan sonra dashboard erişimi açılacak.
-          </Text>
+        <Text style={styles.subtitle}>
+          Katılma isteğin merkezi TeamSync datasına pending olarak kaydedildi. Kulüp yöneticisi onayladıktan sonra dashboard erişimi açılacak.
+        </Text>
 
-          <View style={styles.requestBox}>
-            <Text style={styles.requestLabel}>Başvuru özeti</Text>
-            <Text style={styles.requestValue}>{currentUser?.fullName ?? "Kullanıcı bilgisi yükleniyor"}</Text>
-            <Text style={styles.requestText}>{currentUser?.email ?? "E-posta yükleniyor"}</Text>
-            <Text style={styles.requestText}>{currentClub?.name ?? "Kulüp bilgisi yükleniyor"}</Text>
-          </View>
-
-          <View style={styles.stepsBox}>
-            <Text style={styles.stepsTitle}>Süreç nasıl çalışır?</Text>
-
-            <Text style={styles.stepText}>1. Takım/kulüp kodunu girersin.</Text>
-            <Text style={styles.stepText}>2. Katılma isteğin merkezi joinRequests datasına yazılır.</Text>
-            <Text style={styles.stepText}>3. Admin seni onayladıktan sonra uygulamayı kullanırsın.</Text>
-          </View>
-
-          <View style={styles.statusBox}>
-            <Text style={styles.statusLabel}>Şu anki durum</Text>
-            <Text style={styles.statusValue}>{currentRequest?.status === "pending" ? "Onay bekliyor" : "Pending kayıt aranıyor"}</Text>
-          </View>
-
-          <View style={styles.buttonGroup}>
-            <AppButton
-              title={isRefreshing ? "Kontrol ediliyor..." : "Durumu yenile"}
-              onPress={handleRefreshStatus}
-              disabled={isRefreshing}
-              accessibilityLabel="Onay durumunu yenile"
-              style={styles.button}
-            />
-
-            <AppButton
-              title="Kodu yeniden gir"
-              variant="secondary"
-              onPress={handleRetryCode}
-              accessibilityLabel="Takım kodunu yeniden gir"
-              style={styles.button}
-            />
-
-            <AppButton
-              title="Çıkış yap ve ana sayfaya dön"
-              variant="ghost"
-              onPress={handleBackHome}
-              accessibilityLabel="Çıkış yap ve ana sayfaya dön"
-              style={styles.button}
-            />
-          </View>
+        <View style={styles.requestBox}>
+          <Text style={styles.requestLabel}>Başvuru özeti</Text>
+          <Text style={styles.requestValue}>{currentUser?.fullName ?? "Kullanıcı bilgisi yükleniyor"}</Text>
+          <Text style={styles.requestText}>{currentUser?.email ?? "E-posta yükleniyor"}</Text>
+          <Text style={styles.requestText}>{currentClub?.name ?? "Kulüp bilgisi yükleniyor"}</Text>
         </View>
-      </View>
+
+        <View style={styles.stepsBox}>
+          <Text style={styles.stepsTitle}>Süreç nasıl çalışır?</Text>
+
+          <Text style={styles.stepText}>1. Takım/kulüp kodunu girersin.</Text>
+          <Text style={styles.stepText}>2. Katılma isteğin merkezi joinRequests datasına yazılır.</Text>
+          <Text style={styles.stepText}>3. Admin seni onayladıktan sonra uygulamayı kullanırsın.</Text>
+        </View>
+
+        <View style={styles.statusBox}>
+          <Text style={styles.statusLabel}>Şu anki durum</Text>
+          <StatusBadge
+            label={currentRequest?.status === "pending" ? "Onay bekliyor" : "Pending kayıt aranıyor"}
+            tone={currentRequest?.status === "pending" ? "warning" : "neutral"}
+          />
+        </View>
+
+        <View style={styles.buttonGroup}>
+          <AppButton
+            title={isRefreshing ? "Kontrol ediliyor..." : "Durumu yenile"}
+            onPress={handleRefreshStatus}
+            disabled={isRefreshing}
+            accessibilityLabel="Onay durumunu yenile"
+            style={styles.button}
+          />
+
+          <AppButton
+            title="Kodu yeniden gir"
+            variant="secondary"
+            onPress={handleRetryCode}
+            accessibilityLabel="Takım kodunu yeniden gir"
+            style={styles.button}
+          />
+
+          <AppButton
+            title="Çıkış yap ve ana sayfaya dön"
+            variant="ghost"
+            onPress={handleBackHome}
+            accessibilityLabel="Çıkış yap ve ana sayfaya dön"
+            style={styles.button}
+          />
+        </View>
+      </ScreenCard>
     </ScrollView>
   );
 }
@@ -125,48 +128,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: theme.spacing["2xl"],
   },
-  container: { width: "100%", maxWidth: 560 },
-  card: {
-    width: "100%",
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["3xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    ...theme.shadows.md,
-  },
+  card: { padding: theme.spacing["3xl"] },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
     alignSelf: "center",
-    backgroundColor: theme.colors.state.warningSoft,
-    color: theme.colors.text.warning,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.pageTitle,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    ...Typography.body,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
   },
   requestBox: {
@@ -179,21 +161,19 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   requestLabel: {
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
+    ...Typography.caption,
     color: theme.colors.text.secondary,
     textTransform: "uppercase",
     marginBottom: theme.spacing.sm,
   },
   requestValue: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   requestText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
     marginTop: theme.spacing.xs,
   },
@@ -207,14 +187,12 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   stepsTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.cardTitle,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
   stepText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.lg,
     marginBottom: theme.spacing.sm,
@@ -225,16 +203,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     padding: theme.spacing.lg,
     marginBottom: theme.spacing["2xl"],
+    gap: theme.spacing.sm,
   },
   statusLabel: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.warning,
-    marginBottom: theme.spacing.xs,
-  },
-  statusValue: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.label,
     color: theme.colors.text.warning,
   },
   buttonGroup: { width: "100%", gap: theme.spacing.md },

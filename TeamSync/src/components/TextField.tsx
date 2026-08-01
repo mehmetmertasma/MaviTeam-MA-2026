@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   label: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.sm,
   },
   required: {

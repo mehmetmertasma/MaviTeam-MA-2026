@@ -51,7 +51,7 @@ function getDrawerCopy(language: "tr" | "en") {
         { label: "Members", subtitle: "Roles, status and team access", route: "/members", allowedRoles: adminRoles },
         { label: "Approvals", subtitle: "Review pending join requests", route: "/pending-approvals", allowedRoles: adminRoles },
         { label: "Schedule", subtitle: "Practices and match calendar", route: "/schedule", allowedRoles: allRoles },
-        { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance", allowedRoles: staffRoles },
+        { label: "Attendance", subtitle: "Attendance tracking", route: "/attendance", allowedRoles: allRoles },
         { label: "Availability", subtitle: "Available / unavailable responses", route: "/availability", allowedRoles: allRoles },
         { label: "Messages", subtitle: "Team and direct conversations", route: "/messages", allowedRoles: allRoles },
         { label: "Announcements", subtitle: "Club and team updates", route: "/announcements", allowedRoles: allRoles },
@@ -87,7 +87,7 @@ function getDrawerCopy(language: "tr" | "en") {
       { label: "Üyeler", subtitle: "Rol, durum ve takım erişimi", route: "/members", allowedRoles: adminRoles },
       { label: "Onaylar", subtitle: "Bekleyen katılım istekleri", route: "/pending-approvals", allowedRoles: adminRoles },
       { label: "Program", subtitle: "Antrenman ve maç takvimi", route: "/schedule", allowedRoles: allRoles },
-      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance", allowedRoles: staffRoles },
+      { label: "Yoklama", subtitle: "Katılım takibi", route: "/attendance", allowedRoles: allRoles },
       { label: "Uygunluk", subtitle: "Geliyorum / gelemiyorum bildirimi", route: "/availability", allowedRoles: allRoles },
       { label: "Mesajlar", subtitle: "Takım ve bireysel mesajlar", route: "/messages", allowedRoles: allRoles },
       { label: "Duyurular", subtitle: "Kulüp ve takım duyuruları", route: "/announcements", allowedRoles: allRoles },
@@ -321,13 +321,13 @@ const styles = StyleSheet.create({
   logo: {
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   title: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   closeButton: {
     width: 38,
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginTop: -2,
   },
   profileCard: {
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   avatarText: {
     color: theme.colors.text.inverse,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   profileInfo: {
     flex: 1,
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   profileName: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   profileRole: {
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   itemLabel: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   itemSubtitle: {
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   itemArrow: {
     color: theme.colors.brand.primary,
     fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   logoutArea: {
     borderTopWidth: 1,
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   logoutTitle: {
     color: theme.colors.text.danger,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   logoutSubtitle: {
@@ -460,12 +460,12 @@ const styles = StyleSheet.create({
   logoutArrow: {
     color: theme.colors.text.danger,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   logoutError: {
     color: theme.colors.text.danger,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.medium,
     marginBottom: theme.spacing.sm,
     lineHeight: theme.lineHeights.sm,
   },

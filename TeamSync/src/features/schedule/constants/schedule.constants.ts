@@ -1,3 +1,5 @@
+import type { StatusBadgeTone } from "@/components/StatusBadge";
+import { theme } from "@/constants/theme";
 import type { ScheduleTypeOption } from "../types/schedule.types";
 import type { ScheduleEventType } from "@/types/teamSync";
 
@@ -20,26 +22,38 @@ export function getScheduleTypeLabel(type: ScheduleEventType) {
   return SCHEDULE_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? "Etkinlik";
 }
 
+export function getScheduleTypeTone(type: ScheduleEventType): StatusBadgeTone {
+  if (type === "match") {
+    return "danger";
+  }
+
+  if (type === "meeting") {
+    return "warning";
+  }
+
+  return "info";
+}
+
 export function getScheduleTypeStyles(type: ScheduleEventType) {
   if (type === "match") {
     return {
-      backgroundColor: "#fee2e2",
-      borderColor: "#ef4444",
-      textColor: "#991b1b",
+      backgroundColor: theme.colors.state.dangerSoft,
+      borderColor: theme.colors.state.danger,
+      textColor: theme.colors.text.danger,
     };
   }
 
   if (type === "meeting") {
     return {
-      backgroundColor: "#fef3c7",
-      borderColor: "#f59e0b",
-      textColor: "#92400e",
+      backgroundColor: theme.colors.state.warningSoft,
+      borderColor: theme.colors.state.warning,
+      textColor: theme.colors.text.warning,
     };
   }
 
   return {
-    backgroundColor: "#dbeafe",
-    borderColor: "#2563eb",
-    textColor: "#1e40af",
+    backgroundColor: theme.colors.state.infoSoft,
+    borderColor: theme.colors.state.info,
+    textColor: theme.colors.text.brand,
   };
 }

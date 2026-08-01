@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
 
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import { ALL_CLUB_TEAM_OPTION_ID } from "./constants/schedule.constants";
 import { CalendarSection } from "./components/CalendarSection";
@@ -182,135 +186,88 @@ export default function ScheduleScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.logo}>MaviTeam</Text>
-          <Text style={styles.pageTitle}>Program</Text>
-          <Text style={styles.pageSubtitle}>
-            Antrenman, maç ve toplantıları merkezi data üzerinden yönet.
-          </Text>
-        </View>
+    <AppScreenLayout variant="wide">
+      <PageHeader title="Program" subtitle="Antrenman, maç ve toplantıları merkezi data üzerinden yönet." />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Takvim yönetimi</Text>
-          <Text style={styles.heroTitle}>Aylık program görünümü</Text>
-          <Text style={styles.heroSubtitle}>
-            Aylar arasında geçiş yap, istediğin ayı seç ve etkinliği doğrudan seçili tarihe kaydet.
-          </Text>
-        </View>
+      <Card variant="elevated" style={styles.heroCard}>
+        <StatusBadge label="Takvim yönetimi" tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>Aylık program görünümü</Text>
+        <Text style={styles.heroSubtitle}>
+          Aylar arasında geçiş yap, istediğin ayı seç ve etkinliği doğrudan seçili tarihe kaydet.
+        </Text>
+      </Card>
 
-        <CalendarSection
-          visibleMonth={visibleMonth}
-          visibleMonthEvents={visibleMonthEvents}
-          selectedDayNumber={selectedDayNumber}
-          showMonthPicker={showMonthPicker}
-          showEventForm={showEventForm}
-          statusMessage={statusMessage}
-          onToggleMonthPicker={() => setShowMonthPicker((currentValue) => !currentValue)}
-          onPrevMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -1))}
-          onNextMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 1))}
-          onPrevYear={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -12))}
-          onNextYear={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 12))}
-          onSelectMonth={(monthIndex) => {
-            setMonthAndKeepValidDay(new Date(visibleMonth.getFullYear(), monthIndex, 1));
-            setShowMonthPicker(false);
-          }}
-          onGoToday={goToToday}
-          onSelectDay={selectCalendarDay}
-          onOpenEventForm={openEventForm}
-          onRefresh={loadScheduleData}
+      <CalendarSection
+        visibleMonth={visibleMonth}
+        visibleMonthEvents={visibleMonthEvents}
+        selectedDayNumber={selectedDayNumber}
+        showMonthPicker={showMonthPicker}
+        showEventForm={showEventForm}
+        statusMessage={statusMessage}
+        onToggleMonthPicker={() => setShowMonthPicker((currentValue) => !currentValue)}
+        onPrevMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -1))}
+        onNextMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 1))}
+        onPrevYear={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -12))}
+        onNextYear={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 12))}
+        onSelectMonth={(monthIndex) => {
+          setMonthAndKeepValidDay(new Date(visibleMonth.getFullYear(), monthIndex, 1));
+          setShowMonthPicker(false);
+        }}
+        onGoToday={goToToday}
+        onSelectDay={selectCalendarDay}
+        onOpenEventForm={openEventForm}
+        onRefresh={loadScheduleData}
+      />
+
+      {showEventForm ? (
+        <EventForm
+          selectedDateLabel={selectedDateLabel}
+          title={title}
+          onChangeTitle={setTitle}
+          selectedType={selectedType}
+          onSelectType={setSelectedType}
+          teamOptions={teamOptions}
+          selectedTeamId={selectedTeamId}
+          onSelectTeam={setSelectedTeamId}
+          time={time}
+          onChangeTime={setTime}
+          location={location}
+          onChangeLocation={setLocation}
+          note={note}
+          onChangeNote={setNote}
+          canCreate={canCreate}
+          onSave={handleCreateScheduleItem}
+          onCancel={closeEventForm}
         />
+      ) : null}
 
-        {showEventForm ? (
-          <EventForm
-            selectedDateLabel={selectedDateLabel}
-            title={title}
-            onChangeTitle={setTitle}
-            selectedType={selectedType}
-            onSelectType={setSelectedType}
-            teamOptions={teamOptions}
-            selectedTeamId={selectedTeamId}
-            onSelectTeam={setSelectedTeamId}
-            time={time}
-            onChangeTime={setTime}
-            location={location}
-            onChangeLocation={setLocation}
-            note={note}
-            onChangeNote={setNote}
-            canCreate={canCreate}
-            onSave={handleCreateScheduleItem}
-            onCancel={closeEventForm}
-          />
-        ) : null}
-
-        <EventList
-          visibleMonth={visibleMonth}
-          visibleMonthEvents={visibleMonthEvents}
-          scheduleData={scheduleData}
-        />
-      </View>
-    </ScrollView>
+      <EventList
+        visibleMonth={visibleMonth}
+        visibleMonthEvents={visibleMonthEvents}
+        scheduleData={scheduleData}
+      />
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: {
-    flexGrow: 1,
-    backgroundColor: theme.colors.background.app,
-    paddingHorizontal: theme.spacing["2xl"],
-    paddingBottom: theme.spacing["2xl"],
-  },
-  container: { width: "100%", maxWidth: 1100, alignSelf: "center" },
-  pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.md,
-  },
-  pageTitle: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes["5xl"],
-    fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["5xl"],
-    marginBottom: theme.spacing.sm,
-  },
-  pageSubtitle: {
-    color: theme.colors.text.inverse,
-    opacity: 0.76,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.xl,
-  },
   heroCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["3xl"],
     marginBottom: theme.spacing["2xl"],
-    ...theme.shadows.md,
   },
   heroLabel: {
     alignSelf: "flex-start",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing.lg,
   },
   heroTitle: {
     fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.bold,
     color: theme.colors.text.primary,
     lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   heroSubtitle: {
     fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.regular,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
   },

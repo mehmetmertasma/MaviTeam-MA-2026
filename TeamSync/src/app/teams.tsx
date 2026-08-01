@@ -1,8 +1,14 @@
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
@@ -240,443 +246,339 @@ export default function TeamsScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.logo}>TeamSync</Text>
-          <Text style={styles.pageTitle}>Takımlar</Text>
-          <Text style={styles.pageSubtitle}>Takımları, koçları ve takım üyelerini merkezi data üzerinden yönet.</Text>
-        </View>
+    <AppScreenLayout>
+      <PageHeader
+        title="Takımlar"
+        subtitle="Takımları, koçları ve takım üyelerini merkezi data üzerinden yönet."
+      />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Kulüp organizasyonu</Text>
-          <Text style={styles.heroTitle}>Takım yönetim merkezi</Text>
-          <Text style={styles.heroSubtitle}>
-            Takıma tıklayınca detaylar aynı kartın içinde açılır. Gerekirse takımı güvenli şekilde kaldırabilirsin.
+      <Card style={styles.heroCard} padding="lg">
+        <StatusBadge label="Kulüp organizasyonu" tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>Takım yönetim merkezi</Text>
+        <Text style={styles.heroSubtitle}>
+          Takıma tıklayınca detaylar aynı kartın içinde açılır. Gerekirse takımı güvenli şekilde kaldırabilirsin.
+        </Text>
+      </Card>
+
+      <View style={styles.statsGrid}>
+        <Card style={styles.statCard}>
+          <Text style={styles.statValue}>{teams.length}</Text>
+          <Text style={styles.statLabel}>Takım</Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Text style={styles.statValue}>{totalAthletes}</Text>
+          <Text style={styles.statLabel}>Sporcu</Text>
+        </Card>
+        <Card style={styles.statCard}>
+          <Text style={styles.statValue}>{totalMembers}</Text>
+          <Text style={styles.statLabel}>Üye</Text>
+        </Card>
+      </View>
+
+      <View style={styles.topActions}>
+        <AppButton
+          title={showCreateForm ? "Form açık" : "Yeni takım oluştur"}
+          onPress={() => setShowCreateForm(true)}
+          disabled={showCreateForm}
+          style={styles.actionButton}
+        />
+        <AppButton
+          title="Merkezi datayı yenile"
+          variant="ghost"
+          onPress={refreshTeamsData}
+          style={styles.actionButton}
+        />
+      </View>
+
+      {showCreateForm ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>Yeni takım oluştur</Text>
+          <Text style={styles.sectionSubtitle}>
+            Takım adını gir. Yaş grubu boş kalırsa Genel kullanılır. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.
           </Text>
-        </View>
 
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{teams.length}</Text>
-            <Text style={styles.statLabel}>Takım</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{totalAthletes}</Text>
-            <Text style={styles.statLabel}>Sporcu</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{totalMembers}</Text>
-            <Text style={styles.statLabel}>Üye</Text>
-          </View>
-        </View>
-
-        <View style={styles.topActions}>
-          <AppButton
-            title={showCreateForm ? "Form açık" : "Yeni takım oluştur"}
-            onPress={() => setShowCreateForm(true)}
-            disabled={showCreateForm}
-            style={styles.actionButton}
+          <TextField
+            label="Takım adı"
+            placeholder="Örn. U16 Erkek"
+            value={teamName}
+            onChangeText={setTeamName}
+            containerStyle={styles.field}
           />
-          <AppButton
-            title="Merkezi datayı yenile"
-            variant="ghost"
-            onPress={refreshTeamsData}
-            style={styles.actionButton}
-          />
-        </View>
 
-        {showCreateForm ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Yeni takım oluştur</Text>
-            <Text style={styles.sectionSubtitle}>
-              Takım adını gir. Yaş grubu boş kalırsa Genel kullanılır. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.
-            </Text>
-
-            <Text style={styles.label}>Takım adı</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Örn. U16 Erkek"
-              placeholderTextColor={theme.colors.text.muted}
-              value={teamName}
-              onChangeText={setTeamName}
+          <View style={styles.formGrid}>
+            <TextField
+              label="Yaş grubu opsiyonel"
+              placeholder="Örn. U16 veya Genel"
+              value={ageGroup}
+              onChangeText={setAgeGroup}
+              containerStyle={styles.formField}
             />
-
-            <View style={styles.formGrid}>
-              <View style={styles.formField}>
-                <Text style={styles.label}>Yaş grubu opsiyonel</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Örn. U16 veya Genel"
-                  placeholderTextColor={theme.colors.text.muted}
-                  value={ageGroup}
-                  onChangeText={setAgeGroup}
-                />
-              </View>
-              <View style={styles.formField}>
-                <Text style={styles.label}>Koç adı opsiyonel</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Örn. Can Demir"
-                  placeholderTextColor={theme.colors.text.muted}
-                  value={coachName}
-                  onChangeText={setCoachName}
-                />
-              </View>
-            </View>
-
-            <View style={styles.topActions}>
-              <AppButton
-                title={isCreatingTeam ? "Oluşturuluyor..." : "Takımı oluştur"}
-                onPress={createTeam}
-                disabled={isCreatingTeam}
-                style={styles.actionButton}
-              />
-              <AppButton
-                title="Vazgeç"
-                variant="ghost"
-                onPress={() => {
-                  clearForm();
-                  setShowCreateForm(false);
-                  setStatusMessage("Takım oluşturma iptal edildi.");
-                }}
-                style={styles.actionButton}
-              />
-            </View>
+            <TextField
+              label="Koç adı opsiyonel"
+              placeholder="Örn. Can Demir"
+              value={coachName}
+              onChangeText={setCoachName}
+              containerStyle={styles.formField}
+            />
           </View>
-        ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kulüp takımları</Text>
-          <Text style={styles.sectionSubtitle}>Takıma tıkla; detay, üyeler ve kaldırma işlemi kartın içinde açılacak.</Text>
+          <View style={styles.topActions}>
+            <AppButton
+              title={isCreatingTeam ? "Oluşturuluyor..." : "Takımı oluştur"}
+              onPress={createTeam}
+              disabled={isCreatingTeam}
+              style={styles.actionButton}
+            />
+            <AppButton
+              title="Vazgeç"
+              variant="ghost"
+              onPress={() => {
+                clearForm();
+                setShowCreateForm(false);
+                setStatusMessage("Takım oluşturma iptal edildi.");
+              }}
+              style={styles.actionButton}
+            />
+          </View>
+        </Card>
+      ) : null}
 
-          {teams.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>Henüz takım yok</Text>
-              <Text style={styles.emptyText}>Yeni takım oluştur butonu ile merkezi dataya takım ekleyebilirsin.</Text>
-            </View>
-          ) : (
-            <View style={styles.teamList}>
-              {teams.map((team) => {
-                const isSelected = selectedTeamId === team.id;
-                const teamUsers = getTeamUsers(team, users);
-                const coachNames = getTeamCoachNames(team, users);
-                const isPendingRemove = pendingRemoveTeamId === team.id;
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>Kulüp takımları</Text>
+        <Text style={styles.sectionSubtitle}>Takıma tıkla; detay, üyeler ve kaldırma işlemi kartın içinde açılacak.</Text>
 
-                return (
-                  <View key={team.id} style={[styles.teamCard, isSelected ? styles.teamCardSelected : null]}>
-                    <Pressable
-                      onPress={() => toggleTeamDetails(team)}
-                      style={({ pressed }) => [styles.teamPressArea, pressed ? styles.pressed : null]}
-                    >
-                      <View style={styles.teamTopRow}>
-                        <View style={styles.teamInfo}>
-                          <Text style={styles.teamName}>{team.name}</Text>
-                          <Text style={styles.teamMeta}>{team.ageGroup} · Koç: {coachNames}</Text>
-                        </View>
-                        <Text style={styles.teamBadge}>{teamUsers.length} kişi</Text>
+        {teams.length === 0 ? (
+          <EmptyState title="Henüz takım yok" description="Yeni takım oluştur butonu ile merkezi dataya takım ekleyebilirsin." />
+        ) : (
+          <View style={styles.teamList}>
+            {teams.map((team) => {
+              const isSelected = selectedTeamId === team.id;
+              const teamUsers = getTeamUsers(team, users);
+              const coachNames = getTeamCoachNames(team, users);
+              const isPendingRemove = pendingRemoveTeamId === team.id;
+
+              return (
+                <Card key={team.id} padding="none" style={[styles.teamCard, isSelected ? styles.teamCardSelected : null]}>
+                  <Pressable
+                    onPress={() => toggleTeamDetails(team)}
+                    style={({ pressed }) => [styles.teamPressArea, pressed ? styles.pressed : null]}
+                  >
+                    <View style={styles.teamTopRow}>
+                      <View style={styles.teamInfo}>
+                        <Text style={styles.teamName}>{team.name}</Text>
+                        <Text style={styles.teamMeta}>{team.ageGroup} · Koç: {coachNames}</Text>
                       </View>
-                      <Text style={styles.teamHint}>
-                        {getAthleteCount(team, users)} sporcu · {isSelected ? "Detay açık" : "Detay için tıkla"}
-                      </Text>
-                    </Pressable>
+                      <StatusBadge label={`${teamUsers.length} kişi`} tone="neutral" />
+                    </View>
+                    <Text style={styles.teamHint}>
+                      {getAthleteCount(team, users)} sporcu · {isSelected ? "Detay açık" : "Detay için tıkla"}
+                    </Text>
+                  </Pressable>
 
-                    {isSelected ? (
-                      <View style={styles.expandedArea}>
-                        <View style={styles.detailGrid}>
-                          <View style={styles.detailCard}>
-                            <Text style={styles.detailLabel}>Yaş grubu</Text>
-                            <Text style={styles.detailValue}>{team.ageGroup}</Text>
-                          </View>
-                          <View style={styles.detailCard}>
-                            <Text style={styles.detailLabel}>Toplam kişi</Text>
-                            <Text style={styles.detailValue}>{teamUsers.length}</Text>
-                          </View>
-                          <View style={styles.detailCard}>
-                            <Text style={styles.detailLabel}>Sporcu</Text>
-                            <Text style={styles.detailValue}>{getAthleteCount(team, users)}</Text>
-                          </View>
+                  {isSelected ? (
+                    <View style={styles.expandedArea}>
+                      <View style={styles.detailGrid}>
+                        <Card variant="subtle" padding="sm" style={styles.detailCard}>
+                          <Text style={styles.detailLabel}>Yaş grubu</Text>
+                          <Text style={styles.detailValue}>{team.ageGroup}</Text>
+                        </Card>
+                        <Card variant="subtle" padding="sm" style={styles.detailCard}>
+                          <Text style={styles.detailLabel}>Toplam kişi</Text>
+                          <Text style={styles.detailValue}>{teamUsers.length}</Text>
+                        </Card>
+                        <Card variant="subtle" padding="sm" style={styles.detailCard}>
+                          <Text style={styles.detailLabel}>Sporcu</Text>
+                          <Text style={styles.detailValue}>{getAthleteCount(team, users)}</Text>
+                        </Card>
+                      </View>
+
+                      <View style={styles.memberBlock}>
+                        <View style={styles.memberBlockHeaderRow}>
+                          <Text style={styles.memberBlockTitle}>Takım içi kişiler</Text>
+                          {userCanManageTeamRoster ? (
+                            <AppButton
+                              title={addMemberOpenTeamId === team.id ? "Kapat" : "Kişi ekle"}
+                              variant="secondary"
+                              onPress={() => setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id)}
+                              style={styles.addMemberToggle}
+                            />
+                          ) : null}
                         </View>
 
-                        <View style={styles.memberBlock}>
-                          <View style={styles.memberBlockHeaderRow}>
-                            <Text style={styles.memberBlockTitle}>Takım içi kişiler</Text>
-                            {userCanManageTeamRoster ? (
-                              <Pressable
-                                onPress={() => setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id)}
-                                style={({ pressed }) => [styles.addMemberToggle, pressed ? styles.pressed : null]}
-                              >
-                                <Text style={styles.addMemberToggleText}>
-                                  {addMemberOpenTeamId === team.id ? "Kapat" : "Kişi ekle"}
-                                </Text>
-                              </Pressable>
-                            ) : null}
-                          </View>
+                        {teamUsers.length === 0 ? (
+                          <Card variant="subtle" padding="sm">
+                            <Text style={styles.emptyText}>Bu takımda henüz kişi yok.</Text>
+                          </Card>
+                        ) : (
+                          <View style={styles.memberList}>
+                            {teamUsers.map((member) => {
+                              const isProtectedMember =
+                                member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
+                              const isUpdatingThisMember = updatingMemberId === member.id;
 
-                          {teamUsers.length === 0 ? (
-                            <View style={styles.emptyBoxCompact}>
-                              <Text style={styles.emptyText}>Bu takımda henüz kişi yok.</Text>
-                            </View>
-                          ) : (
-                            <View style={styles.memberList}>
-                              {teamUsers.map((member) => {
-                                const isProtectedMember =
-                                  member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
-                                const isUpdatingThisMember = updatingMemberId === member.id;
-
-                                return (
-                                  <View key={member.id} style={styles.memberCard}>
-                                    <View style={styles.avatar}>
-                                      <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
-                                    </View>
-                                    <View style={styles.memberInfo}>
-                                      <Text style={styles.memberName}>{member.fullName}</Text>
-                                      <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
-                                    </View>
+                              return (
+                                <Card key={member.id} variant="subtle" padding="sm" style={styles.memberCard}>
+                                  <View style={styles.avatar}>
+                                    <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                                  </View>
+                                  <View style={styles.memberInfo}>
+                                    <Text style={styles.memberName}>{member.fullName}</Text>
+                                    <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
+                                  </View>
+                                  <AppButton
+                                    title="Mesaj"
+                                    variant="secondary"
+                                    onPress={() => openMessages(member.fullName)}
+                                    style={styles.memberButton}
+                                  />
+                                  {userCanManageTeamRoster && !isProtectedMember ? (
                                     <AppButton
-                                      title="Mesaj"
-                                      variant="secondary"
-                                      onPress={() => openMessages(member.fullName)}
+                                      title={isUpdatingThisMember ? "..." : "Çıkar"}
+                                      variant="ghost"
+                                      disabled={isUpdatingThisMember}
+                                      onPress={() => setTeamMembership(team, member, false)}
                                       style={styles.memberButton}
                                     />
-                                    {userCanManageTeamRoster && !isProtectedMember ? (
-                                      <AppButton
-                                        title={isUpdatingThisMember ? "..." : "Çıkar"}
-                                        variant="ghost"
-                                        disabled={isUpdatingThisMember}
-                                        onPress={() => setTeamMembership(team, member, false)}
-                                        style={styles.memberButton}
-                                      />
-                                    ) : null}
+                                  ) : null}
+                                </Card>
+                              );
+                            })}
+                          </View>
+                        )}
+
+                        {userCanManageTeamRoster && addMemberOpenTeamId === team.id ? (
+                          <Card variant="subtle" padding="sm" style={styles.addMemberPanel}>
+                            {(() => {
+                              const availableUsers = users.filter(
+                                (user) =>
+                                  user.status === "active" &&
+                                  user.role !== "superAdmin" &&
+                                  !teamUsers.some((member) => member.id === user.id)
+                              );
+
+                              if (availableUsers.length === 0) {
+                                return <Text style={styles.emptyText}>Eklenebilecek başka aktif üye yok.</Text>;
+                              }
+
+                              return availableUsers.map((user) => {
+                                const isUpdatingThisUser = updatingMemberId === user.id;
+
+                                return (
+                                  <View key={user.id} style={styles.addMemberRow}>
+                                    <View style={styles.memberInfo}>
+                                      <Text style={styles.memberName}>{user.fullName}</Text>
+                                      <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
+                                    </View>
+                                    <AppButton
+                                      title={isUpdatingThisUser ? "..." : "Ekle"}
+                                      disabled={isUpdatingThisUser}
+                                      onPress={() => setTeamMembership(team, user, true)}
+                                      style={styles.memberButton}
+                                    />
                                   </View>
                                 );
-                              })}
-                            </View>
-                          )}
+                              });
+                            })()}
+                          </Card>
+                        ) : null}
+                      </View>
 
-                          {userCanManageTeamRoster && addMemberOpenTeamId === team.id ? (
-                            <View style={styles.addMemberPanel}>
-                              {(() => {
-                                const availableUsers = users.filter(
-                                  (user) =>
-                                    user.status === "active" &&
-                                    user.role !== "superAdmin" &&
-                                    !teamUsers.some((member) => member.id === user.id)
-                                );
+                      {isPendingRemove ? (
+                        <Card variant="danger" padding="sm">
+                          <Text style={styles.confirmTitle}>Bu takımı kaldırmak istediğine emin misin?</Text>
+                          <Text style={styles.confirmText}>Takım kartı listeden kalkacak ve kullanıcıların takım bağlantısı temizlenecek.</Text>
+                        </Card>
+                      ) : null}
 
-                                if (availableUsers.length === 0) {
-                                  return <Text style={styles.emptyText}>Eklenebilecek başka aktif üye yok.</Text>;
-                                }
-
-                                return availableUsers.map((user) => {
-                                  const isUpdatingThisUser = updatingMemberId === user.id;
-
-                                  return (
-                                    <View key={user.id} style={styles.addMemberRow}>
-                                      <View style={styles.memberInfo}>
-                                        <Text style={styles.memberName}>{user.fullName}</Text>
-                                        <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
-                                      </View>
-                                      <AppButton
-                                        title={isUpdatingThisUser ? "..." : "Ekle"}
-                                        disabled={isUpdatingThisUser}
-                                        onPress={() => setTeamMembership(team, user, true)}
-                                        style={styles.memberButton}
-                                      />
-                                    </View>
-                                  );
-                                });
-                              })()}
-                            </View>
-                          ) : null}
-                        </View>
+                      <View style={styles.teamActionsRow}>
+                        <AppButton
+                          title={isPendingRemove ? "Evet, kaldır" : "Takımı kaldır"}
+                          variant="danger"
+                          onPress={() => removeTeam(team)}
+                          style={styles.actionButton}
+                        />
 
                         {isPendingRemove ? (
-                          <View style={styles.confirmBox}>
-                            <Text style={styles.confirmTitle}>Bu takımı kaldırmak istediğine emin misin?</Text>
-                            <Text style={styles.confirmText}>Takım kartı listeden kalkacak ve kullanıcıların takım bağlantısı temizlenecek.</Text>
-                          </View>
+                          <AppButton
+                            title="Vazgeç"
+                            variant="ghost"
+                            onPress={() => {
+                              setPendingRemoveTeamId("");
+                              setStatusMessage("Takım kaldırma iptal edildi.");
+                            }}
+                            style={styles.actionButton}
+                          />
                         ) : null}
-
-                        <View style={styles.teamActionsRow}>
-                          <Pressable
-                            onPress={() => removeTeam(team)}
-                            style={({ pressed }) => [
-                              styles.removeButton,
-                              isPendingRemove ? styles.removeButtonConfirm : null,
-                              pressed ? styles.pressed : null,
-                            ]}
-                          >
-                            <Text style={styles.removeButtonText}>{isPendingRemove ? "Evet, kaldır" : "Takımı kaldır"}</Text>
-                          </Pressable>
-
-                          {isPendingRemove ? (
-                            <Pressable
-                              onPress={() => {
-                                setPendingRemoveTeamId("");
-                                setStatusMessage("Takım kaldırma iptal edildi.");
-                              }}
-                              style={({ pressed }) => [styles.cancelRemoveButton, pressed ? styles.pressed : null]}
-                            >
-                              <Text style={styles.cancelRemoveButtonText}>Vazgeç</Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
                       </View>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
-          )}
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </View>
+        )}
 
-          <Text style={styles.statusText}>{statusMessage}</Text>
-        </View>
-      </View>
-    </ScrollView>
+        <Text style={styles.statusText}>{statusMessage}</Text>
+      </Card>
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: {
-    flexGrow: 1,
-    backgroundColor: theme.colors.background.app,
-    paddingHorizontal: theme.spacing["2xl"],
-    paddingBottom: theme.spacing["2xl"],
-  },
-  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
-  pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: {
-    color: theme.colors.brand.primary,
+  heroCard: { marginBottom: theme.spacing["2xl"] },
+  heroLabel: { marginBottom: theme.spacing.lg },
+  heroTitle: {
     fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.md,
-  },
-  pageTitle: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes["5xl"],
-    fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["5xl"],
+    fontWeight: theme.fontWeights.semibold,
+    color: theme.colors.text.primary,
+    lineHeight: theme.lineHeights["2xl"],
     marginBottom: theme.spacing.sm,
   },
-  pageSubtitle: {
-    color: theme.colors.text.inverse,
-    opacity: 0.76,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.xl,
-  },
-  heroCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["3xl"],
-    marginBottom: theme.spacing["2xl"],
-    ...theme.shadows.md,
-  },
-  heroLabel: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
-    marginBottom: theme.spacing.lg,
-  },
-  heroTitle: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
-    color: theme.colors.text.primary,
-    lineHeight: theme.lineHeights["4xl"],
-    marginBottom: theme.spacing.md,
-  },
-  heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl },
+  heroSubtitle: { fontSize: theme.fontSizes.lg, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.xl, fontWeight: theme.fontWeights.regular },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing["2xl"] },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: 145,
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    ...theme.shadows.sm,
-  },
-  statValue: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold },
+  statCard: { flexGrow: 1, flexBasis: 145 },
+  statValue: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.bold, marginBottom: theme.spacing.xs },
+  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.medium },
   topActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
   actionButton: { minWidth: 170 },
-  section: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    ...theme.shadows.sm,
-  },
-  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md, marginBottom: theme.spacing.xl },
-  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm },
-  input: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
+  section: { marginBottom: theme.spacing["2xl"] },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md, marginBottom: theme.spacing.xl },
+  field: { marginBottom: theme.spacing.lg },
+  formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing.lg },
   formField: { flex: 1, minWidth: 220 },
-  emptyBox: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
-  emptyBoxCompact: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
-  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
-  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   teamList: { gap: theme.spacing.md },
-  teamCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, overflow: "hidden" },
-  teamCardSelected: { borderColor: theme.colors.brand.primary, backgroundColor: theme.colors.background.surface },
+  teamCard: { overflow: "hidden" },
+  teamCardSelected: { borderColor: theme.colors.brand.primary },
   teamPressArea: { padding: theme.spacing.lg },
   teamTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: theme.spacing.lg, marginBottom: theme.spacing.sm },
   teamInfo: { flex: 1 },
-  teamName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  teamMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
-  teamBadge: { backgroundColor: theme.colors.background.surface, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full, overflow: "hidden" },
-  teamHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  teamName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  teamMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular },
+  teamHint: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium },
   expandedArea: { borderTopWidth: 1, borderTopColor: theme.colors.border.default, padding: theme.spacing.lg, gap: theme.spacing.lg },
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  detailCard: { flexGrow: 1, flexBasis: 130, backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
-  detailLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.xs },
-  detailValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black },
+  detailCard: { flexGrow: 1, flexBasis: 130 },
+  detailLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium, marginBottom: theme.spacing.xs },
+  detailValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold },
   memberBlock: { gap: theme.spacing.md },
   memberBlockHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
-  memberBlockTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
-  addMemberToggle: { borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primarySoft, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  addMemberToggleText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  memberBlockTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
+  addMemberToggle: { alignSelf: "flex-start" },
   memberList: { gap: theme.spacing.md },
-  memberCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default, flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
+  memberCard: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
   avatar: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  avatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   memberInfo: { flex: 1 },
-  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular },
   memberButton: { minWidth: 96 },
   addMemberPanel: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg, gap: theme.spacing.md },
   addMemberRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
-  confirmBox: { backgroundColor: theme.colors.state.warningSoft, borderRadius: theme.radius.lg, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.state.warning },
-  confirmTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  confirmText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  confirmTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  confirmText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   teamActionsRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  removeButton: { minHeight: 46, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.state.danger, paddingHorizontal: theme.spacing.lg, alignItems: "center", justifyContent: "center" },
-  removeButtonConfirm: { backgroundColor: theme.colors.state.danger },
-  removeButtonText: { color: theme.colors.state.danger, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
-  cancelRemoveButton: { minHeight: 46, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, alignItems: "center", justifyContent: "center" },
-  cancelRemoveButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
-  statusText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xl, lineHeight: theme.lineHeights.md },
+  statusText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, marginTop: theme.spacing.xl, lineHeight: theme.lineHeights.md },
   pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
 });

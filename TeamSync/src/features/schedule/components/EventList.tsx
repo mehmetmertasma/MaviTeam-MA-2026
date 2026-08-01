@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from "react-native";
 
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
 
-import { getScheduleTypeLabel, getScheduleTypeStyles } from "../constants/schedule.constants";
+import { getScheduleTypeLabel, getScheduleTypeTone } from "../constants/schedule.constants";
 import { formatEventDate, formatEventTime, formatMonthTitle } from "../utils/schedule-date.utils";
 import { getScheduleTeamLabel } from "../utils/schedule-selectors.utils";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
@@ -23,22 +24,19 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData }: Ev
           <Text style={scheduleSharedStyles.sectionTitle}>{formatMonthTitle(visibleMonth)} etkinlikleri</Text>
           <Text style={scheduleSharedStyles.sectionSubtitle}>Seçili aydaki kayıtlar merkezi data’dan listeleniyor.</Text>
         </View>
-        <Text style={scheduleSharedStyles.statusPill}>{visibleMonthEvents.length} kayıt</Text>
+        <StatusBadge label={`${visibleMonthEvents.length} kayıt`} tone="info" />
       </View>
 
       <View style={styles.eventList}>
         {scheduleData !== null && visibleMonthEvents.length > 0 ? (
           visibleMonthEvents.map((event) => {
-            const typeStyles = getScheduleTypeStyles(event.type);
-
             return (
               <View key={event.id} style={styles.eventCard}>
-                <View style={[styles.eventTypeBar, { backgroundColor: typeStyles.borderColor }]} />
-
                 <View style={styles.eventContent}>
-                  <Text style={styles.eventType}>
-                    {getScheduleTypeLabel(event.type)} · {getScheduleTeamLabel(event, scheduleData)}
-                  </Text>
+                  <View style={styles.eventHeaderRow}>
+                    <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} />
+                    <Text style={styles.eventTeam}>{getScheduleTeamLabel(event, scheduleData)}</Text>
+                  </View>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventMeta}>
                     {formatEventDate(event.startsAt)} · {formatEventTime(event.startsAt)} · {event.location}
@@ -69,33 +67,37 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
     overflow: "hidden",
   },
-  eventTypeBar: { width: 8 },
   eventContent: {
     flex: 1,
     padding: theme.spacing.lg,
   },
-  eventType: {
-    color: theme.colors.text.brand,
+  eventHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+  },
+  eventTeam: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.xs,
+    fontWeight: theme.fontWeights.medium,
   },
   eventTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   eventMeta: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.medium,
     marginBottom: theme.spacing.sm,
   },
   eventNote: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     lineHeight: theme.lineHeights.md,
   },
   emptyCard: {
@@ -108,13 +110,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.sm,
   },
   emptyText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     lineHeight: theme.lineHeights.md,
   },
 });

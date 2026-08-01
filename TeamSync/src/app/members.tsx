@@ -1,6 +1,13 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppButton } from "@/components/AppButton";
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
@@ -37,6 +44,12 @@ const statusLabels: Record<UserStatus, string> = {
   active: "Active",
   pending: "Pending",
   removed: "Removed",
+};
+
+const statusTones: Record<UserStatus, StatusBadgeTone> = {
+  active: "success",
+  pending: "warning",
+  removed: "danger",
 };
 
 function getInitials(name: string) {
@@ -187,164 +200,144 @@ export default function MembersScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.logo}>MaviTeam</Text>
-          <Text style={styles.pageTitle}>Üye Yönetimi</Text>
-          <Text style={styles.pageSubtitle}>Üyeleri kompakt listede gör, kişiye tıklayınca detayları aç ve admin olarak rol/takım bilgilerini düzenle.</Text>
-        </View>
+    <AppScreenLayout>
+      <PageHeader
+        title="Üye Yönetimi"
+        subtitle="Üyeleri kompakt listede gör, kişiye tıklayınca detayları aç ve admin olarak rol/takım bilgilerini düzenle."
+      />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Kulüp kullanıcı kontrolü</Text>
-          <Text style={styles.heroTitle}>Roller, durumlar ve takım bağlantıları</Text>
-          <Text style={styles.heroSubtitle}>Kartlar kapalıyken ekran sade kalır. Sadece seçtiğin kişinin detayları ve edit seçenekleri açılır.</Text>
-        </View>
+      <Card style={styles.heroCard} padding="lg">
+        <StatusBadge label="Kulüp kullanıcı kontrolü" tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>Roller, durumlar ve takım bağlantıları</Text>
+        <Text style={styles.heroSubtitle}>Kartlar kapalıyken ekran sade kalır. Sadece seçtiğin kişinin detayları ve edit seçenekleri açılır.</Text>
+      </Card>
 
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}><Text style={styles.statValue}>{members.length}</Text><Text style={styles.statLabel}>Toplam</Text></View>
-          <View style={styles.statCard}><Text style={styles.statValue}>{activeCount}</Text><Text style={styles.statLabel}>Aktif</Text></View>
-          <View style={styles.statCard}><Text style={styles.statValue}>{coachCount}</Text><Text style={styles.statLabel}>Coach</Text></View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Kulüp üyeleri</Text>
-              <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
-            </View>
-            <Pressable onPress={refreshMembersData} style={({ pressed }) => [styles.refreshButton, pressed ? styles.pressed : null]}>
-              <Text style={styles.refreshButtonText}>Yenile</Text>
-            </Pressable>
-          </View>
-
-          {members.length === 0 ? (
-            <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Henüz üye yok</Text><Text style={styles.emptyText}>Kullanıcılar kulübe katıldıkça burada görünecek.</Text></View>
-          ) : (
-            <View style={styles.memberList}>
-              {members.map((member) => {
-                const isSelected = selectedUserId === member.id;
-                const isEditing = editingUserId === member.id;
-                const isProtected = member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
-
-                return (
-                  <View key={member.id} style={[styles.memberCard, isSelected ? styles.memberCardSelected : null]}>
-                    <Pressable onPress={() => openMember(member)} style={({ pressed }) => [styles.memberSummary, pressed ? styles.pressed : null]}>
-                      <View style={styles.avatar}><Text style={styles.avatarText}>{getInitials(member.fullName)}</Text></View>
-                      <View style={styles.memberInfo}>
-                        <Text style={styles.memberName}>{member.fullName}</Text>
-                        <Text style={styles.memberMeta}>{member.email || "E-posta yok"}</Text>
-                      </View>
-                      <View style={styles.memberBadges}>
-                        <Text style={styles.roleBadge}>{roleLabels[member.role]}</Text>
-                        <Text style={[styles.statusBadge, member.status === "active" ? styles.statusActive : null, member.status === "pending" ? styles.statusPending : null, member.status === "removed" ? styles.statusRemoved : null]}>{statusLabels[member.status]}</Text>
-                      </View>
-                    </Pressable>
-
-                    {isSelected ? (
-                      <View style={styles.expandedArea}>
-                        <View style={styles.detailGrid}>
-                          <View style={styles.detailBox}><Text style={styles.detailLabel}>Takımlar</Text><Text style={styles.detailValue}>{getTeamNames(member, teams)}</Text></View>
-                          <View style={styles.detailBox}><Text style={styles.detailLabel}>Kullanıcı ID</Text><Text style={styles.detailValue}>{member.id}</Text></View>
-                        </View>
-
-                        {isEditing ? (
-                          <View style={styles.editPanel}>
-                            <Text style={styles.editLabel}>Rol</Text>
-                            <View style={styles.chipRow}>{roleOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftRole(option.value)} style={({ pressed }) => [styles.chip, draftRole === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftRole === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
-
-                            <Text style={styles.editLabel}>Durum</Text>
-                            <View style={styles.chipRow}>{statusOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftStatus(option.value)} style={({ pressed }) => [styles.chip, draftStatus === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftStatus === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
-
-                            <Text style={styles.editLabel}>Takımlar</Text>
-                            <View style={styles.chipRow}>{teams.length === 0 ? <Text style={styles.emptyText}>Henüz takım yok.</Text> : teams.map((team) => { const isTeamSelected = draftTeamIds.includes(team.id); return (<Pressable key={team.id} onPress={() => toggleDraftTeam(team.id)} disabled={draftStatus === "removed"} style={({ pressed }) => [styles.chip, isTeamSelected ? styles.chipSelected : null, draftStatus === "removed" ? styles.chipDisabled : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, isTeamSelected ? styles.chipTextSelected : null]}>{team.name}</Text></Pressable>); })}</View>
-
-                            <View style={styles.actionRow}>
-                              <Pressable disabled={isSaving} onPress={() => saveMember(member)} style={({ pressed }) => [styles.saveButton, isSaving ? styles.buttonDisabled : null, pressed && !isSaving ? styles.pressed : null]}><Text style={styles.saveButtonText}>{isSaving ? "Saving..." : "Save"}</Text></Pressable>
-                              <Pressable disabled={isSaving} onPress={() => setEditingUserId("")} style={({ pressed }) => [styles.cancelButton, pressed && !isSaving ? styles.pressed : null]}><Text style={styles.cancelButtonText}>Cancel</Text></Pressable>
-                            </View>
-                          </View>
-                        ) : (
-                          <View style={styles.actionRow}>
-                            <Pressable disabled={!userCanManageMembers || isProtected} onPress={() => startEdit(member)} style={({ pressed }) => [styles.editButton, (!userCanManageMembers || isProtected) ? styles.buttonDisabled : null, pressed && userCanManageMembers && !isProtected ? styles.pressed : null]}><Text style={styles.editButtonText}>{isProtected ? "Protected" : "Edit"}</Text></Pressable>
-                            <Text style={styles.inlineHint}>{isProtected ? "Kendi hesabın, owner veya platform admin korunur." : "Rol, durum ve takımları düzenle."}</Text>
-                          </View>
-                        )}
-                      </View>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
+      <View style={styles.statsGrid}>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{members.length}</Text><Text style={styles.statLabel}>Toplam</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{activeCount}</Text><Text style={styles.statLabel}>Aktif</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{coachCount}</Text><Text style={styles.statLabel}>Coach</Text></Card>
       </View>
-    </ScrollView>
+
+      <Card style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderText}>
+            <Text style={styles.sectionTitle}>Kulüp üyeleri</Text>
+            <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+          </View>
+          <AppButton title="Yenile" variant="ghost" onPress={refreshMembersData} style={styles.refreshButton} />
+        </View>
+
+        {members.length === 0 ? (
+          <EmptyState title="Henüz üye yok" description="Kullanıcılar kulübe katıldıkça burada görünecek." />
+        ) : (
+          <View style={styles.memberList}>
+            {members.map((member) => {
+              const isSelected = selectedUserId === member.id;
+              const isEditing = editingUserId === member.id;
+              const isProtected = member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
+
+              return (
+                <Card key={member.id} padding="none" style={[styles.memberCard, isSelected ? styles.memberCardSelected : null]}>
+                  <Pressable onPress={() => openMember(member)} style={({ pressed }) => [styles.memberSummary, pressed ? styles.pressed : null]}>
+                    <View style={styles.avatar}><Text style={styles.avatarText}>{getInitials(member.fullName)}</Text></View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{member.fullName}</Text>
+                      <Text style={styles.memberMeta}>{member.email || "E-posta yok"}</Text>
+                    </View>
+                    <View style={styles.memberBadges}>
+                      <StatusBadge label={roleLabels[member.role]} tone="info" />
+                      <StatusBadge label={statusLabels[member.status]} tone={statusTones[member.status]} />
+                    </View>
+                  </Pressable>
+
+                  {isSelected ? (
+                    <View style={styles.expandedArea}>
+                      <View style={styles.detailGrid}>
+                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>Takımlar</Text><Text style={styles.detailValue}>{getTeamNames(member, teams)}</Text></Card>
+                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>Kullanıcı ID</Text><Text style={styles.detailValue}>{member.id}</Text></Card>
+                      </View>
+
+                      {isEditing ? (
+                        <View style={styles.editPanel}>
+                          <Text style={styles.editLabel}>Rol</Text>
+                          <View style={styles.chipRow}>{roleOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftRole(option.value)} style={({ pressed }) => [styles.chip, draftRole === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftRole === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
+
+                          <Text style={styles.editLabel}>Durum</Text>
+                          <View style={styles.chipRow}>{statusOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftStatus(option.value)} style={({ pressed }) => [styles.chip, draftStatus === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftStatus === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
+
+                          <Text style={styles.editLabel}>Takımlar</Text>
+                          <View style={styles.chipRow}>{teams.length === 0 ? <Text style={styles.emptyText}>Henüz takım yok.</Text> : teams.map((team) => { const isTeamSelected = draftTeamIds.includes(team.id); return (<Pressable key={team.id} onPress={() => toggleDraftTeam(team.id)} disabled={draftStatus === "removed"} style={({ pressed }) => [styles.chip, isTeamSelected ? styles.chipSelected : null, draftStatus === "removed" ? styles.chipDisabled : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, isTeamSelected ? styles.chipTextSelected : null]}>{team.name}</Text></Pressable>); })}</View>
+
+                          <View style={styles.actionRow}>
+                            <AppButton title={isSaving ? "Saving..." : "Save"} disabled={isSaving} onPress={() => saveMember(member)} style={styles.actionButton} />
+                            <AppButton title="Cancel" variant="ghost" disabled={isSaving} onPress={() => setEditingUserId("")} style={styles.actionButton} />
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={styles.actionRow}>
+                          <AppButton
+                            title={isProtected ? "Protected" : "Edit"}
+                            variant="secondary"
+                            disabled={!userCanManageMembers || isProtected}
+                            onPress={() => startEdit(member)}
+                            style={styles.actionButton}
+                          />
+                          <Text style={styles.inlineHint}>{isProtected ? "Kendi hesabın, owner veya platform admin korunur." : "Rol, durum ve takımları düzenle."}</Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </View>
+        )}
+      </Card>
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: { flexGrow: 1, backgroundColor: theme.colors.background.app, paddingHorizontal: theme.spacing["2xl"], paddingBottom: theme.spacing["2xl"] },
-  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
-  pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
-  pageTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"], marginBottom: theme.spacing.sm },
-  pageSubtitle: { color: theme.colors.text.inverse, opacity: 0.76, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.xl },
-  heroCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["3xl"], marginBottom: theme.spacing["2xl"], ...theme.shadows.md },
-  heroLabel: { alignSelf: "flex-start", backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, borderRadius: theme.radius.full, marginBottom: theme.spacing.lg },
-  heroTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, color: theme.colors.text.primary, lineHeight: theme.lineHeights["4xl"], marginBottom: theme.spacing.sm },
-  heroSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, lineHeight: theme.lineHeights.xl, fontWeight: theme.fontWeights.semibold },
+  heroCard: { marginBottom: theme.spacing["2xl"] },
+  heroLabel: { marginBottom: theme.spacing.lg },
+  heroTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, color: theme.colors.text.primary, lineHeight: theme.lineHeights["2xl"], marginBottom: theme.spacing.sm },
+  heroSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.lg, lineHeight: theme.lineHeights.xl, fontWeight: theme.fontWeights.regular },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg, marginBottom: theme.spacing["2xl"] },
-  statCard: { flexGrow: 1, flexBasis: 160, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.xl, padding: theme.spacing.xl, ...theme.shadows.sm },
-  statValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black },
-  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginTop: theme.spacing.xs },
-  section: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], ...theme.shadows.md },
+  statCard: { flexGrow: 1, flexBasis: 160 },
+  statValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.bold },
+  statLabel: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium, marginTop: theme.spacing.xs },
+  section: { marginBottom: theme.spacing["2xl"] },
   sectionHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.md, marginBottom: theme.spacing.xl },
   sectionHeaderText: { flex: 1 },
-  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  refreshButton: { backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  refreshButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
+  refreshButton: { alignSelf: "flex-start" },
   memberList: { gap: theme.spacing.md },
-  memberCard: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.xl, backgroundColor: theme.colors.background.elevated, overflow: "hidden" },
+  memberCard: { overflow: "hidden" },
   memberCardSelected: { borderColor: theme.colors.brand.primary },
   memberSummary: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
   avatar: { width: 42, height: 42, borderRadius: theme.radius.full, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.brand.primarySoft },
-  avatarText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.black },
+  avatarText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   memberInfo: { flex: 1, minWidth: 0 },
-  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.black },
-  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginTop: theme.spacing.xxs },
+  memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
+  memberMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium, marginTop: theme.spacing.xxs },
   memberBadges: { alignItems: "flex-end", gap: theme.spacing.xs },
-  roleBadge: { overflow: "hidden", borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md },
-  statusBadge: { overflow: "hidden", borderRadius: theme.radius.full, backgroundColor: theme.colors.background.subtle, color: theme.colors.text.secondary, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md },
-  statusActive: { backgroundColor: theme.colors.state.successSoft, color: theme.colors.text.success },
-  statusPending: { backgroundColor: theme.colors.state.warningSoft, color: theme.colors.text.warning },
-  statusRemoved: { backgroundColor: theme.colors.state.dangerSoft, color: theme.colors.text.danger },
   expandedArea: { borderTopWidth: 1, borderTopColor: theme.colors.border.default, padding: theme.spacing.lg, gap: theme.spacing.lg, backgroundColor: theme.colors.background.subtle },
   detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  detailBox: { flexGrow: 1, flexBasis: 220, backgroundColor: theme.colors.background.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.lg },
-  detailLabel: { color: theme.colors.text.muted, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.black, textTransform: "uppercase", marginBottom: theme.spacing.xs },
-  detailValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.bold },
+  detailBox: { flexGrow: 1, flexBasis: 220 },
+  detailLabel: { color: theme.colors.text.muted, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.medium, textTransform: "uppercase", marginBottom: theme.spacing.xs },
+  detailValue: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   editPanel: { gap: theme.spacing.md },
-  editLabel: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  editLabel: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   chip: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, backgroundColor: theme.colors.background.surface, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
   chipSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   chipDisabled: { opacity: 0.45 },
-  chipText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
+  chipText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium },
   chipTextSelected: { color: theme.colors.text.inverse },
   actionRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: theme.spacing.sm },
-  editButton: { backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.xl },
-  editButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
-  saveButton: { backgroundColor: theme.colors.brand.primary, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.xl },
-  saveButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
-  cancelButton: { backgroundColor: theme.colors.background.surface, borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.xl },
-  cancelButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.black },
-  buttonDisabled: { opacity: 0.48 },
-  inlineHint: { flex: 1, color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
-  emptyCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing["2xl"], alignItems: "center" },
-  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  actionButton: { minWidth: 120 },
+  inlineHint: { flex: 1, color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium },
+  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular },
   pressed: { opacity: 0.84, transform: [{ scale: 0.992 }] },
 });

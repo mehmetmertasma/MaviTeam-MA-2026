@@ -55,12 +55,12 @@ const styles = StyleSheet.create({
   icon: {
     color: theme.colors.text.danger,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   title: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
   },
   description: {

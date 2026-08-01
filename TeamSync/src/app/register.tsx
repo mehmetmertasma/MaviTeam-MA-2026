@@ -1,11 +1,13 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
 import { ScreenCard } from "@/components/ScreenCard";
-import { theme } from "@/constants/theme";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
+import { Typography, theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { emailVerificationService } from "@/services/emailVerificationService";
@@ -132,82 +134,66 @@ export default function RegisterScreen() {
         <AppBackButton fallbackHref="/" />
 
         <Text style={styles.logo}>{t.common.appName}</Text>
-        <Text style={styles.badge}>{t.auth.registerBadge}</Text>
+        <StatusBadge label={t.auth.registerBadge} tone="info" style={styles.badge} />
         <Text style={styles.title}>{t.auth.registerTitle}</Text>
         <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
 
         <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.auth.fullNameLabel}</Text>
-            <TextInput
-              value={fullName}
-              onChangeText={(value) => {
-                setFullName(value);
-                clearStatusOnChange();
-              }}
-              placeholder={t.auth.fullNamePlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              style={styles.input}
-              autoComplete="name"
-              textContentType="name"
-              accessibilityLabel={t.auth.accessibility.fullName}
-            />
-          </View>
+          <TextField
+            label={t.auth.fullNameLabel}
+            value={fullName}
+            onChangeText={(value) => {
+              setFullName(value);
+              clearStatusOnChange();
+            }}
+            placeholder={t.auth.fullNamePlaceholder}
+            autoComplete="name"
+            textContentType="name"
+            accessibilityLabel={t.auth.accessibility.fullName}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.auth.emailLabel}</Text>
-            <TextInput
-              value={email}
-              onChangeText={(value) => {
-                setEmail(value);
-                clearStatusOnChange();
-              }}
-              placeholder={t.auth.emailPlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-              textContentType="emailAddress"
-              style={styles.input}
-              accessibilityLabel={t.auth.accessibility.email}
-            />
-          </View>
+          <TextField
+            label={t.auth.emailLabel}
+            value={email}
+            onChangeText={(value) => {
+              setEmail(value);
+              clearStatusOnChange();
+            }}
+            placeholder={t.auth.emailPlaceholder}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            accessibilityLabel={t.auth.accessibility.email}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.auth.passwordLabel}</Text>
-            <TextInput
-              value={password}
-              onChangeText={(value) => {
-                setPassword(value);
-                clearStatusOnChange();
-              }}
-              placeholder={t.auth.newPasswordPlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-              style={styles.input}
-              accessibilityLabel={t.auth.accessibility.password}
-            />
-          </View>
+          <TextField
+            label={t.auth.passwordLabel}
+            value={password}
+            onChangeText={(value) => {
+              setPassword(value);
+              clearStatusOnChange();
+            }}
+            placeholder={t.auth.newPasswordPlaceholder}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            accessibilityLabel={t.auth.accessibility.password}
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.auth.confirmPasswordLabel}</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={(value) => {
-                setConfirmPassword(value);
-                clearStatusOnChange();
-              }}
-              placeholder={t.auth.confirmPasswordPlaceholder}
-              placeholderTextColor={theme.colors.text.muted}
-              secureTextEntry
-              autoComplete="new-password"
-              textContentType="newPassword"
-              style={styles.input}
-              accessibilityLabel={t.auth.accessibility.confirmPassword}
-            />
-          </View>
+          <TextField
+            label={t.auth.confirmPasswordLabel}
+            value={confirmPassword}
+            onChangeText={(value) => {
+              setConfirmPassword(value);
+              clearStatusOnChange();
+            }}
+            placeholder={t.auth.confirmPasswordPlaceholder}
+            secureTextEntry
+            autoComplete="new-password"
+            textContentType="newPassword"
+            accessibilityLabel={t.auth.accessibility.confirmPassword}
+          />
         </View>
 
         <View style={styles.infoBox}>
@@ -250,59 +236,28 @@ const styles = StyleSheet.create({
   },
   card: { padding: theme.spacing["3xl"] },
   logo: {
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
     textAlign: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
     alignSelf: "center",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    ...Typography.pageTitle,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["4xl"],
     marginBottom: theme.spacing.md,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    ...Typography.body,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
     marginBottom: theme.spacing["2xl"],
   },
   form: { width: "100%", gap: theme.spacing.lg },
-  inputGroup: { width: "100%" },
-  label: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.extrabold,
-    color: theme.colors.text.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  input: {
-    width: "100%",
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.background.surface,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    fontSize: theme.fontSizes.lg,
-    color: theme.colors.text.primary,
-  },
   infoBox: {
     width: "100%",
     backgroundColor: theme.colors.background.subtle,
@@ -313,24 +268,19 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border.default,
   },
   infoTitle: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    ...Typography.label,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.xs,
   },
   infoText: {
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
-    lineHeight: theme.lineHeights.md,
   },
   statusText: {
+    ...Typography.supporting,
     marginTop: theme.spacing.lg,
     color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
-    lineHeight: theme.lineHeights.md,
   },
   warningText: {
     color: theme.colors.text.danger,

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
 
@@ -56,7 +57,7 @@ export function CalendarSection({
           </Text>
         </View>
 
-        <Text style={scheduleSharedStyles.statusPill}>{visibleMonthEvents.length} etkinlik</Text>
+        <StatusBadge label={`${visibleMonthEvents.length} etkinlik`} tone="info" />
       </View>
 
       <View style={styles.monthControlRow}>
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
   monthNavText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   monthSelectButton: {
     minHeight: 50,
@@ -220,14 +221,14 @@ const styles = StyleSheet.create({
   monthSelectText: {
     color: theme.colors.text.inverse,
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     textTransform: "capitalize",
   },
   monthSelectHint: {
     color: theme.colors.text.inverse,
     opacity: 0.78,
     fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.medium,
     marginTop: 2,
   },
   monthPickerCard: {
@@ -256,12 +257,12 @@ const styles = StyleSheet.create({
   yearButtonText: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   yearTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   monthGrid: {
     flexDirection: "row",
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
   monthOptionText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     textTransform: "capitalize",
   },
   monthOptionTextSelected: { color: theme.colors.text.inverse },
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   todayButtonText: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   legendRow: {
     flexDirection: "row",
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
   statusText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     marginTop: theme.spacing.lg,
     lineHeight: theme.lineHeights.md,
   },

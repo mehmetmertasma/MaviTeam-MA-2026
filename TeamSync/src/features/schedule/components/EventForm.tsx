@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEventType } from "@/types/teamSync";
 
@@ -57,7 +58,7 @@ export function EventForm({
           </Text>
         </View>
 
-        <Text style={scheduleSharedStyles.statusPill}>Yeni</Text>
+        <StatusBadge label="Yeni" tone="info" />
       </View>
 
       <View style={styles.selectedDateCard}>
@@ -194,18 +195,18 @@ const styles = StyleSheet.create({
   selectedDateLabel: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.medium,
     marginBottom: theme.spacing.xs,
   },
   selectedDateText: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   label: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.sm,
   },
   input: {
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     marginBottom: theme.spacing.lg,
   },
   textArea: { minHeight: 110, textAlignVertical: "top" },
@@ -243,7 +244,7 @@ const styles = StyleSheet.create({
   optionButtonText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   optionButtonTextSelected: { color: theme.colors.text.inverse },
 });

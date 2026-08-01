@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
   title: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     textAlign: "center",
   },
   description: {

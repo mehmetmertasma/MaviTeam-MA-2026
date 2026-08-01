@@ -7,6 +7,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
+import { theme } from "@/constants/theme";
 import { AppDataProvider } from "@/providers/AppDataProvider";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 import { LanguageProvider, useTranslation } from "@/localization";
@@ -16,7 +17,7 @@ export const unstable_settings = {
   initialRouteName: "index",
 };
 
-const APP_BACKGROUND_COLOR = "#0f172a";
+const APP_BACKGROUND_COLOR = theme.colors.background.app;
 const GLOBAL_NAV_TOP_OFFSET = 10;
 const GLOBAL_NAV_HEIGHT = 44;
 const GLOBAL_NAV_BOTTOM_GAP = 14;
@@ -48,10 +49,20 @@ function AppProviders({ children }: PropsWithChildren) {
 
 function LoadingScreen({ message }: { message: string }) {
   return (
-    <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR, alignItems: "center", justifyContent: "center", padding: 24 }}>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: APP_BACKGROUND_COLOR,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: theme.spacing["2xl"],
+      }}
+    >
       <StatusBar style="light" />
-      <Text style={{ color: "white", fontSize: 20, fontWeight: "900", marginBottom: 8 }}>MaviTeam</Text>
-      <Text style={{ color: "#cbd5e1", fontSize: 15, fontWeight: "700", textAlign: "center" }}>
+      <Text style={{ color: theme.colors.text.inverse, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.bold, marginBottom: theme.spacing.sm }}>
+        MaviTeam
+      </Text>
+      <Text style={{ color: theme.colors.text.inverse, opacity: 0.72, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, textAlign: "center" }}>
         {message}
       </Text>
     </View>

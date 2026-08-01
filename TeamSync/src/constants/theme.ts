@@ -290,16 +290,16 @@ export const Shadows = theme.shadows;
 // of sync with each other screen that does the same thing slightly
 // differently). Existing per-field theme usage still works unchanged.
 export const Typography = {
-  displayTitle: { fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"] },
-  pageTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["4xl"] },
-  sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["2xl"] },
-  cardTitle: { fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.xl },
+  displayTitle: { fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.bold, lineHeight: theme.lineHeights["5xl"] },
+  pageTitle: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.bold, lineHeight: theme.lineHeights["4xl"] },
+  sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights["2xl"] },
+  cardTitle: { fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.xl },
   body: { fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.lg },
-  supporting: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
-  label: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.md },
-  button: { fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.extrabold, lineHeight: theme.lineHeights.lg },
-  caption: { fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.sm },
-  statNumber: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["4xl"] },
+  supporting: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
+  label: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.md },
+  button: { fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.lg },
+  caption: { fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium, lineHeight: theme.lineHeights.sm },
+  statNumber: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.bold, lineHeight: theme.lineHeights["4xl"] },
 } as const;
 
 export const BottomTabInset =

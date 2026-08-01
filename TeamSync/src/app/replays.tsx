@@ -1,8 +1,13 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
+import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
@@ -255,108 +260,135 @@ export default function ReplaysScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.logo}>MaviTeam</Text>
-          <Text style={styles.pageTitle}>Replay Linkleri</Text>
-          <Text style={styles.pageSubtitle}>Koçlar video dosyası yüklemez; sadece YouTube, Drive, Hudl veya benzeri link ekler.</Text>
+    <AppScreenLayout variant="standard">
+      <PageHeader
+        eyebrow="Düşük maliyetli video sistemi"
+        title="Replay Linkleri"
+        subtitle="Koçlar video dosyası yüklemez; sadece YouTube, Drive, Hudl veya benzeri link ekler."
+      />
+
+      <Card style={styles.heroCard}>
+        <Text style={styles.heroTitle}>Video bizde değil, link bizde</Text>
+        <Text style={styles.heroSubtitle}>MaviTeam sadece başlık, açıklama, hedef takım ve URL metadata’sını saklar. Kullanıcı butona basınca dış link açılır.</Text>
+      </Card>
+
+      {userCanManageReplayLinks ? (
+        <View style={styles.topActions}>
+          <AppButton title={showCreateForm ? "Form açık" : "Replay linki ekle"} onPress={() => { setShowCreateForm(true); setStatusMessage("Replay linki bilgilerini doldurabilirsin."); }} disabled={showCreateForm} style={styles.actionButton} />
+          <AppButton title="Datayı yenile" variant="ghost" onPress={loadReplayData} style={styles.actionButton} />
         </View>
+      ) : null}
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Düşük maliyetli video sistemi</Text>
-          <Text style={styles.heroTitle}>Video bizde değil, link bizde</Text>
-          <Text style={styles.heroSubtitle}>MaviTeam sadece başlık, açıklama, hedef takım ve URL metadata’sını saklar. Kullanıcı butona basınca dış link açılır.</Text>
-        </View>
-
-        {userCanManageReplayLinks ? (
-          <View style={styles.topActions}>
-            <AppButton title={showCreateForm ? "Form açık" : "Replay linki ekle"} onPress={() => { setShowCreateForm(true); setStatusMessage("Replay linki bilgilerini doldurabilirsin."); }} disabled={showCreateForm} style={styles.actionButton} />
-            <AppButton title="Datayı yenile" variant="ghost" onPress={loadReplayData} style={styles.actionButton} />
-          </View>
-        ) : null}
-
-        {showCreateForm && userCanManageReplayLinks ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>Replay linki ekle</Text>
-                <Text style={styles.sectionSubtitle}>Video dosyası yüklenmez. Sadece dış video linki kaydedilir.</Text>
-              </View>
-              <Text style={styles.statusPill}>Link</Text>
-            </View>
-
-            <Text style={styles.label}>Başlık</Text>
-            <TextInput value={title} onChangeText={setTitle} placeholder="Örn: Maç analizi" placeholderTextColor={theme.colors.text.muted} style={styles.input} />
-
-            <Text style={styles.label}>Açıklama</Text>
-            <TextInput value={description} onChangeText={setDescription} placeholder="Link hakkında kısa açıklama yaz..." placeholderTextColor={theme.colors.text.muted} multiline style={[styles.input, styles.textArea]} />
-
-            <Text style={styles.label}>Replay URL</Text>
-            <TextInput value={replayUrl} onChangeText={setReplayUrl} placeholder="https://youtube.com/... veya https://drive.google.com/..." placeholderTextColor={theme.colors.text.muted} autoCapitalize="none" autoCorrect={false} style={styles.input} />
-
-            <Text style={styles.label}>İçerik tipi</Text>
-            <View style={styles.optionGrid}>{replayTypes.map((option) => { const isSelected = selectedType === option.type; return (<Pressable key={option.type} onPress={() => setSelectedType(option.type)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>
-
-            <Text style={styles.label}>Kim görecek?</Text>
-            <View style={styles.optionGrid}>{targetOptions.map((target) => { const isSelected = selectedTargetId === target.id; return (<Pressable key={target.id} onPress={() => setSelectedTargetId(target.id)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{target.label}</Text></Pressable>); })}</View>
-
-            <View style={styles.actionRow}>
-              <AppButton title="Linki kaydet" onPress={handleAddReplay} disabled={!canAddReplay} style={styles.actionButton} />
-              <AppButton title="Vazgeç" variant="ghost" onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage("Replay linki ekleme iptal edildi."); }} style={styles.actionButton} />
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
+      {showCreateForm && userCanManageReplayLinks ? (
+        <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Replay listesi</Text>
-              <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+              <Text style={styles.sectionTitle}>Replay linki ekle</Text>
+              <Text style={styles.sectionSubtitle}>Video dosyası yüklenmez. Sadece dış video linki kaydedilir.</Text>
             </View>
-            <Text style={styles.statusPill}>{visibleReplays.length} görünür</Text>
+            <Text style={styles.statusPill}>Link</Text>
           </View>
 
-          <View style={styles.optionGrid}>{filterOptions.map((option) => { const isSelected = activeFilter === option.filter; return (<Pressable key={option.filter} onPress={() => setActiveFilter(option.filter)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>
+          <TextField label="Başlık" value={title} onChangeText={setTitle} placeholder="Örn: Maç analizi" containerStyle={styles.field} />
 
-          {appData !== null && visibleReplays.length > 0 ? (
-            <View style={styles.replayList}>{visibleReplays.map((replay) => (<View key={replay.id} style={styles.replayCard}><View style={styles.replayTopRow}><View style={styles.replayInfo}><Text style={styles.replayType}>{getReplayTypeLabel(replay.type)}</Text><Text style={styles.replayTitle}>{replay.title}</Text><Text style={styles.replayMeta}>{getReplayAudienceLabel(replay, appData)} · {getUserName(replay.createdByUserId, users)} · {formatDate(replay.createdAt)}</Text></View></View><Text style={styles.replayDescription}>{replay.description}</Text><Text style={styles.linkPreview} numberOfLines={1}>{replay.videoUrl}</Text><View style={styles.cardActions}><Pressable onPress={() => handleOpenReplayLink(replay.videoUrl)} style={({ pressed }) => [styles.openButton, pressed ? styles.pressed : null]}><Text style={styles.openButtonText}>Linki aç</Text></Pressable>{userCanDeleteReplayLinks ? (<Pressable onPress={() => handleRemoveReplay(replay.id)} style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}><Text style={styles.deleteButtonText}>Kaldır</Text></Pressable>) : null}</View></View>))}</View>
-          ) : (
-            <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Henüz replay linki yok</Text><Text style={styles.emptyText}>Replay linki ekle butonuyla ilk dış video linkini kaydedebilirsin. Video dosyası MaviTeam’e yüklenmez.</Text></View>
-          )}
+          <TextField
+            label="Açıklama"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Link hakkında kısa açıklama yaz..."
+            multiline
+            containerStyle={styles.field}
+          />
+
+          <TextField
+            label="Replay URL"
+            value={replayUrl}
+            onChangeText={setReplayUrl}
+            placeholder="https://youtube.com/... veya https://drive.google.com/..."
+            autoCapitalize="none"
+            autoCorrect={false}
+            containerStyle={styles.field}
+          />
+
+          <Text style={styles.label}>İçerik tipi</Text>
+          <View style={styles.optionGrid}>{replayTypes.map((option) => { const isSelected = selectedType === option.type; return (<Pressable key={option.type} onPress={() => setSelectedType(option.type)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>
+
+          <Text style={styles.label}>Kim görecek?</Text>
+          <View style={styles.optionGrid}>{targetOptions.map((target) => { const isSelected = selectedTargetId === target.id; return (<Pressable key={target.id} onPress={() => setSelectedTargetId(target.id)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{target.label}</Text></Pressable>); })}</View>
+
+          <View style={styles.actionRow}>
+            <AppButton title="Linki kaydet" onPress={handleAddReplay} disabled={!canAddReplay} style={styles.actionButton} />
+            <AppButton title="Vazgeç" variant="ghost" onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage("Replay linki ekleme iptal edildi."); }} style={styles.actionButton} />
+          </View>
+        </Card>
+      ) : null}
+
+      <Card style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderText}>
+            <Text style={styles.sectionTitle}>Replay listesi</Text>
+            <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
+          </View>
+          <Text style={styles.statusPill}>{visibleReplays.length} görünür</Text>
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.optionGrid}>{filterOptions.map((option) => { const isSelected = activeFilter === option.filter; return (<Pressable key={option.filter} onPress={() => setActiveFilter(option.filter)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>
+
+        {appData !== null && visibleReplays.length > 0 ? (
+          <View style={styles.replayList}>
+            {visibleReplays.map((replay) => (
+              <View key={replay.id} style={styles.replayCard}>
+                <View style={styles.replayTopRow}>
+                  <View style={styles.replayInfo}>
+                    <Text style={styles.replayType}>{getReplayTypeLabel(replay.type)}</Text>
+                    <Text style={styles.replayTitle}>{replay.title}</Text>
+                    <Text style={styles.replayMeta}>{getReplayAudienceLabel(replay, appData)} · {getUserName(replay.createdByUserId, users)} · {formatDate(replay.createdAt)}</Text>
+                  </View>
+                </View>
+                <Text style={styles.replayDescription}>{replay.description}</Text>
+                <Text style={styles.linkPreview} numberOfLines={1}>{replay.videoUrl}</Text>
+                <View style={styles.cardActions}>
+                  <Pressable onPress={() => handleOpenReplayLink(replay.videoUrl)} style={({ pressed }) => [styles.openButton, pressed ? styles.pressed : null]}>
+                    <Text style={styles.openButtonText}>Linki aç</Text>
+                  </Pressable>
+                  {userCanDeleteReplayLinks ? (
+                    <Pressable onPress={() => handleRemoveReplay(replay.id)} style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}>
+                      <Text style={styles.deleteButtonText}>Kaldır</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <EmptyState
+            title="Henüz replay linki yok"
+            description="Replay linki ekle butonuyla ilk dış video linkini kaydedebilirsin. Video dosyası MaviTeam’e yüklenmez."
+          />
+        )}
+      </Card>
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: { flexGrow: 1, backgroundColor: theme.colors.background.app, paddingHorizontal: theme.spacing["2xl"], paddingBottom: theme.spacing["2xl"] },
-  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
-  pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.md },
-  pageTitle: { color: theme.colors.text.inverse, fontSize: theme.fontSizes["5xl"], fontWeight: theme.fontWeights.black, lineHeight: theme.lineHeights["5xl"], marginBottom: theme.spacing.sm },
-  pageSubtitle: { color: theme.colors.text.inverse, opacity: 0.76, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, lineHeight: theme.lineHeights.xl, maxWidth: 720 },
-  heroCard: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default },
-  heroLabel: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm, textTransform: "uppercase" },
-  heroTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
+  heroCard: { gap: theme.spacing.sm, marginBottom: theme.spacing["2xl"] },
+  heroTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["3xl"], fontWeight: theme.fontWeights.semibold },
   heroSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, lineHeight: theme.lineHeights.lg },
   topActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
   actionButton: { minWidth: 180 },
-  section: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], padding: theme.spacing["2xl"], marginBottom: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default },
+  section: { marginBottom: theme.spacing["2xl"] },
   sectionHeaderRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.lg },
   sectionHeaderText: { flex: 1 },
-  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
+  sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, lineHeight: theme.lineHeights.lg },
-  statusPill: { color: theme.colors.text.brand, backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md, fontWeight: theme.fontWeights.extrabold, overflow: "hidden" },
-  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold, marginBottom: theme.spacing.sm, marginTop: theme.spacing.md },
-  input: { width: "100%", borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.lg, padding: theme.spacing.md, color: theme.colors.text.primary, backgroundColor: theme.colors.background.subtle, fontSize: theme.fontSizes.md, marginBottom: theme.spacing.sm },
-  textArea: { minHeight: 96, textAlignVertical: "top" },
+  statusPill: { color: theme.colors.text.brand, backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md, fontWeight: theme.fontWeights.semibold, overflow: "hidden" },
+  label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.sm, marginTop: theme.spacing.md },
+  field: { marginBottom: theme.spacing.sm },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.md },
   optionButton: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, backgroundColor: theme.colors.background.subtle },
   optionButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
-  optionButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
+  optionButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   optionButtonTextSelected: { color: theme.colors.text.inverse },
   pressed: { opacity: 0.72 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.lg },
@@ -364,17 +396,14 @@ const styles = StyleSheet.create({
   replayCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
   replayTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md, marginBottom: theme.spacing.md },
   replayInfo: { flex: 1 },
-  replayType: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.extrabold, textTransform: "uppercase", marginBottom: theme.spacing.xs },
-  replayTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.xs },
-  replayMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
+  replayType: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, textTransform: "uppercase", marginBottom: theme.spacing.xs },
+  replayTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
+  replayMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular },
   replayDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, lineHeight: theme.lineHeights.lg, marginBottom: theme.spacing.md },
-  linkPreview: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.md },
+  linkPreview: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular, marginBottom: theme.spacing.md },
   cardActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
   openButton: { backgroundColor: theme.colors.brand.primary, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  openButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
+  openButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   deleteButton: { backgroundColor: theme.colors.danger.soft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
-  deleteButtonText: { color: theme.colors.danger.text, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.extrabold },
-  emptyCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, alignItems: "center" },
-  emptyTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.black, marginBottom: theme.spacing.sm },
-  emptyText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, textAlign: "center", lineHeight: theme.lineHeights.lg },
+  deleteButtonText: { color: theme.colors.danger.text, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
 });

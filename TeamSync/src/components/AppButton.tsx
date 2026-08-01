@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.lg,
     letterSpacing: 0.1,
     textAlign: "center",

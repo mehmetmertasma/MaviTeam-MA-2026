@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   weekDayText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   dayCell: {
     width: `${100 / 7}%`,
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   dayNumber: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   selectedDayText: {
     color: theme.colors.text.brand,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   todayBadge: {
     color: theme.colors.text.brand,
     fontSize: 10,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   dayEventList: { gap: 4 },
   calendarEventPill: {
@@ -168,12 +168,12 @@ const styles = StyleSheet.create({
   },
   calendarEventText: {
     fontSize: 11,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   moreEventsText: {
     color: theme.colors.text.secondary,
     fontSize: 11,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

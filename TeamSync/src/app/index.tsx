@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "@/components/AppButton";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { ScreenCard } from "@/components/ScreenCard";
+import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 
@@ -19,7 +20,7 @@ export default function HomeScreen() {
 
         <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <Text style={styles.badge}>{t.home.badge}</Text>
+        <StatusBadge label={t.home.badge} tone="info" style={styles.badge} />
 
         <Text style={styles.title}>{t.home.title}</Text>
 
@@ -90,25 +91,18 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: theme.fontSizes["3xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.bold,
     color: theme.colors.brand.primary,
     marginBottom: theme.spacing.md,
     textAlign: "center",
   },
   badge: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
+    alignSelf: "center",
     marginBottom: theme.spacing["2xl"],
-    textAlign: "center",
   },
   title: {
     fontSize: theme.fontSizes["5xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.bold,
     color: theme.colors.text.primary,
     textAlign: "center",
     lineHeight: theme.lineHeights["5xl"],
@@ -130,14 +124,14 @@ const styles = StyleSheet.create({
   },
   featureTitle: {
     fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.extrabold,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
   featureText: {
     fontSize: theme.fontSizes.md,
     color: theme.colors.text.secondary,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     lineHeight: theme.lineHeights.lg,
     marginBottom: theme.spacing.sm,
   },
@@ -153,7 +147,7 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.sm,
     color: theme.colors.text.muted,
     textAlign: "center",
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.medium,
     lineHeight: theme.lineHeights.md,
   },
 });

@@ -1,8 +1,14 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { Card } from "@/components/Card";
+import { EmptyState } from "@/components/EmptyState";
+import { PageHeader } from "@/components/PageHeader";
+import { StatusBadge } from "@/components/StatusBadge";
+import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
@@ -220,225 +226,171 @@ export default function AnnouncementsScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <View style={styles.container}>
-        <View style={styles.pageHeader}>
-          <Text style={styles.logo}>TeamSync</Text>
-          <Text style={styles.pageTitle}>Duyurular</Text>
-          <Text style={styles.pageSubtitle}>Kulüp veya takım üyelerine merkezi data üzerinden duyuru yayınla.</Text>
-        </View>
+    <AppScreenLayout>
+      <PageHeader title="Duyurular" subtitle="Kulüp veya takım üyelerine merkezi data üzerinden duyuru yayınla." />
 
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Kulüp iletişim merkezi</Text>
-          <Text style={styles.heroTitle}>Duyuru yönetimi</Text>
-          <Text style={styles.heroSubtitle}>
-            Duyurular artık Firebase varsa Firestore kulüp datasından gelir. Her kullanıcı sadece kendi kulübünün duyurularını görür.
-          </Text>
-        </View>
+      <Card variant="elevated" style={styles.heroCard}>
+        <StatusBadge label="Kulüp iletişim merkezi" tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>Duyuru yönetimi</Text>
+        <Text style={styles.heroSubtitle}>
+          Duyurular artık Firebase varsa Firestore kulüp datasından gelir. Her kullanıcı sadece kendi kulübünün duyurularını görür.
+        </Text>
+      </Card>
 
-        <View style={styles.actionRowTop}>
-          <AppButton
-            title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
-            onPress={() => {
-              if (!userCanPublish) {
-                setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
-                return;
-              }
+      <View style={styles.actionRowTop}>
+        <AppButton
+          title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
+          onPress={() => {
+            if (!userCanPublish) {
+              setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
+              return;
+            }
 
-              setShowCreateForm(true);
-              setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
-            }}
-            disabled={showCreateForm || !userCanPublish}
-            style={styles.actionButton}
-          />
+            setShowCreateForm(true);
+            setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
+          }}
+          disabled={showCreateForm || !userCanPublish}
+          style={styles.actionButton}
+        />
 
-          <AppButton
-            title="Merkezi datayı yenile"
-            variant="ghost"
-            onPress={loadAnnouncementsData}
-            style={styles.actionButton}
-          />
-        </View>
+        <AppButton
+          title="Merkezi datayı yenile"
+          variant="ghost"
+          onPress={loadAnnouncementsData}
+          style={styles.actionButton}
+        />
+      </View>
 
-        {showCreateForm ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>Yeni duyuru oluştur</Text>
-                <Text style={styles.sectionSubtitle}>Başlığı, mesajı ve hedef kitleyi seç.</Text>
-              </View>
-              <Text style={styles.statusPill}>Yeni</Text>
-            </View>
-
-            <Text style={styles.label}>Duyuru başlığı</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Örn: Maç programı açıklandı"
-              placeholderTextColor={theme.colors.text.muted}
-              value={title}
-              onChangeText={setTitle}
-            />
-
-            <Text style={styles.label}>Duyuru mesajı</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Duyuru detaylarını yaz..."
-              placeholderTextColor={theme.colors.text.muted}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-            />
-
-            <Text style={styles.label}>Kimlere gönderilecek?</Text>
-            <View style={styles.targetGrid}>
-              {targetOptions.map((target) => {
-                const isSelected = selectedTargetId === target.id;
-
-                return (
-                  <Pressable
-                    key={target.id}
-                    onPress={() => setSelectedTargetId(target.id)}
-                    style={({ pressed }) => [
-                      styles.targetButton,
-                      isSelected ? styles.targetButtonSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>
-                      {target.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            <View style={styles.publishRow}>
-              <AppButton
-                title={isSubmitting ? "Yayınlanıyor..." : "Duyuruyu yayınla"}
-                onPress={publishAnnouncement}
-                disabled={!canPublish}
-                style={styles.actionButton}
-              />
-              <AppButton
-                title="Vazgeç"
-                variant="ghost"
-                onPress={() => {
-                  clearForm();
-                  setShowCreateForm(false);
-                  setStatusMessage("Duyuru oluşturma iptal edildi.");
-                }}
-                style={styles.actionButton}
-              />
-            </View>
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
+      {showCreateForm ? (
+        <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Yayınlanan duyurular</Text>
-              <Text style={styles.sectionSubtitle}>Paylaşılan duyuruları burada takip edebilirsin.</Text>
+              <Text style={styles.sectionTitle}>Yeni duyuru oluştur</Text>
+              <Text style={styles.sectionSubtitle}>Başlığı, mesajı ve hedef kitleyi seç.</Text>
             </View>
-            <Text style={styles.statusPill}>{announcements.length} aktif</Text>
+            <StatusBadge label="Yeni" tone="info" />
           </View>
 
-          <View style={styles.announcementList}>
-            {appData !== null && announcements.length > 0 ? (
-              announcements.map((announcement) => (
-                <View key={announcement.id} style={styles.announcementCard}>
-                  <View style={styles.announcementHeaderRow}>
-                    <View style={styles.announcementTextArea}>
-                      <Text style={styles.announcementTarget}>
-                        {getAnnouncementTargetLabel(announcement, appData)}
-                      </Text>
-                      <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                      <Text style={styles.announcementDate}>Paylaşıldı: {formatDate(announcement.createdAt)}</Text>
-                    </View>
+          <TextField
+            label="Duyuru başlığı"
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Örn: Maç programı açıklandı"
+            containerStyle={styles.field}
+          />
 
-                    {userCanDelete ? (
-                      <Pressable
-                        onPress={() => deleteAnnouncement(announcement.id)}
-                        style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}
-                      >
-                        <Text style={styles.deleteButtonText}>Sil</Text>
-                      </Pressable>
-                    ) : null}
+          <TextField
+            label="Duyuru mesajı"
+            value={message}
+            onChangeText={setMessage}
+            placeholder="Duyuru detaylarını yaz..."
+            multiline
+            containerStyle={styles.field}
+          />
+
+          <Text style={styles.label}>Kimlere gönderilecek?</Text>
+          <View style={styles.targetGrid}>
+            {targetOptions.map((target) => {
+              const isSelected = selectedTargetId === target.id;
+
+              return (
+                <Pressable
+                  key={target.id}
+                  onPress={() => setSelectedTargetId(target.id)}
+                  style={({ pressed }) => [
+                    styles.targetButton,
+                    isSelected ? styles.targetButtonSelected : null,
+                    pressed ? styles.pressed : null,
+                  ]}
+                >
+                  <Text style={[styles.targetButtonText, isSelected ? styles.targetButtonTextSelected : null]}>
+                    {target.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <View style={styles.publishRow}>
+            <AppButton
+              title={isSubmitting ? "Yayınlanıyor..." : "Duyuruyu yayınla"}
+              onPress={publishAnnouncement}
+              disabled={!canPublish}
+              style={styles.actionButton}
+            />
+            <AppButton
+              title="Vazgeç"
+              variant="ghost"
+              onPress={() => {
+                clearForm();
+                setShowCreateForm(false);
+                setStatusMessage("Duyuru oluşturma iptal edildi.");
+              }}
+              style={styles.actionButton}
+            />
+          </View>
+        </Card>
+      ) : null}
+
+      <Card style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.sectionHeaderText}>
+            <Text style={styles.sectionTitle}>Yayınlanan duyurular</Text>
+            <Text style={styles.sectionSubtitle}>Paylaşılan duyuruları burada takip edebilirsin.</Text>
+          </View>
+          <StatusBadge label={`${announcements.length} aktif`} tone="info" />
+        </View>
+
+        <View style={styles.announcementList}>
+          {appData !== null && announcements.length > 0 ? (
+            announcements.map((announcement) => (
+              <Card key={announcement.id} variant="subtle" style={styles.announcementCard}>
+                <View style={styles.announcementHeaderRow}>
+                  <View style={styles.announcementTextArea}>
+                    <Text style={styles.announcementTarget}>
+                      {getAnnouncementTargetLabel(announcement, appData)}
+                    </Text>
+                    <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                    <Text style={styles.announcementDate}>Paylaşıldı: {formatDate(announcement.createdAt)}</Text>
                   </View>
 
-                  <Text style={styles.announcementMessage}>{announcement.message}</Text>
+                  {userCanDelete ? (
+                    <AppButton
+                      title="Sil"
+                      variant="ghost"
+                      onPress={() => deleteAnnouncement(announcement.id)}
+                      style={styles.deleteButton}
+                    />
+                  ) : null}
                 </View>
-              ))
-            ) : (
-              <View style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Henüz duyuru yok</Text>
-                <Text style={styles.emptyText}>Yeni duyuru oluştur butonuna basarak ilk duyurunu ekleyebilirsin.</Text>
-              </View>
-            )}
-          </View>
 
-          <Text style={styles.statusText}>{statusMessage}</Text>
+                <Text style={styles.announcementMessage}>{announcement.message}</Text>
+              </Card>
+            ))
+          ) : (
+            <EmptyState title="Henüz duyuru yok" description="Yeni duyuru oluştur butonuna basarak ilk duyurunu ekleyebilirsin." />
+          )}
         </View>
-      </View>
-    </ScrollView>
+
+        <Text style={styles.statusText}>{statusMessage}</Text>
+      </Card>
+    </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: theme.colors.background.app },
-  screen: {
-    flexGrow: 1,
-    backgroundColor: theme.colors.background.app,
-    paddingHorizontal: theme.spacing["2xl"],
-    paddingBottom: theme.spacing["2xl"],
-  },
-  container: { width: "100%", maxWidth: 980, alignSelf: "center" },
-  pageHeader: { marginBottom: theme.spacing["2xl"] },
-  logo: {
-    color: theme.colors.brand.primary,
-    fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.md,
-  },
-  pageTitle: {
-    color: theme.colors.text.inverse,
-    fontSize: theme.fontSizes["5xl"],
-    fontWeight: theme.fontWeights.black,
-    lineHeight: theme.lineHeights["5xl"],
-    marginBottom: theme.spacing.sm,
-  },
-  pageSubtitle: {
-    color: theme.colors.text.inverse,
-    opacity: 0.76,
-    fontSize: theme.fontSizes.lg,
-    fontWeight: theme.fontWeights.semibold,
-  },
-  heroCard: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["3xl"],
-    marginBottom: theme.spacing["2xl"],
-    ...theme.shadows.md,
-  },
-  heroLabel: {
-    alignSelf: "flex-start",
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.extrabold,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.lg,
-    borderRadius: theme.radius.full,
-    marginBottom: theme.spacing.lg,
-  },
+  heroCard: { marginBottom: theme.spacing["2xl"] },
+  heroLabel: { marginBottom: theme.spacing.lg },
   heroTitle: {
-    fontSize: theme.fontSizes["4xl"],
-    fontWeight: theme.fontWeights.black,
+    fontSize: theme.fontSizes["2xl"],
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
-    lineHeight: theme.lineHeights["4xl"],
-    marginBottom: theme.spacing.md,
+    lineHeight: theme.lineHeights["2xl"],
+    marginBottom: theme.spacing.sm,
   },
   heroSubtitle: {
     fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.regular,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.xl,
   },
@@ -449,15 +401,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing["2xl"],
   },
   actionButton: { flexGrow: 1 },
-  section: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius["2xl"],
-    padding: theme.spacing["2xl"],
-    marginBottom: theme.spacing["2xl"],
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    ...theme.shadows.sm,
-  },
+  section: { marginBottom: theme.spacing["2xl"] },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -468,45 +412,23 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: {
     fontSize: theme.fontSizes["2xl"],
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
     marginBottom: theme.spacing.md,
   },
   sectionSubtitle: {
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     color: theme.colors.text.secondary,
     lineHeight: theme.lineHeights.md,
-  },
-  statusPill: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
   },
   label: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.sm,
   },
-  input: {
-    minHeight: 52,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    marginBottom: theme.spacing.lg,
-  },
-  textArea: { minHeight: 120, textAlignVertical: "top" },
+  field: { marginBottom: theme.spacing.lg },
   targetGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -528,18 +450,12 @@ const styles = StyleSheet.create({
   targetButtonText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
   },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
   publishRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
   announcementList: { gap: theme.spacing.md },
-  announcementCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
+  announcementCard: { padding: theme.spacing.lg },
   announcementHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -551,62 +467,31 @@ const styles = StyleSheet.create({
   announcementTarget: {
     color: theme.colors.text.brand,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   announcementTitle: {
     color: theme.colors.text.primary,
     fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
+    fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.xs,
   },
   announcementDate: {
     color: theme.colors.text.muted,
     fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.medium,
   },
   announcementMessage: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     lineHeight: theme.lineHeights.lg,
   },
-  deleteButton: {
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    backgroundColor: theme.colors.background.surface,
-  },
-  deleteButtonText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.black,
-  },
-  emptyCard: {
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-  },
-  emptyTitle: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.black,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
-    lineHeight: theme.lineHeights.md,
-  },
+  deleteButton: { alignSelf: "flex-start" },
   statusText: {
     color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.semibold,
+    fontWeight: theme.fontWeights.regular,
     marginTop: theme.spacing.xl,
     lineHeight: theme.lineHeights.md,
   },

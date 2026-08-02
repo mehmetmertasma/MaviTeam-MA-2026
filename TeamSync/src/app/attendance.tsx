@@ -117,10 +117,10 @@ export default function AttendanceScreen() {
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
   const [statusMessage, setStatusMessage] = useState("Önce takım ve antrenman seçerek yoklama alabilirsin.");
   const [showCreateSession, setShowCreateSession] = useState(false);
-  const [newSessionTeamId, setNewSessionTeamId] = useState("");
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [newSessionLocation, setNewSessionLocation] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [showTeamPicker, setShowTeamPicker] = useState(false);
 
   const currentUser = appData?.currentUser;
   const canTakeAttendance = currentUser?.role === "clubAdmin" || currentUser?.role === "coach";
@@ -200,15 +200,8 @@ export default function AttendanceScreen() {
   }
 
   async function handleCreateSession() {
-    if (appData === null) {
-      setStatusMessage("Oturum oluşturmak için önce merkezi data yüklenmeli.");
-      return;
-    }
-
-    const targetTeam = teams.find((team) => team.id === newSessionTeamId);
-
-    if (targetTeam === undefined) {
-      setStatusMessage("Oturum hangi takım için olacak? Lütfen bir takım seç.");
+    if (appData === null || selectedTeam === undefined) {
+      setStatusMessage("Oturum oluşturmak için önce yukarıdan bir takım seçmelisin.");
       return;
     }
 
@@ -223,8 +216,8 @@ export default function AttendanceScreen() {
       setIsCreatingSession(true);
 
       const nextAppData = await teamSyncService.createScheduleEvent({
-        clubId: targetTeam.clubId,
-        teamId: targetTeam.id,
+        clubId: selectedTeam.clubId,
+        teamId: selectedTeam.id,
         title: trimmedTitle,
         type: "practice",
         startsAt: new Date().toISOString(),
@@ -235,10 +228,8 @@ export default function AttendanceScreen() {
       setAppData(nextAppData);
 
       const createdEvent = [...nextAppData.scheduleEvents]
-        .filter((event) => event.teamId === targetTeam.id)
+        .filter((event) => event.teamId === selectedTeam.id)
         .sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime())[0];
-
-      setSelectedTeamId(targetTeam.id);
 
       if (createdEvent !== undefined) {
         setSelectedEventId(createdEvent.id);
@@ -247,7 +238,7 @@ export default function AttendanceScreen() {
       setNewSessionTitle("");
       setNewSessionLocation("");
       setShowCreateSession(false);
-      setStatusMessage(`${targetTeam.name} için ${trimmedTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`);
+      setStatusMessage(`${selectedTeam.name} için ${trimmedTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`);
     } catch {
       setStatusMessage("Oturum oluşturulurken bir sorun oluştu.");
     } finally {
@@ -364,31 +355,51 @@ export default function AttendanceScreen() {
             <EmptyState title="Henüz bir takıma bağlı değilsin" description="Bir takıma eklendiğinde yoklama durumunu burada görebileceksin." />
           )
         ) : (
-          <View style={styles.teamGrid}>
-            {teams.map((team) => {
-              const isSelected = selectedTeamId === team.id;
-              const teamEventCount = getTeamEvents(team.id, scheduleEvents).length;
-              const teamMemberCount = getTeamMembers(team, users).length;
+          <View>
+            <Pressable
+              onPress={() => setShowTeamPicker((currentValue) => !currentValue)}
+              style={({ pressed }) => [styles.teamDropdownButton, pressed ? styles.pressed : null]}
+            >
+              <View style={styles.teamDropdownTextArea}>
+                <Text style={styles.teamDropdownLabel}>Takım</Text>
+                <Text style={styles.teamDropdownValue}>{selectedTeam?.name ?? "Takım seç"}</Text>
+              </View>
+              <Text style={styles.teamDropdownChevron}>{showTeamPicker ? "▲" : "▼"}</Text>
+            </Pressable>
 
-              return (
-                <Pressable
-                  key={team.id}
-                  onPress={() => selectTeam(team)}
-                  style={({ pressed }) => [
-                    styles.teamCard,
-                    isSelected ? styles.teamCardSelected : null,
-                    pressed ? styles.pressed : null,
-                  ]}
-                >
-                  <Text style={styles.teamName}>{team.name}</Text>
-                  <Text style={styles.teamMeta}>{team.ageGroup}</Text>
-                  <View style={styles.teamStatsRow}>
-                    <Text style={styles.teamStat}>{teamMemberCount} kişi</Text>
-                    <Text style={styles.teamStat}>{teamEventCount} oturum</Text>
-                  </View>
-                </Pressable>
-              );
-            })}
+            {showTeamPicker ? (
+              <View style={styles.teamDropdownList}>
+                {teams.map((team) => {
+                  const isSelected = selectedTeamId === team.id;
+                  const teamMemberCount = getTeamMembers(team, users).length;
+
+                  return (
+                    <Pressable
+                      key={team.id}
+                      onPress={() => {
+                        selectTeam(team);
+                        setShowTeamPicker(false);
+                      }}
+                      style={({ pressed }) => [
+                        styles.teamDropdownRow,
+                        isSelected ? styles.teamDropdownRowSelected : null,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <View style={styles.teamDropdownRowTextArea}>
+                        <Text style={[styles.teamDropdownRowText, isSelected ? styles.teamDropdownRowTextSelected : null]}>
+                          {team.name}
+                        </Text>
+                        <Text style={styles.teamDropdownRowMeta}>{team.ageGroup}</Text>
+                      </View>
+                      <Text style={[styles.teamDropdownRowCount, isSelected ? styles.teamDropdownRowTextSelected : null]}>
+                        {teamMemberCount} kişi
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
         )}
       </Card>
@@ -404,47 +415,21 @@ export default function AttendanceScreen() {
           <Text style={styles.statusPill}>{availableEvents.length} oturum</Text>
         </View>
 
-        {canTakeAttendance && teams.length > 0 ? (
+        {canTakeAttendance && selectedTeam !== undefined ? (
           <AppButton
             title={showCreateSession ? "Kapat" : "Yeni oturum oluştur"}
             variant="secondary"
-            onPress={() => {
-              setShowCreateSession((currentValue) => !currentValue);
-              setNewSessionTeamId((currentValue) => (currentValue === "" ? selectedTeamId : currentValue));
-            }}
+            onPress={() => setShowCreateSession((currentValue) => !currentValue)}
             style={styles.newSessionButton}
           />
         ) : null}
 
-        {showCreateSession ? (
+        {showCreateSession && selectedTeam !== undefined ? (
           <Card variant="subtle" style={styles.createSessionBox}>
-            <Text style={styles.createSessionTitle}>Yeni oturum</Text>
+            <Text style={styles.createSessionTitle}>{selectedTeam.name} için yeni oturum</Text>
             <Text style={styles.createSessionSubtitle}>
               Oturum şimdi (bugünün tarihi ve saati) için oluşturulur. Farklı bir tarih planlamak istersen Program ekranını kullan.
             </Text>
-
-            <Text style={styles.label}>Hangi takım için?</Text>
-            <View style={styles.newSessionTeamGrid}>
-              {teams.map((team) => {
-                const isSelected = newSessionTeamId === team.id;
-
-                return (
-                  <Pressable
-                    key={team.id}
-                    onPress={() => setNewSessionTeamId(team.id)}
-                    style={({ pressed }) => [
-                      styles.newSessionTeamChip,
-                      isSelected ? styles.newSessionTeamChipSelected : null,
-                      pressed ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text style={[styles.newSessionTeamChipText, isSelected ? styles.newSessionTeamChipTextSelected : null]}>
-                      {team.name}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
 
             <TextField
               label="Oturum adı"
@@ -622,30 +607,73 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     marginBottom: theme.spacing.sm,
   },
-  newSessionTeamGrid: {
+  teamDropdownButton: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.lg,
-  },
-  newSessionTeamChip: {
-    borderRadius: theme.radius.full,
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     backgroundColor: theme.colors.background.surface,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
   },
-  newSessionTeamChipSelected: {
-    backgroundColor: theme.colors.brand.primary,
-    borderColor: theme.colors.brand.primary,
+  teamDropdownTextArea: { flex: 1 },
+  teamDropdownLabel: {
+    color: theme.colors.text.muted,
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.medium,
+    textTransform: "uppercase",
+    marginBottom: theme.spacing.xs,
   },
-  newSessionTeamChipText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.sm,
+  teamDropdownValue: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.lg,
     fontWeight: theme.fontWeights.semibold,
   },
-  newSessionTeamChipTextSelected: { color: theme.colors.text.inverse },
+  teamDropdownChevron: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    marginLeft: theme.spacing.md,
+  },
+  teamDropdownList: {
+    marginTop: theme.spacing.sm,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    overflow: "hidden",
+  },
+  teamDropdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    backgroundColor: theme.colors.background.surface,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border.default,
+  },
+  teamDropdownRowSelected: { backgroundColor: theme.colors.brand.primarySoft },
+  teamDropdownRowTextArea: { flex: 1 },
+  teamDropdownRowText: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  teamDropdownRowTextSelected: { color: theme.colors.text.brand },
+  teamDropdownRowMeta: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.regular,
+    marginTop: theme.spacing.xs,
+  },
+  teamDropdownRowCount: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.medium,
+  },
   heroCard: { gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
   heroTitle: {
     fontSize: theme.fontSizes["4xl"],
@@ -708,43 +736,6 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.radius.full,
-    overflow: "hidden",
-  },
-  teamGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  teamCard: {
-    flexGrow: 1,
-    flexBasis: 220,
-    backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    padding: theme.spacing.lg,
-  },
-  teamCardSelected: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    borderColor: theme.colors.brand.primary,
-  },
-  teamName: {
-    color: theme.colors.text.primary,
-    fontSize: theme.fontSizes.xl,
-    fontWeight: theme.fontWeights.semibold,
-    marginBottom: theme.spacing.xs,
-  },
-  teamMeta: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.regular,
-    marginBottom: theme.spacing.md,
-  },
-  teamStatsRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
-  teamStat: {
-    backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.full,
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
     overflow: "hidden",
   },
   eventList: { gap: theme.spacing.md },

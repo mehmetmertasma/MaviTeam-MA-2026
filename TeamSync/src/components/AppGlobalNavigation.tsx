@@ -16,6 +16,8 @@ const routesWithoutTopControls = [
   "/create-club",
   "/join-club",
   "/join-request-sent",
+  "/privacy-policy",
+  "/terms-of-service",
 ];
 
 const TOP_CONTROL_OFFSET = 10;

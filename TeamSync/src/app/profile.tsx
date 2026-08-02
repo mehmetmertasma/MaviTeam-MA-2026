@@ -72,6 +72,10 @@ function getProfileCopy(language: "tr" | "en") {
       pushDescription: "Announcements, schedule, and message notifications.",
       emailNotifications: "Email notifications",
       emailDescription: "Email updates for important club changes.",
+      legalTitle: "Legal",
+      legalSubtitle: "Review how your data is handled and the terms you agreed to.",
+      legalPrivacy: "Privacy Policy",
+      legalTerms: "Terms of Service",
       accountActions: "Account actions",
       accountActionsSubtitle: "Securely manage this session from your account center.",
       logoutTitle: "Log out",
@@ -99,6 +103,10 @@ function getProfileCopy(language: "tr" | "en") {
     pushDescription: "Duyuru, program ve mesaj bildirimleri.",
     emailNotifications: "E-posta bildirimleri",
     emailDescription: "Önemli kulüp güncellemeleri için e-posta.",
+    legalTitle: "Yasal",
+    legalSubtitle: "Verilerinizin nasıl kullanıldığını ve kabul ettiğiniz koşulları inceleyin.",
+    legalPrivacy: "Gizlilik Politikası",
+    legalTerms: "Kullanım Koşulları",
     accountActions: "Hesap işlemleri",
     accountActionsSubtitle: "Oturumunuzu hesap merkezinden güvenli şekilde yönetebilirsiniz.",
     logoutTitle: "Çıkış yap",
@@ -421,6 +429,26 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
+      <Card style={styles.section}>
+        <Text style={styles.sectionTitle}>{copy.legalTitle}</Text>
+        <Text style={styles.sectionSubtitle}>{copy.legalSubtitle}</Text>
+
+        <View style={styles.legalLinksRow}>
+          <AppButton
+            title={copy.legalPrivacy}
+            variant="ghost"
+            onPress={() => router.push("/privacy-policy" as never)}
+            style={styles.legalLinkButton}
+          />
+          <AppButton
+            title={copy.legalTerms}
+            variant="ghost"
+            onPress={() => router.push("/terms-of-service" as never)}
+            style={styles.legalLinkButton}
+          />
+        </View>
+      </Card>
+
       <Card variant="danger" style={styles.section}>
         <Text style={styles.sectionTitle}>{copy.accountActions}</Text>
         <Text style={styles.sectionSubtitle}>{copy.accountActionsSubtitle}</Text>
@@ -472,6 +500,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.md },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   languageBox: { marginTop: theme.spacing.xl },
+  legalLinksRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.lg },
+  legalLinkButton: { flexGrow: 1, minWidth: 160 },
   form: { gap: theme.spacing.lg },
   formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
   formField: { flex: 1, minWidth: 240 },

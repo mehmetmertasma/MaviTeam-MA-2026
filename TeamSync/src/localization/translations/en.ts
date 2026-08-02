@@ -52,6 +52,9 @@ export const en = {
       "One consistent experience across web, iPhone, and Android",
     ],
     footerText: "New users create an account. Existing users can sign in.",
+    legalPrivacy: "Privacy Policy",
+    legalAnd: " · ",
+    legalTerms: "Terms of Service",
     accessibility: {
       createClub: "Go to registration, then create a new club",
       joinClub: "Go to registration, then join a club with a team code",

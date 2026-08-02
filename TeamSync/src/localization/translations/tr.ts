@@ -50,6 +50,9 @@ export const tr = {
       "Web, iPhone ve Android için ortak deneyim",
     ],
     footerText: "Yeni kullanıcılar hesap oluşturur. Mevcut kullanıcılar giriş yapabilir.",
+    legalPrivacy: "Gizlilik Politikası",
+    legalAnd: " · ",
+    legalTerms: "Kullanım Koşulları",
     accessibility: {
       createClub: "Kayıt ekranından sonra yeni kulüp oluşturma sayfasına git",
       joinClub: "Kayıt ekranından sonra takım kodu ile kulübe katılma sayfasına git",

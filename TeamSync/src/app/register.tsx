@@ -41,6 +41,11 @@ export default function RegisterScreen() {
         creatingAccount: "Hesap oluşturuluyor...",
         preparingProfile: "Hesap profili hazırlanıyor...",
         readyForNextStep: "Hesap oluşturuldu. Sonraki adıma geçiliyor...",
+        legalConsentPrefix: "Hesap oluşturarak ",
+        legalPrivacyLabel: "Gizlilik Politikası'nı",
+        legalAnd: " ve ",
+        legalTermsLabel: "Kullanım Koşulları'nı",
+        legalConsentSuffix: " kabul etmiş olursunuz.",
       }
     : {
         accountSetupTitle: "Secure account setup",
@@ -48,6 +53,11 @@ export default function RegisterScreen() {
         creatingAccount: "Creating account...",
         preparingProfile: "Preparing account profile...",
         readyForNextStep: "Account created. Moving to the next step...",
+        legalConsentPrefix: "By creating an account, you agree to our ",
+        legalPrivacyLabel: "Privacy Policy",
+        legalAnd: " and ",
+        legalTermsLabel: "Terms of Service",
+        legalConsentSuffix: ".",
       };
 
   const [fullName, setFullName] = useState("");
@@ -201,6 +211,18 @@ export default function RegisterScreen() {
           <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
         </View>
 
+        <Text style={styles.legalConsentText}>
+          {registerCopy.legalConsentPrefix}
+          <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
+            {registerCopy.legalPrivacyLabel}
+          </Text>
+          {registerCopy.legalAnd}
+          <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
+            {registerCopy.legalTermsLabel}
+          </Text>
+          {registerCopy.legalConsentSuffix}
+        </Text>
+
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
 
         <View style={styles.buttonGroup}>
@@ -275,6 +297,16 @@ const styles = StyleSheet.create({
   infoText: {
     ...Typography.supporting,
     color: theme.colors.text.secondary,
+  },
+  legalConsentText: {
+    ...Typography.caption,
+    color: theme.colors.text.muted,
+    textAlign: "center",
+    marginTop: theme.spacing["2xl"],
+  },
+  legalLink: {
+    color: theme.colors.text.brand,
+    fontWeight: theme.fontWeights.semibold,
   },
   statusText: {
     ...Typography.supporting,

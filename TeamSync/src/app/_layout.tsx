@@ -30,10 +30,12 @@ const routesWithoutGlobalNavigation = [
   "/create-club",
   "/join-club",
   "/join-request-sent",
+  "/privacy-policy",
+  "/terms-of-service",
 ];
 
-const publicAuthRoutes = ["/", "/login", "/register", "/verify-email"];
-const workspaceSetupRoutes = ["/", "/create-club", "/join-club", "/join-request-sent"];
+const publicAuthRoutes = ["/", "/login", "/register", "/verify-email", "/privacy-policy", "/terms-of-service"];
+const workspaceSetupRoutes = ["/", "/create-club", "/join-club", "/join-request-sent", "/privacy-policy", "/terms-of-service"];
 
 function AppProviders({ children }: PropsWithChildren) {
   return (
@@ -222,6 +224,8 @@ function AppContent() {
         <Stack.Screen name="statistics" />
         <Stack.Screen name="replays" />
         <Stack.Screen name="payments" />
+        <Stack.Screen name="privacy-policy" />
+        <Stack.Screen name="terms-of-service" />
       </Stack>
 
       <AppGlobalNavigation />

@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -65,6 +65,16 @@ export default function HomeScreen() {
         </View>
 
         <Text style={styles.footerText}>{t.home.footerText}</Text>
+
+        <Text style={styles.legalLinksText}>
+          <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
+            {t.home.legalPrivacy}
+          </Text>
+          {t.home.legalAnd}
+          <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
+            {t.home.legalTerms}
+          </Text>
+        </Text>
       </ScreenCard>
     </ScrollView>
   );
@@ -149,5 +159,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: theme.fontWeights.medium,
     lineHeight: theme.lineHeights.md,
+  },
+  legalLinksText: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.text.muted,
+    textAlign: "center",
+  },
+  legalLink: {
+    color: theme.colors.text.brand,
+    fontWeight: theme.fontWeights.semibold,
   },
 });

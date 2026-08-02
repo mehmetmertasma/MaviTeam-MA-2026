@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDoc, getDocs, collection, query, where } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, deleteDoc, collection, query, where } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 // Covers the security model touched by the attendance-permissions fix
@@ -236,6 +236,71 @@ describe("scheduleEvents", () => {
         location: "Kapali Spor Salonu",
         createdByUserId: PARENT_A1,
         createdAt: "2026-08-08T00:00:00.000Z",
+      })
+    );
+  });
+
+  it("coach can delete a schedule event for their own team", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(deleteDoc(doc(db, "scheduleEvents", "event-a1-team")));
+  });
+
+  it("coach cannot delete a schedule event for a team they don't coach", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertFails(deleteDoc(doc(db, "scheduleEvents", "event-a-clubwide")));
+  });
+
+  it("clubAdmin can delete any schedule event in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "scheduleEvents", "event-a-clubwide")));
+  });
+
+  it("parent cannot delete a schedule event", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(deleteDoc(doc(db, "scheduleEvents", "event-a1-team")));
+  });
+});
+
+describe("attendanceSummaries", () => {
+  const SUMMARY_FIXTURE = {
+    userId: ATHLETE_A1,
+    clubId: CLUB_A,
+    years: { "2026": { present: 10, absent: 2, late: 1, excused: 0, total: 13 } },
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "attendanceSummaries", ATHLETE_A1), SUMMARY_FIXTURE);
+    });
+  });
+
+  it("a user can read their own attendance summary", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(getDoc(doc(db, "attendanceSummaries", ATHLETE_A1)));
+  });
+
+  it("clubAdmin can read any summary in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDoc(doc(db, "attendanceSummaries", ATHLETE_A1)));
+  });
+
+  it("another club member cannot read someone else's summary", async () => {
+    const db = authedFirestore(PARENT_A2);
+    await assertFails(getDoc(doc(db, "attendanceSummaries", ATHLETE_A1)));
+  });
+
+  it("a clubAdmin from a different club cannot read the summary", async () => {
+    const db = authedFirestore(ADMIN_B);
+    await assertFails(getDoc(doc(db, "attendanceSummaries", ATHLETE_A1)));
+  });
+
+  it("no client, not even the record's own owner, can write a summary directly", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertFails(
+      setDoc(doc(db, "attendanceSummaries", ATHLETE_A1), {
+        ...SUMMARY_FIXTURE,
+        years: { "2026": { present: 999, absent: 0, late: 0, excused: 0, total: 999 } },
       })
     );
   });

@@ -320,8 +320,9 @@ service cloud.firestore {
       allow create, update: if (currentUserIsClubAdmin()
           && request.resource.data.clubId == currentUserClubId())
         || canCoachManageOwnTeamData(request.resource.data);
-      allow delete: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+      allow delete: if (currentUserIsClubAdmin()
+          && resource.data.clubId == currentUserClubId())
+        || canCoachManageOwnTeamData(resource.data);
     }
 
     match /attendanceRecords/{attendanceRecordId} {
@@ -329,6 +330,16 @@ service cloud.firestore {
       allow create, update: if canCreateOrUpdateAttendance(request.resource.data);
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
+    }
+
+    // Written only by the scheduled cleanupOldAttendance Cloud Function via
+    // the Admin SDK (which bypasses these rules) -- clients can read their
+    // own yearly totals, or a clubAdmin can read anyone's in their club, but
+    // no client write path exists.
+    match /attendanceSummaries/{userId} {
+      allow read: if isSelf(userId)
+        || (currentUserIsClubAdmin() && resource.data.clubId == currentUserClubId());
+      allow write: if false;
     }
 
     match /payments/{paymentId} {

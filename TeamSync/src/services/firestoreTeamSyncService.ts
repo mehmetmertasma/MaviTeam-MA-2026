@@ -845,6 +845,28 @@ export const firestoreTeamSyncService = {
     await setDoc(eventRef, updateData, { merge: true });
   },
 
+  async removeScheduleEvent(firebaseUser: User, eventId: string) {
+    const { db } = requireFirebaseServices();
+    const workspace = await this.getCurrentWorkspace(firebaseUser);
+
+    if (workspace === null || workspace.club === null) {
+      throw new Error("FIRESTORE_WORKSPACE_MISSING");
+    }
+
+    if (!userCanManageSchedule(workspace.currentUser.role)) {
+      throw new Error("SCHEDULE_PERMISSION_DENIED");
+    }
+
+    const eventRef = doc(db, "scheduleEvents", eventId);
+    const eventSnapshot = await getDoc(eventRef);
+
+    if (!eventSnapshot.exists() || readString(eventSnapshot.data().clubId) !== workspace.club.id) {
+      throw new Error("SCHEDULE_EVENT_MISSING");
+    }
+
+    await deleteDoc(eventRef);
+  },
+
   async listAnnouncementsForCurrentClub(firebaseUser: User, maxResults = 30): Promise<Announcement[]> {
     const { db } = requireFirebaseServices();
     const workspace = await this.getCurrentWorkspace(firebaseUser);

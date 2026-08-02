@@ -93,6 +93,26 @@ export type AttendanceRecord = {
   updatedAt?: TimestampString;
 };
 
+// Raw AttendanceRecord documents are only kept for a couple of weeks (see
+// functions/index.js's cleanupOldAttendance) -- once a record ages out, its
+// status is folded into the matching year here (keyed by session year) and
+// the raw record is deleted, so "yearly average attendance" survives the
+// cleanup even though the day-by-day records don't.
+export type AttendanceYearlyTotals = {
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  total: number;
+};
+
+export type AttendanceSummary = {
+  userId: string;
+  clubId: string;
+  years: Record<string, AttendanceYearlyTotals>;
+  updatedAt: TimestampString;
+};
+
 export type ChatGroup = {
   id: string;
   clubId: string;

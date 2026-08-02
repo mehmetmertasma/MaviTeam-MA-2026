@@ -703,6 +703,21 @@ export const teamSyncService = {
     });
   },
 
+  async removeScheduleEvent(eventId: string) {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      await firestoreTeamSyncService.removeScheduleEvent(firebaseUser, eventId);
+
+      return loadAppData();
+    }
+
+    const data = await loadAppData();
+    return saveAppData({
+      ...data,
+      scheduleEvents: data.scheduleEvents.filter((event) => event.id !== eventId),
+    });
+  },
+
   async createChatGroup(input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {
     if (authService.isConfigured()) {
       const firebaseUser = getFirebaseUserOrThrow();

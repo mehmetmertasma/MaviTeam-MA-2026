@@ -121,6 +121,7 @@ export default function AttendanceScreen() {
   const [newSessionLocation, setNewSessionLocation] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showTeamPicker, setShowTeamPicker] = useState(false);
+  const [pendingRemoveEventId, setPendingRemoveEventId] = useState("");
 
   const currentUser = appData?.currentUser;
   const canTakeAttendance = currentUser?.role === "clubAdmin" || currentUser?.role === "coach";
@@ -197,6 +198,28 @@ export default function AttendanceScreen() {
     setSelectedEventId(event.id);
     setAttendanceDraft({});
     setStatusMessage(`${event.title} için yoklama açıldı.`);
+  }
+
+  async function handleRemoveEvent(event: ScheduleEvent) {
+    if (pendingRemoveEventId !== event.id) {
+      setPendingRemoveEventId(event.id);
+      setStatusMessage(`${event.title} silinecek. Eminsen tekrar Sil'e bas.`);
+      return;
+    }
+
+    try {
+      const nextAppData = await teamSyncService.removeScheduleEvent(event.id);
+      setAppData(nextAppData);
+      setPendingRemoveEventId("");
+
+      if (selectedEventId === event.id) {
+        setSelectedEventId("");
+      }
+
+      setStatusMessage(`${event.title} silindi.`);
+    } catch {
+      setStatusMessage("Oturum silinirken bir sorun oluştu.");
+    }
   }
 
   async function handleCreateSession() {
@@ -473,26 +496,34 @@ export default function AttendanceScreen() {
               const isSelected = selectedEventId === event.id;
 
               return (
-                <Pressable
-                  key={event.id}
-                  onPress={() => selectEvent(event)}
-                  style={({ pressed }) => [
-                    styles.eventCard,
-                    isSelected ? styles.eventCardSelected : null,
-                    pressed ? styles.pressed : null,
-                  ]}
-                >
-                  <View style={styles.eventDateBox}>
-                    <Text style={styles.eventDateText}>{formatEventDate(event.startsAt)}</Text>
-                    <Text style={styles.eventTimeText}>{formatEventTime(event.startsAt)}</Text>
-                  </View>
+                <View key={event.id} style={[styles.eventCard, isSelected ? styles.eventCardSelected : null]}>
+                  <Pressable
+                    onPress={() => selectEvent(event)}
+                    style={({ pressed }) => [styles.eventMainArea, pressed ? styles.pressed : null]}
+                  >
+                    <View style={styles.eventDateBox}>
+                      <Text style={styles.eventDateText}>{formatEventDate(event.startsAt)}</Text>
+                      <Text style={styles.eventTimeText}>{formatEventTime(event.startsAt)}</Text>
+                    </View>
 
-                  <View style={styles.eventInfo}>
-                    <Text style={styles.eventType}>{getEventTypeLabel(event.type)}</Text>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <Text style={styles.eventMeta}>{event.location}</Text>
-                  </View>
-                </Pressable>
+                    <View style={styles.eventInfo}>
+                      <Text style={styles.eventType}>{getEventTypeLabel(event.type)}</Text>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <Text style={styles.eventMeta}>{event.location}</Text>
+                    </View>
+                  </Pressable>
+
+                  {canTakeAttendance ? (
+                    <Pressable
+                      onPress={() => handleRemoveEvent(event)}
+                      style={({ pressed }) => [styles.eventDeleteButton, pressed ? styles.pressed : null]}
+                    >
+                      <Text style={styles.eventDeleteButtonText}>
+                        {pendingRemoveEventId === event.id ? "Emin misin?" : "Sil"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               );
             })}
           </View>
@@ -741,6 +772,7 @@ const styles = StyleSheet.create({
   eventList: { gap: theme.spacing.md },
   eventCard: {
     flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.md,
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
@@ -751,6 +783,26 @@ const styles = StyleSheet.create({
   eventCardSelected: {
     backgroundColor: theme.colors.brand.primarySoft,
     borderColor: theme.colors.brand.primary,
+  },
+  eventMainArea: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+  },
+  eventDeleteButton: {
+    alignSelf: "flex-start",
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.surface,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+  },
+  eventDeleteButtonText: {
+    color: theme.colors.text.danger,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
   },
   eventDateBox: {
     width: 92,

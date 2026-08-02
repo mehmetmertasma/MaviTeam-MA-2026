@@ -32,10 +32,13 @@
     "react-native-worklets": "0.8.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "@types/node": "^26.1.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.4",
     "eslint-config-expo": "^56.0.4",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.10"
   },
   "scripts": {
     "start": "expo start",
@@ -46,6 +49,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "quality": "npm run lint && npm run typecheck",
+    "test:rules": "npm exec --yes --ignore-scripts --package firebase-tools -- firebase emulators:exec --only firestore \"vitest run tests/firestore-rules\"",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "export:web": "expo export --platform web",
     "deploy:firebase": "npm run export:web && npm exec --yes --ignore-scripts --package firebase-tools -- firebase deploy --only firestore:rules,firestore:indexes,functions,hosting",

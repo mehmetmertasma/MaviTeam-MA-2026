@@ -117,6 +117,7 @@ export default function AttendanceScreen() {
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
   const [statusMessage, setStatusMessage] = useState("Önce takım ve antrenman seçerek yoklama alabilirsin.");
   const [showCreateSession, setShowCreateSession] = useState(false);
+  const [newSessionTeamId, setNewSessionTeamId] = useState("");
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [newSessionLocation, setNewSessionLocation] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
@@ -199,8 +200,15 @@ export default function AttendanceScreen() {
   }
 
   async function handleCreateSession() {
-    if (appData === null || selectedTeam === undefined) {
-      setStatusMessage("Oturum oluşturmak için önce takım seçmelisin.");
+    if (appData === null) {
+      setStatusMessage("Oturum oluşturmak için önce merkezi data yüklenmeli.");
+      return;
+    }
+
+    const targetTeam = teams.find((team) => team.id === newSessionTeamId);
+
+    if (targetTeam === undefined) {
+      setStatusMessage("Oturum hangi takım için olacak? Lütfen bir takım seç.");
       return;
     }
 
@@ -215,8 +223,8 @@ export default function AttendanceScreen() {
       setIsCreatingSession(true);
 
       const nextAppData = await teamSyncService.createScheduleEvent({
-        clubId: selectedTeam.clubId,
-        teamId: selectedTeam.id,
+        clubId: targetTeam.clubId,
+        teamId: targetTeam.id,
         title: trimmedTitle,
         type: "practice",
         startsAt: new Date().toISOString(),
@@ -227,8 +235,10 @@ export default function AttendanceScreen() {
       setAppData(nextAppData);
 
       const createdEvent = [...nextAppData.scheduleEvents]
-        .filter((event) => event.teamId === selectedTeam.id)
+        .filter((event) => event.teamId === targetTeam.id)
         .sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime())[0];
+
+      setSelectedTeamId(targetTeam.id);
 
       if (createdEvent !== undefined) {
         setSelectedEventId(createdEvent.id);
@@ -237,7 +247,7 @@ export default function AttendanceScreen() {
       setNewSessionTitle("");
       setNewSessionLocation("");
       setShowCreateSession(false);
-      setStatusMessage(`${trimmedTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`);
+      setStatusMessage(`${targetTeam.name} için ${trimmedTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`);
     } catch {
       setStatusMessage("Oturum oluşturulurken bir sorun oluştu.");
     } finally {
@@ -394,21 +404,47 @@ export default function AttendanceScreen() {
           <Text style={styles.statusPill}>{availableEvents.length} oturum</Text>
         </View>
 
-        {canTakeAttendance && selectedTeam !== undefined ? (
+        {canTakeAttendance && teams.length > 0 ? (
           <AppButton
             title={showCreateSession ? "Kapat" : "Yeni oturum oluştur"}
             variant="secondary"
-            onPress={() => setShowCreateSession((currentValue) => !currentValue)}
+            onPress={() => {
+              setShowCreateSession((currentValue) => !currentValue);
+              setNewSessionTeamId((currentValue) => (currentValue === "" ? selectedTeamId : currentValue));
+            }}
             style={styles.newSessionButton}
           />
         ) : null}
 
-        {showCreateSession && selectedTeam !== undefined ? (
+        {showCreateSession ? (
           <Card variant="subtle" style={styles.createSessionBox}>
             <Text style={styles.createSessionTitle}>Yeni oturum</Text>
             <Text style={styles.createSessionSubtitle}>
               Oturum şimdi (bugünün tarihi ve saati) için oluşturulur. Farklı bir tarih planlamak istersen Program ekranını kullan.
             </Text>
+
+            <Text style={styles.label}>Hangi takım için?</Text>
+            <View style={styles.newSessionTeamGrid}>
+              {teams.map((team) => {
+                const isSelected = newSessionTeamId === team.id;
+
+                return (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => setNewSessionTeamId(team.id)}
+                    style={({ pressed }) => [
+                      styles.newSessionTeamChip,
+                      isSelected ? styles.newSessionTeamChipSelected : null,
+                      pressed ? styles.pressed : null,
+                    ]}
+                  >
+                    <Text style={[styles.newSessionTeamChipText, isSelected ? styles.newSessionTeamChipTextSelected : null]}>
+                      {team.name}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
             <TextField
               label="Oturum adı"
@@ -580,6 +616,36 @@ const styles = StyleSheet.create({
   },
   createSessionField: { marginBottom: theme.spacing.lg },
   createSessionButton: { alignSelf: "flex-start" },
+  label: {
+    color: theme.colors.text.primary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.semibold,
+    marginBottom: theme.spacing.sm,
+  },
+  newSessionTeamGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.lg,
+  },
+  newSessionTeamChip: {
+    borderRadius: theme.radius.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.surface,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  newSessionTeamChipSelected: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  newSessionTeamChipText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  newSessionTeamChipTextSelected: { color: theme.colors.text.inverse },
   heroCard: { gap: theme.spacing.md, marginBottom: theme.spacing["2xl"] },
   heroTitle: {
     fontSize: theme.fontSizes["4xl"],

@@ -35,7 +35,23 @@ const routesWithoutGlobalNavigation = [
 ];
 
 const publicAuthRoutes = ["/", "/login", "/register", "/verify-email", "/privacy-policy", "/terms-of-service"];
-const workspaceSetupRoutes = ["/", "/create-club", "/join-club", "/join-request-sent", "/privacy-policy", "/terms-of-service"];
+// "/login" and "/register" are included here (even though they aren't
+// "setup" screens) so that an already-signed-in, verified, clubless user who
+// lands back on either one -- e.g. clicking a home-screen button again after
+// an earlier attempt -- doesn't get force-redirected to "/create-club" by
+// the workspace guard below before they can pick "join a club" again. Both
+// are already public auth routes, so this doesn't change how a user who
+// already has a club gets bounced to "/dashboard" from either screen.
+const workspaceSetupRoutes = [
+  "/",
+  "/login",
+  "/register",
+  "/create-club",
+  "/join-club",
+  "/join-request-sent",
+  "/privacy-policy",
+  "/terms-of-service",
+];
 
 function AppProviders({ children }: PropsWithChildren) {
   return (

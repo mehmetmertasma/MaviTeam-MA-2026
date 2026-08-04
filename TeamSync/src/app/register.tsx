@@ -117,7 +117,19 @@ export default function RegisterScreen() {
       });
 
       setStatusMessage(registerCopy.preparingProfile);
-      const challenge = await emailVerificationService.requestCode({ fullName: trimmedName });
+
+      // The account already exists and is signed in at this point, so even
+      // if requesting the code fails (a flaky Cloud Function call), we
+      // still need to land on /verify-email with the *correct* next
+      // destination rather than get stuck here -- verify-email.tsx already
+      // requests a fresh code itself whenever it wasn't handed one directly.
+      let challenge: { expiresAt: string; devCode?: string } | null = null;
+
+      try {
+        challenge = await emailVerificationService.requestCode({ fullName: trimmedName });
+      } catch (codeRequestError) {
+        console.warn("Initial verification code request failed; verify-email will retry.", codeRequestError);
+      }
 
       setStatusMessage(registerCopy.readyForNextStep);
 
@@ -127,8 +139,8 @@ export default function RegisterScreen() {
           fullName: user.displayName ?? trimmedName,
           email: user.email ?? trimmedEmail,
           next: nextRoute === "/join-club" ? "join-club" : "create-club",
-          expiresAt: challenge.expiresAt,
-          ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
+          ...(challenge ? { expiresAt: challenge.expiresAt } : {}),
+          ...(challenge?.devCode ? { devCode: challenge.devCode } : {}),
         },
       } as never);
     } catch (registerError) {

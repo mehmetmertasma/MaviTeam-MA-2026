@@ -106,7 +106,26 @@ function AppContent() {
   }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, routeIsPublic]);
 
   useEffect(() => {
-    if (!isFirebaseAuthConfigured || !isAuthReady || !isSignedIn || user === null || user.emailVerified || pathname === "/verify-email") {
+    // Firebase signs a user in immediately on account creation, before
+    // they've verified their email -- which makes this effect's condition
+    // true while register.tsx is still on-screen, mid-flow, waiting on its
+    // own network call to request the verification code. If this effect
+    // redirected here too, it would only have the current pathname
+    // ("/register") to guess the right destination from, always guessing
+    // "create-club" even when the user chose "join a club" -- clobbering
+    // register.tsx's own correct, context-aware redirect if that one is
+    // ever slow or fails. Skipping "/register" leaves that transition
+    // entirely to register.tsx; this effect still catches everyone else
+    // (e.g. a returning user who reopens the app mid-verification).
+    if (
+      !isFirebaseAuthConfigured
+      || !isAuthReady
+      || !isSignedIn
+      || user === null
+      || user.emailVerified
+      || pathname === "/verify-email"
+      || pathname === "/register"
+    ) {
       return;
     }
 

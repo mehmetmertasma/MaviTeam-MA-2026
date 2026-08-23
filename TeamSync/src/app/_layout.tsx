@@ -42,10 +42,24 @@ const publicAuthRoutes = ["/", "/login", "/register", "/verify-email", "/privacy
 // the workspace guard below before they can pick "join a club" again. Both
 // are already public auth routes, so this doesn't change how a user who
 // already has a club gets bounced to "/dashboard" from either screen.
+//
+// "/verify-email" is included for the same race-condition reason as
+// "/register" is skipped in the effect above, one step later in the flow:
+// the moment verifyEmailCode succeeds, user.emailVerified flips true and
+// re-renders this component *before* verify-email.tsx's own
+// ensureUserProfile()-then-redirect finishes -- so this guard would run
+// first, see workspace.club === null, and defer to
+// getSetupRouteForSignedInUser(pathname), which only special-cases
+// "/join-club"/"/join-request-sent" and defaults everything else (including
+// "/verify-email" itself) to "/create-club", clobbering a join-club intent
+// regardless of what the user actually chose. Skipping it here leaves the
+// redirect entirely to verify-email.tsx's own nextRoute, which already knows
+// the real intent via its route params.
 const workspaceSetupRoutes = [
   "/",
   "/login",
   "/register",
+  "/verify-email",
   "/create-club",
   "/join-club",
   "/join-request-sent",

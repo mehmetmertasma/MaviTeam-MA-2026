@@ -33,7 +33,6 @@ type FirestoreUserStatus = "emailVerified" | "active" | "pending" | "pendingAppr
 
 type EnsureUserProfileInput = {
   user: User;
-  role?: UserRole;
   status?: FirestoreUserStatus;
 };
 
@@ -347,12 +346,20 @@ export const firestoreTeamSyncService = {
     const now = serverTimestamp();
 
     if (!userSnapshot.exists()) {
+      // Always starts as "athlete" with no club, regardless of whether this
+      // person meant to create a club or join one -- createClubWorkspace
+      // and requestJoinClub are the only places that actually grant
+      // clubAdmin/set a real clubId, and only once that action truly
+      // happens (submitting the create-club form / an invite code), not
+      // just from picking a button or landing on a route. A club's admin
+      // can also freely change anyone's role later from the Members screen,
+      // so there's no need to guess the "right" role up front.
       await setDoc(userRef, {
         uid: input.user.uid,
         fullName: getDisplayName(input.user),
         email: input.user.email ?? "",
         emailVerified: input.user.emailVerified,
-        role: input.role ?? "clubAdmin",
+        role: "athlete",
         status: input.status ?? "emailVerified",
         clubId: null,
         teamIds: [],

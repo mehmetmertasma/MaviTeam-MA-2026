@@ -133,7 +133,6 @@ export default function VerifyEmailScreen() {
 
       await firestoreTeamSyncService.ensureUserProfile({
         user,
-        role: nextRoute === "/create-club" ? "clubAdmin" : "athlete",
         status: "emailVerified",
       });
 

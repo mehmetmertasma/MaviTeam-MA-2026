@@ -11,6 +11,7 @@ import { Typography, theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { emailVerificationService } from "@/services/emailVerificationService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function isValidEmail(value: string) {
   const trimmedValue = value.trim();
@@ -65,6 +66,20 @@ export default function LoginScreen() {
 
       if (!user.emailVerified) {
         setStatusMessage(t.auth.verificationRequired);
+
+        // Falls back to "create-club" if no intent was ever recorded (e.g.
+        // an older account from before this existed) -- matches the
+        // previous hardcoded behavior for that case, but now respects a
+        // "join-club" intent recorded at registration instead of always
+        // overriding it.
+        let next: "create-club" | "join-club" = "create-club";
+
+        try {
+          next = (await firestoreTeamSyncService.getRegistrationIntent(user)) ?? "create-club";
+        } catch (intentError) {
+          console.warn("Reading registration intent failed; defaulting to create-club.", intentError);
+        }
+
         const challenge = await emailVerificationService.requestCode({
           fullName: user.displayName ?? trimmedEmail,
         });
@@ -74,7 +89,7 @@ export default function LoginScreen() {
           params: {
             fullName: user.displayName ?? "",
             email: user.email ?? trimmedEmail,
-            next: "create-club",
+            next,
             expiresAt: challenge.expiresAt,
             ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
           },

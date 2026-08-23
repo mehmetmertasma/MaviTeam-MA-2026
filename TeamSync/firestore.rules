@@ -205,6 +205,17 @@ service cloud.firestore {
         );
     }
 
+    // Records whether a not-yet-verified account meant to create a club or
+    // join one, so /login can route them correctly if they come back after
+    // closing the app instead of finishing verification in the same
+    // session as register.tsx's own (correctly-parameterized) redirect.
+    // Self-scoped only, written directly by the client (not a Cloud
+    // Function), before email verification -- so this can't require
+    // verifiedEmail() the way users/{userId} below does.
+    match /registrationIntents/{userId} {
+      allow read, write: if isSelf(userId);
+    }
+
     match /users/{userId} {
       allow create: if verifiedEmail()
         && isSelf(userId)
@@ -340,6 +351,14 @@ service cloud.firestore {
       allow read: if isSelf(userId)
         || (currentUserIsClubAdmin() && resource.data.clubId == currentUserClubId());
       allow write: if false;
+    }
+
+    // Bounce/complaint/suppression state mirrored from Resend's webhook
+    // (resendWebhook function) and read back by requestEmailVerificationCode
+    // before sending, both via the Admin SDK. No client needs this and it's
+    // keyed by email rather than uid, so there's no self-access case either.
+    match /emailDeliveryStatus/{email} {
+      allow read, write: if false;
     }
 
     match /payments/{paymentId} {

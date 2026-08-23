@@ -1,21 +1,29 @@
 const admin = require("firebase-admin");
 const { randomInt } = require("node:crypto");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
+const { Webhook } = require("svix");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1" });
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
-const REQUEST_COOLDOWN_MS = 60 * 1000;
+// Cooldown before the Nth request in the window (N-1 is the array index),
+// escalating instead of a flat 60s. A burst of near-identical emails to the
+// same address in a short window is exactly the pattern inbox providers
+// bounce/spam-flag on, which is what feeds Resend's suppression list -- so
+// spacing repeat sends out further apart is a real mitigation, not just a
+// friendlier UX.
+const REQUEST_COOLDOWN_STEPS_MS = [60 * 1000, 2 * 60 * 1000, 5 * 60 * 1000, 15 * 60 * 1000];
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const MAX_CODES_PER_WINDOW = 5;
 const RESEND_API_URL = "https://api.resend.com/emails";
 const FROM_EMAIL = "MaviTeam <no-reply@maviteam.com>";
 const resendApiKey = defineSecret("RESEND_API_KEY");
+const resendWebhookSecret = defineSecret("RESEND_WEBHOOK_SECRET");
 
 const ATTENDANCE_RETENTION_DAYS = 14;
 const ATTENDANCE_CLEANUP_BATCH_SIZE = 300;
@@ -27,6 +35,10 @@ function createVerificationCode() {
 
 function normalizeCode(value) {
   return String(value ?? "").replace(/[^0-9]/g, "").slice(0, 6);
+}
+
+function normalizeEmailAddress(value) {
+  return String(value ?? "").trim().toLowerCase();
 }
 
 function timestampToMillis(value) {
@@ -46,28 +58,32 @@ function timestampToMillis(value) {
   return 0;
 }
 
+function getRequiredCooldownMs(requestsAlreadySentInWindow) {
+  const stepIndex = Math.min(Math.max(requestsAlreadySentInWindow - 1, 0), REQUEST_COOLDOWN_STEPS_MS.length - 1);
+  return REQUEST_COOLDOWN_STEPS_MS[stepIndex];
+}
+
 function getNextRateLimitState(data, nowMillis) {
   const lastRequestedAtMillis = timestampToMillis(data?.requestedAt || data?.updatedAt || data?.createdAt);
-
-  if (
-    data?.status === "pending" &&
-    lastRequestedAtMillis > 0 &&
-    nowMillis - lastRequestedAtMillis < REQUEST_COOLDOWN_MS
-  ) {
-    throw new HttpsError("resource-exhausted", "Please wait before requesting another verification code.");
-  }
-
   const rateLimit = data?.rateLimit || {};
   const windowStartedAtMillis = timestampToMillis(rateLimit.windowStartedAt);
+  const windowIsActive = windowStartedAtMillis > 0 && nowMillis - windowStartedAtMillis < RATE_LIMIT_WINDOW_MS;
+  const currentCount = windowIsActive && typeof rateLimit.count === "number" ? rateLimit.count : 0;
 
-  if (windowStartedAtMillis <= 0 || nowMillis - windowStartedAtMillis >= RATE_LIMIT_WINDOW_MS) {
+  if (data?.status === "pending" && lastRequestedAtMillis > 0) {
+    const requiredCooldownMs = getRequiredCooldownMs(currentCount);
+
+    if (nowMillis - lastRequestedAtMillis < requiredCooldownMs) {
+      throw new HttpsError("resource-exhausted", "Please wait before requesting another verification code.");
+    }
+  }
+
+  if (!windowIsActive) {
     return {
       windowStartedAt: admin.firestore.Timestamp.fromMillis(nowMillis),
       count: 1,
     };
   }
-
-  const currentCount = typeof rateLimit.count === "number" ? rateLimit.count : 0;
 
   if (currentCount >= MAX_CODES_PER_WINDOW) {
     throw new HttpsError("resource-exhausted", "Too many verification code requests. Please try again later.");
@@ -168,6 +184,19 @@ async function sendVerificationEmail({ apiKey, to, code, displayName }) {
 exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async (request) => {
   const user = getAuthenticatedUser(request);
   const db = admin.firestore();
+  const normalizedEmail = normalizeEmailAddress(user.email);
+
+  // Resend/SES suppress an address account-wide after a bounce or spam
+  // complaint and silently drop every future send to it -- the API still
+  // returns success, so without this check the function would keep
+  // reporting "sent" forever with no email ever arriving. The
+  // resendWebhook function below is what keeps this collection current.
+  const deliveryStatusSnapshot = await db.doc(`emailDeliveryStatus/${normalizedEmail}`).get();
+
+  if (deliveryStatusSnapshot.exists && deliveryStatusSnapshot.data()?.suppressed === true) {
+    throw new HttpsError("failed-precondition", "EMAIL_SUPPRESSED");
+  }
+
   const codeRef = db.doc(`emailVerificationCodes/${user.uid}`);
   const code = createVerificationCode();
   const nowMillis = Date.now();
@@ -175,10 +204,16 @@ exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async
   const expiresAt = admin.firestore.Timestamp.fromMillis(nowMillis + CODE_TTL_MS);
   const displayName = String(request.data?.fullName || user.name).trim() || "MaviTeam User";
 
-  await db.runTransaction(async (transaction) => {
+  const nextRateLimit = await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(codeRef);
-    const rateLimit = getNextRateLimitState(snapshot.exists ? snapshot.data() : null, nowMillis);
+    const existingData = snapshot.exists ? snapshot.data() : null;
+    const rateLimit = getNextRateLimitState(existingData, nowMillis);
 
+    // Only the cooldown/status fields are committed here. The rate-limit
+    // *count* is deliberately left at its pre-request value (see below) --
+    // it only advances once we know the email actually went out, so a
+    // Resend outage or misconfiguration can't burn through a user's 5
+    // requests/hour budget on sends that never delivered.
     transaction.set(codeRef, {
       uid: user.uid,
       email: user.email,
@@ -189,10 +224,12 @@ exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async
       status: "pending",
       requestedAt: now,
       expiresAt,
-      rateLimit,
+      rateLimit: existingData?.rateLimit || { windowStartedAt: now, count: 0 },
       createdAt: now,
       updatedAt: now,
     });
+
+    return rateLimit;
   });
 
   try {
@@ -210,6 +247,7 @@ exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async
         messageId: delivery?.id || null,
         sentAt: admin.firestore.Timestamp.now(),
       },
+      rateLimit: nextRateLimit,
       updatedAt: admin.firestore.Timestamp.now(),
     });
   } catch (error) {
@@ -311,6 +349,78 @@ exports.verifyEmailCode = onCall(async (request) => {
   }
 
   return { ok: true };
+});
+
+// Resend suppresses an address account-wide (across every domain we send
+// from) after a bounce or spam complaint, and silently drops every future
+// send to it while still returning success from the API -- there is no way
+// to detect this from the send call itself. This webhook is the only real
+// signal, so it mirrors bounce/complaint/suppression state into Firestore;
+// requestEmailVerificationCode checks emailDeliveryStatus/{email} before
+// attempting a send so we can tell a user the truth instead of a false
+// "sent". Configure this URL (after first deploy) as a webhook endpoint in
+// the Resend dashboard, subscribed to email.bounced, email.complained,
+// suppression.added, and suppression.removed, then set its signing secret
+// via `firebase functions:secrets:set RESEND_WEBHOOK_SECRET`.
+const SUPPRESSING_WEBHOOK_EVENTS = new Set(["email.bounced", "email.complained", "suppression.added"]);
+const CLEARING_WEBHOOK_EVENTS = new Set(["suppression.removed"]);
+
+exports.resendWebhook = onRequest({ secrets: [resendWebhookSecret] }, async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  let event;
+
+  try {
+    const webhook = new Webhook(resendWebhookSecret.value());
+    event = webhook.verify(req.rawBody, {
+      "svix-id": req.headers["svix-id"],
+      "svix-timestamp": req.headers["svix-timestamp"],
+      "svix-signature": req.headers["svix-signature"],
+    });
+  } catch (error) {
+    console.error("Resend webhook signature verification failed", error);
+    res.status(400).send("Invalid signature");
+    return;
+  }
+
+  const eventType = event?.type;
+  const rawRecipients = event?.data?.to;
+  const recipients = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients].filter(Boolean);
+
+  if (!SUPPRESSING_WEBHOOK_EVENTS.has(eventType) && !CLEARING_WEBHOOK_EVENTS.has(eventType)) {
+    res.status(200).send("Ignored");
+    return;
+  }
+
+  const db = admin.firestore();
+  const now = admin.firestore.Timestamp.now();
+  const suppressed = SUPPRESSING_WEBHOOK_EVENTS.has(eventType);
+
+  await Promise.all(
+    recipients.map((rawEmail) => {
+      const normalizedEmail = normalizeEmailAddress(rawEmail);
+
+      if (!normalizedEmail) {
+        return null;
+      }
+
+      return db.doc(`emailDeliveryStatus/${normalizedEmail}`).set(
+        {
+          email: normalizedEmail,
+          suppressed,
+          lastEventType: eventType,
+          lastEventAt: now,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    })
+  );
+
+  res.status(200).send("OK");
 });
 
 // Attendance records older than ATTENDANCE_RETENTION_DAYS are deleted to

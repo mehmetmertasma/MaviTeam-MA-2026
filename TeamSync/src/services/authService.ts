@@ -54,6 +54,7 @@ function getErrorCode(error: unknown) {
     if (error.message === "WORKSPACE_SETUP_REQUIRED") return "WORKSPACE_SETUP_REQUIRED";
     if (error.message === "CLUB_CODE_ALREADY_EXISTS") return "CLUB_CODE_ALREADY_EXISTS";
     if (error.message === "CLUB_CODE_REQUIRED") return "CLUB_CODE_REQUIRED";
+    if (error.message === "EMAIL_SUPPRESSED") return "EMAIL_SUPPRESSED";
   }
 
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -87,6 +88,8 @@ export function getAuthErrorMessage(error: unknown) {
       return "Bu kulüp kodu zaten kullanılıyor. Kulüp adını biraz değiştirip tekrar dene.";
     case "CLUB_CODE_REQUIRED":
       return "Kulüp kodu oluşturulamadı. Kulüp adını kontrol edip tekrar dene.";
+    case "EMAIL_SUPPRESSED":
+      return "Bu email adresine doğrulama kodu gönderilemiyor (önceki bir teslimat sorunu var). Farklı bir email adresi dene ya da bizimle iletişime geç.";
     case "FIRESTORE_WORKSPACE_MISSING":
       return "Kulüp çalışma alanı yüklenemedi. Oturumunu yenileyip tekrar dene.";
     case "TEAM_PERMISSION_DENIED":

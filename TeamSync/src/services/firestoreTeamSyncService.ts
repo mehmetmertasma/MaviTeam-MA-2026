@@ -375,6 +375,29 @@ export const firestoreTeamSyncService = {
     );
   },
 
+  // The only record of "did this person mean to create a club or join one"
+  // once account creation succeeds -- register.tsx's own next-step redirect
+  // already has this from its route params, but that's lost the moment the
+  // user closes the app before verifying and comes back through /login
+  // instead, which has no way to know their original intent otherwise.
+  async recordRegistrationIntent(firebaseUser: User, next: "create-club" | "join-club") {
+    const { db } = requireFirebaseServices();
+
+    await setDoc(
+      doc(db, "registrationIntents", firebaseUser.uid),
+      { next, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  },
+
+  async getRegistrationIntent(firebaseUser: User): Promise<"create-club" | "join-club" | null> {
+    const { db } = requireFirebaseServices();
+    const snapshot = await getDoc(doc(db, "registrationIntents", firebaseUser.uid));
+    const next = snapshot.data()?.next;
+
+    return next === "join-club" ? "join-club" : next === "create-club" ? "create-club" : null;
+  },
+
   async getCurrentWorkspace(firebaseUser: User): Promise<FirestoreWorkspace | null> {
     const { db } = requireFirebaseServices();
     const userRef = doc(db, "users", firebaseUser.uid);

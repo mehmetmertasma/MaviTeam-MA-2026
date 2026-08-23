@@ -11,6 +11,7 @@ import { Typography, theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { emailVerificationService } from "@/services/emailVerificationService";
+import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 function getNextRoute(value: string | string[] | undefined) {
   const firstValue = Array.isArray(value) ? value[0] : value;
@@ -117,6 +118,19 @@ export default function RegisterScreen() {
       });
 
       setStatusMessage(registerCopy.preparingProfile);
+
+      // Best-effort: this only matters if the user closes the app before
+      // verifying and comes back through /login later instead of
+      // continuing this same session, so a failure here shouldn't block
+      // the normal path (which already carries "next" via route params).
+      try {
+        await firestoreTeamSyncService.recordRegistrationIntent(
+          user,
+          nextRoute === "/join-club" ? "join-club" : "create-club"
+        );
+      } catch (intentError) {
+        console.warn("Recording registration intent failed; /login will default to create-club later.", intentError);
+      }
 
       // The account already exists and is signed in at this point, so even
       // if requesting the code fails (a flaky Cloud Function call), we

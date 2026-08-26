@@ -1,6 +1,8 @@
 const admin = require("firebase-admin");
+const Sentry = require("@sentry/node");
 const { randomInt } = require("node:crypto");
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
@@ -8,6 +10,15 @@ const { Webhook } = require("svix");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1" });
+
+// SENTRY_DSN is loaded from functions/.env at deploy time (Firebase
+// Functions v2's built-in dotenv support), not defineSecret -- a DSN isn't
+// actually secret (it's a write-only ingestion endpoint), so it doesn't
+// need Secret Manager, and a plain process.env value is readable here at
+// module load time instead of only inside a handler that declares it.
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0 });
+}
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -517,4 +528,467 @@ exports.cleanupOldAttendance = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
   const result = await runAttendanceCleanup(db);
   console.log("Attendance cleanup finished", result);
+});
+
+// Platform admin (superadmin) panel -- gated by a hardcoded UID allowlist,
+// not a Firestore role field, so nothing any client could ever write to
+// their own profile could grant them access across every club. Only used
+// by the separate admin-panel web app (never bundled into the main app),
+// which is the only client that ever calls these.
+const PLATFORM_ADMIN_UIDS = new Set(["hXIhLZtzVvgJWrmlk8BsdLS5uP02"]);
+
+function requirePlatformAdmin(request) {
+  if (!request.auth || !PLATFORM_ADMIN_UIDS.has(request.auth.uid)) {
+    throw new HttpsError("permission-denied", "Not authorized for the platform admin panel.");
+  }
+}
+
+exports.getPlatformOverview = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const db = admin.firestore();
+  const clubsSnapshot = await db.collection("clubs").get();
+
+  const clubs = await Promise.all(
+    clubsSnapshot.docs.map(async (clubSnapshot) => {
+      const data = clubSnapshot.data();
+
+      const [usersCountSnapshot, teamsCountSnapshot] = await Promise.all([
+        db.collection("users").where("clubId", "==", clubSnapshot.id).count().get(),
+        db.collection("teams").where("clubId", "==", clubSnapshot.id).count().get(),
+      ]);
+
+      return {
+        id: clubSnapshot.id,
+        name: data.name || "",
+        city: data.city || "",
+        sport: data.sport || "",
+        status: data.status === "suspended" ? "suspended" : "active",
+        createdAt: data.createdAt?.toDate?.().toISOString() ?? null,
+        memberCount: usersCountSnapshot.data().count,
+        teamCount: teamsCountSnapshot.data().count,
+      };
+    })
+  );
+
+  clubs.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+
+  return {
+    totalClubs: clubs.length,
+    totalMembers: clubs.reduce((sum, club) => sum + club.memberCount, 0),
+    clubs,
+  };
+});
+
+exports.setClubStatus = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const clubId = String(request.data?.clubId || "").trim();
+  const nextStatus = request.data?.status;
+
+  if (clubId === "") {
+    throw new HttpsError("invalid-argument", "clubId is required.");
+  }
+
+  if (nextStatus !== "active" && nextStatus !== "suspended") {
+    throw new HttpsError("invalid-argument", "status must be 'active' or 'suspended'.");
+  }
+
+  const db = admin.firestore();
+  const clubRef = db.doc(`clubs/${clubId}`);
+  const clubSnapshot = await clubRef.get();
+
+  if (!clubSnapshot.exists) {
+    throw new HttpsError("not-found", "Club not found.");
+  }
+
+  const previousStatus = clubSnapshot.data()?.status === "suspended" ? "suspended" : "active";
+
+  await clubRef.update({
+    status: nextStatus,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection("adminAuditLog").add({
+    action: "setClubStatus",
+    clubId,
+    previousStatus,
+    newStatus: nextStatus,
+    performedByUid: request.auth.uid,
+    performedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, clubId, status: nextStatus };
+});
+
+// Deletes every doc across the club's collections in pages of
+// DELETE_BATCH_SIZE (Firestore write batches cap at 500 operations).
+async function deleteAllWhereClubIdEquals(db, collectionName, clubId) {
+  const DELETE_BATCH_SIZE = 400;
+  let totalDeleted = 0;
+
+  for (;;) {
+    const snapshot = await db.collection(collectionName).where("clubId", "==", clubId).limit(DELETE_BATCH_SIZE).get();
+
+    if (snapshot.empty) {
+      return totalDeleted;
+    }
+
+    const batch = db.batch();
+    snapshot.docs.forEach((docSnapshot) => batch.delete(docSnapshot.ref));
+    await batch.commit();
+    totalDeleted += snapshot.size;
+
+    if (snapshot.size < DELETE_BATCH_SIZE) {
+      return totalDeleted;
+    }
+  }
+}
+
+// Every collection that stores a clubId field, wiped entirely when a club
+// is deleted. Does NOT touch Firebase Auth accounts -- members keep their
+// email/password login, they just end up with no Firestore profile at all,
+// which the app already treats the same as a brand-new never-onboarded
+// account (getCurrentWorkspace returns null -> routed to create/join again).
+const CLUB_SCOPED_COLLECTIONS = [
+  "users",
+  "teams",
+  "announcements",
+  "scheduleEvents",
+  "attendanceRecords",
+  "attendanceSummaries",
+  "chatGroups",
+  "chatMessages",
+  "payments",
+  "replays",
+  "joinRequests",
+];
+
+exports.deleteClub = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const clubId = String(request.data?.clubId || "").trim();
+
+  if (clubId === "") {
+    throw new HttpsError("invalid-argument", "clubId is required.");
+  }
+
+  const db = admin.firestore();
+  const clubRef = db.doc(`clubs/${clubId}`);
+  const clubSnapshot = await clubRef.get();
+
+  if (!clubSnapshot.exists) {
+    throw new HttpsError("not-found", "Club not found.");
+  }
+
+  const clubData = clubSnapshot.data();
+  const deletedCounts = {};
+
+  for (const collectionName of CLUB_SCOPED_COLLECTIONS) {
+    deletedCounts[collectionName] = await deleteAllWhereClubIdEquals(db, collectionName, clubId);
+  }
+
+  if (clubData.code) {
+    await db.doc(`clubCodes/${clubData.code}`).delete().catch(() => {});
+  }
+
+  await clubRef.delete();
+
+  await db.collection("adminAuditLog").add({
+    action: "deleteClub",
+    clubId,
+    clubName: clubData.name || "",
+    deletedCounts,
+    performedByUid: request.auth.uid,
+    performedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, clubId, deletedCounts };
+});
+
+// Push notifications -- the first Firestore-triggered functions in this
+// file (everything above is onCall/onSchedule/onRequest). Delivery is
+// best-effort: a failure here must never surface to the user who sent the
+// message/announcement/event, since by the time these triggers run the
+// underlying write has already succeeded. Every catch below only logs.
+const EXPO_PUSH_API_URL = "https://exp.host/--/api/v2/push/send";
+const EXPO_PUSH_CHUNK_SIZE = 100;
+const FIRESTORE_IN_CLAUSE_LIMIT = 30;
+const NOTIFICATION_BODY_MAX_LENGTH = 120;
+
+function truncateForNotification(text) {
+  const trimmed = String(text || "").trim();
+
+  if (trimmed.length <= NOTIFICATION_BODY_MAX_LENGTH) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, NOTIFICATION_BODY_MAX_LENGTH - 1)}…`;
+}
+
+// Looks tokens up in chunks of FIRESTORE_IN_CLAUSE_LIMIT because Firestore's
+// "in" operator caps at 30 values per query.
+async function getExpoPushTokensForUsers(db, userIds) {
+  const tokens = [];
+
+  for (let i = 0; i < userIds.length; i += FIRESTORE_IN_CLAUSE_LIMIT) {
+    const chunk = userIds.slice(i, i + FIRESTORE_IN_CLAUSE_LIMIT);
+    const snapshot = await db
+      .collection("users")
+      .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+      .get();
+
+    snapshot.docs.forEach((docSnapshot) => {
+      const userTokens = docSnapshot.data().expoPushTokens;
+
+      if (Array.isArray(userTokens)) {
+        userTokens.forEach((token) => {
+          if (typeof token === "string" && token.length > 0) {
+            tokens.push(token);
+          }
+        });
+      }
+    });
+  }
+
+  return Array.from(new Set(tokens));
+}
+
+async function sendExpoPushNotifications(db, userIds, excludeUserId, payload) {
+  const recipientIds = Array.from(new Set(userIds)).filter((userId) => userId !== excludeUserId);
+
+  if (recipientIds.length === 0) {
+    return;
+  }
+
+  const tokens = await getExpoPushTokensForUsers(db, recipientIds);
+
+  if (tokens.length === 0) {
+    return;
+  }
+
+  const messages = tokens.map((token) => ({ to: token, sound: "default", ...payload }));
+
+  for (let i = 0; i < messages.length; i += EXPO_PUSH_CHUNK_SIZE) {
+    const chunk = messages.slice(i, i + EXPO_PUSH_CHUNK_SIZE);
+
+    try {
+      const response = await fetch(EXPO_PUSH_API_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify(chunk),
+      });
+
+      if (!response.ok) {
+        console.warn("[sendExpoPushNotifications] Expo push API returned", response.status, await response.text());
+      }
+    } catch (pushError) {
+      console.warn("[sendExpoPushNotifications] Failed to reach Expo push API.", pushError);
+    }
+  }
+}
+
+async function getSenderDisplayName(db, senderUserId) {
+  const senderSnapshot = await db.doc(`users/${senderUserId}`).get();
+  return senderSnapshot.exists ? senderSnapshot.data().fullName || "Yeni mesaj" : "Yeni mesaj";
+}
+
+// Club-wide (teamId absent/null) or team-filtered active-member lookup,
+// shared by announcements and schedule events. Filters teamIds in memory
+// instead of an "array-contains" Firestore clause on top of the "clubId =="
+// equality filter so this never needs a new composite index -- a club-scale
+// user list (hundreds, not the app's whole user base) comfortably fits in
+// one query either way.
+async function getActiveClubOrTeamUserIds(db, clubId, teamId) {
+  const snapshot = await db.collection("users").where("clubId", "==", clubId).where("status", "==", "active").get();
+
+  return snapshot.docs
+    .filter((docSnapshot) => !teamId || (docSnapshot.data().teamIds ?? []).includes(teamId))
+    .map((docSnapshot) => docSnapshot.id);
+}
+
+// Pinned to europe-west1 (not the us-central1 default from
+// setGlobalOptions) to stay close to the Firestore database's own region.
+// The database itself is in "eur3", Firestore's Europe multi-region alias
+// -- that's not a real deployable Cloud Functions location (it's made up
+// of europe-west1 + europe-west4 under the hood), so europe-west1 is the
+// closest actual region a Firestore trigger can be pinned to.
+// Wraps a Firestore-trigger handler so an unexpected failure (e.g. a
+// transient Firestore error inside getExpoPushTokensForUsers, not just the
+// already-caught Expo push API failures inside sendExpoPushNotifications)
+// is reported to Sentry instead of silently vanishing into Cloud Logging
+// that nobody is watching. These three triggers have no caller waiting on
+// them -- unlike the callable functions above, whose errors already
+// surface to whoever called them -- which is what makes this class of
+// failure genuinely invisible without this.
+function withTriggerErrorCapture(handler) {
+  return async (event) => {
+    try {
+      await handler(event);
+    } catch (error) {
+      if (process.env.SENTRY_DSN) {
+        Sentry.captureException(error);
+      }
+
+      console.warn("[withTriggerErrorCapture] Trigger handler failed:", error);
+    }
+  };
+}
+
+exports.onChatMessageCreated = onDocumentCreated(
+  { document: "chatMessages/{messageId}", region: "europe-west1" },
+  withTriggerErrorCapture(async (event) => {
+    const message = event.data?.data();
+
+    if (!message) {
+      return;
+    }
+
+    const recipientIds = Array.isArray(message.directUserIds) && message.directUserIds.length > 0
+      ? message.directUserIds
+      : Array.isArray(message.visibleUserIds)
+        ? message.visibleUserIds
+        : [];
+
+    if (recipientIds.length === 0) {
+      return;
+    }
+
+    const db = admin.firestore();
+    const senderName = await getSenderDisplayName(db, message.senderUserId);
+
+    await sendExpoPushNotifications(db, recipientIds, message.senderUserId, {
+      title: senderName,
+      body: truncateForNotification(message.text),
+      data: { route: "/messages" },
+    });
+  })
+);
+
+exports.onAnnouncementCreated = onDocumentCreated(
+  { document: "announcements/{announcementId}", region: "europe-west1" },
+  withTriggerErrorCapture(async (event) => {
+    const announcement = event.data?.data();
+
+    if (!announcement) {
+      return;
+    }
+
+    const db = admin.firestore();
+    const recipientIds = await getActiveClubOrTeamUserIds(db, announcement.clubId, announcement.targetTeamId ?? null);
+
+    await sendExpoPushNotifications(db, recipientIds, announcement.createdByUserId, {
+      title: announcement.title || "Yeni duyuru",
+      body: truncateForNotification(announcement.message),
+      data: { route: "/announcements" },
+    });
+  })
+);
+
+exports.onScheduleEventCreated = onDocumentCreated(
+  { document: "scheduleEvents/{eventId}", region: "europe-west1" },
+  withTriggerErrorCapture(async (event) => {
+    const scheduleEvent = event.data?.data();
+
+    if (!scheduleEvent) {
+      return;
+    }
+
+    const db = admin.firestore();
+    const recipientIds = await getActiveClubOrTeamUserIds(db, scheduleEvent.clubId, scheduleEvent.teamId ?? null);
+
+    await sendExpoPushNotifications(db, recipientIds, scheduleEvent.createdByUserId, {
+      title: "Yeni etkinlik",
+      body: truncateForNotification(scheduleEvent.title),
+      data: { route: "/schedule" },
+    });
+  })
+);
+
+// Self-service account deletion (App Store 5.1.1(v) / Play's Account
+// Deletion policy both require this). Unlike deleteClub, this only erases
+// the requesting user's own profile + membership footprint -- chat
+// messages they sent, attendance, payments, and announcements/events they
+// created are left alone. Deleting those would corrupt other members'
+// shared history for the sake of one person leaving; a deleted sender
+// already renders as "Bilinmeyen kullanıcı" the same way an already-
+// removed member's history does today (see getSenderName in
+// src/app/messages.tsx), so nothing new is needed there.
+//
+// The club owner is blocked from deleting their own account: clubCodes/{code}
+// documents are permanently pinned to ownerId in firestore.rules with no
+// fallback for other clubAdmins, and there's no ownership-transfer feature
+// yet. Deleting the owner's account would leave that club's join-code
+// management broken forever with no recovery path.
+exports.deleteMyAccount = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const uid = request.auth.uid;
+  const db = admin.firestore();
+  const userRef = db.doc(`users/${uid}`);
+  const userSnapshot = await userRef.get();
+
+  if (!userSnapshot.exists) {
+    await admin.auth().deleteUser(uid).catch(() => {});
+    return { ok: true };
+  }
+
+  const userData = userSnapshot.data();
+  const clubId = userData.clubId || null;
+
+  if (clubId) {
+    const clubSnapshot = await db.doc(`clubs/${clubId}`).get();
+
+    if (clubSnapshot.exists && clubSnapshot.data().ownerId === uid) {
+      throw new HttpsError(
+        "failed-precondition",
+        "You're the owner of this club. Transfer ownership to another admin before deleting your account -- contact support for help with this."
+      );
+    }
+
+    // Teams: fetched with a single equality filter and filtered for
+    // membership in memory, same simplification as
+    // getActiveClubOrTeamUserIds above -- a club's team count is small
+    // enough that this avoids needing a new composite index just for this
+    // one cleanup step.
+    const teamsSnapshot = await db.collection("teams").where("clubId", "==", clubId).get();
+    const teamUpdates = teamsSnapshot.docs
+      .filter((docSnapshot) => {
+        const data = docSnapshot.data();
+        return (data.memberIds ?? []).includes(uid) || (data.coachIds ?? []).includes(uid);
+      })
+      .map((docSnapshot) =>
+        docSnapshot.ref.update({
+          memberIds: admin.firestore.FieldValue.arrayRemove(uid),
+          coachIds: admin.firestore.FieldValue.arrayRemove(uid),
+        })
+      );
+
+    // chatGroups: this composite index (clubId + visibleUserIds CONTAINS)
+    // already exists in firestore.indexes.json, so query it directly.
+    const chatGroupsSnapshot = await db
+      .collection("chatGroups")
+      .where("clubId", "==", clubId)
+      .where("visibleUserIds", "array-contains", uid)
+      .get();
+    const chatGroupUpdates = chatGroupsSnapshot.docs.map((docSnapshot) =>
+      docSnapshot.ref.update({ visibleUserIds: admin.firestore.FieldValue.arrayRemove(uid) })
+    );
+
+    await Promise.all([...teamUpdates, ...chatGroupUpdates]);
+  }
+
+  // Pure equality filter on userId, no clubId scoping needed -- catches a
+  // stray pending request to any club, not just their current one.
+  const joinRequestsSnapshot = await db.collection("joinRequests").where("userId", "==", uid).get();
+  await Promise.all(joinRequestsSnapshot.docs.map((docSnapshot) => docSnapshot.ref.delete()));
+
+  await userRef.delete();
+
+  // The irreversible step, last and only once everything above succeeded.
+  await admin.auth().deleteUser(uid);
+
+  return { ok: true };
 });

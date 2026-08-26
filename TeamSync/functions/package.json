@@ -14,6 +14,7 @@
     "test:cleanup": "npm exec --yes --package firebase-tools -- firebase emulators:exec --only firestore --project cleanup-test \"node test-cleanup.js\""
   },
   "dependencies": {
+    "@sentry/node": "^10.71.0",
     "firebase-admin": "^13.6.0",
     "firebase-functions": "^7.3.2",
     "svix": "^1.99.1"

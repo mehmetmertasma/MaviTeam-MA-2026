@@ -6,6 +6,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
@@ -13,6 +14,7 @@ import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Payment, PaymentStatus, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 const EMPTY_PAYMENTS: Payment[] = [];
 const EMPTY_USERS: UserProfile[] = [];
@@ -82,6 +84,7 @@ export default function PaymentsScreen() {
   const [amountText, setAmountText] = useState("");
   const [dueDateText, setDueDateText] = useState("");
   const [statusMessage, setStatusMessage] = useState("Ödeme kayıtları merkezi TeamSync datasından yüklendi.");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const users = appData?.users ?? EMPTY_USERS;
   const selectedUserId = users.some((user) => user.id === selectedUserIdState && user.status !== "removed")
@@ -101,6 +104,10 @@ export default function PaymentsScreen() {
   const activeUsers = users.filter((user) => user.status !== "removed");
   const userCanManagePayments = canManagePayments(appData);
   const visiblePayments = userCanManagePayments || appData === null ? payments : payments.filter((payment) => payment.userId === appData.currentUser.id);
+
+  const filteredPayments = useMemo(() => {
+    return visiblePayments.filter((payment) => matchesSearchQuery(searchQuery, getUserName(payment.userId, users), payment.title));
+  }, [visiblePayments, users, searchQuery]);
 
   const summary = useMemo(() => ({
     paidCount: payments.filter((payment) => payment.status === "paid").length,
@@ -202,9 +209,19 @@ export default function PaymentsScreen() {
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>Ödeme listesi</Text><Text style={styles.sectionSubtitle}>{statusMessage}</Text></View><Text style={styles.statusPill}>{visiblePayments.length} kayıt</Text></View>
 
-        {appData !== null && visiblePayments.length > 0 ? (
+        {visiblePayments.length > 5 ? (
+          <SearchField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="İsim veya başlık ara..."
+            accessibilityLabel="Ödemelerde ara"
+            style={styles.searchField}
+          />
+        ) : null}
+
+        {appData !== null && filteredPayments.length > 0 ? (
           <View style={styles.paymentList}>
-            {visiblePayments.map((payment) => {
+            {filteredPayments.map((payment) => {
               return (
                 <View key={payment.id} style={styles.paymentCard}>
                   <View style={styles.cardTopRow}>
@@ -236,6 +253,8 @@ export default function PaymentsScreen() {
               );
             })}
           </View>
+        ) : visiblePayments.length > 0 ? (
+          <EmptyState title="Aramayla eşleşen ödeme yok" description="Farklı bir isim veya başlık ile tekrar dene." />
         ) : (
           <EmptyState title="Henüz ödeme kaydı yok" description="Yeni ödeme oluştur butonuyla ilk merkezi ödeme kaydını ekleyebilirsin." />
         )}
@@ -259,18 +278,19 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, color: theme.colors.text.primary, marginBottom: theme.spacing.xs },
   sectionSubtitle: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.md },
-  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full, overflow: "hidden" },
+  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.sm, overflow: "hidden" },
   label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.sm },
   field: { marginBottom: theme.spacing.lg },
   formGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.lg },
   formField: { flex: 1, minWidth: 220 },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.xl },
-  optionButton: { borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.subtle },
+  optionButton: { borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.subtle },
   optionButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   optionButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   optionButtonTextSelected: { color: theme.colors.text.inverse },
-  paymentList: { gap: theme.spacing.lg },
-  paymentCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.xl, borderWidth: 1, borderColor: theme.colors.border.default },
+  searchField: { marginBottom: theme.spacing.lg },
+  paymentList: { gap: theme.spacing.md },
+  paymentCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
   cardTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.lg },
   cardTitleGroup: { flex: 1 },
   athleteName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },

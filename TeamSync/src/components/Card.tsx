@@ -63,6 +63,6 @@ export default Card;
 
 const styles = StyleSheet.create({
   base: {
-    borderRadius: theme.radius["2xl"],
+    borderRadius: theme.radius.xl,
   },
 });

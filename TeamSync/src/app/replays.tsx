@@ -7,6 +7,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
@@ -14,6 +15,7 @@ import { authService } from "@/services/authService";
 import { firestoreReplayLinkService } from "@/services/firestoreReplayLinkService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Replay, ReplayType, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type ReplayFilter = "all" | ReplayType;
 
@@ -104,6 +106,7 @@ export default function ReplaysScreen() {
   const [selectedType, setSelectedType] = useState<ReplayType>("match");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [statusMessage, setStatusMessage] = useState("Replay linkleri MaviTeam datasından yüklendi.");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Firestore-backed replay visibility (visibleUserIds) is more precise than
   // the shared appData's copy, so this overlays a dedicated fetch on top of
@@ -150,6 +153,10 @@ export default function ReplaysScreen() {
 
     return activeFilter === "all" ? roleVisibleReplays : roleVisibleReplays.filter((replay) => replay.type === activeFilter);
   }, [activeFilter, appData, replays, userCanManageReplayLinks]);
+
+  const filteredReplays = useMemo(() => {
+    return visibleReplays.filter((replay) => matchesSearchQuery(searchQuery, replay.title, replay.description));
+  }, [visibleReplays, searchQuery]);
 
   const canAddReplay = title.trim().length > 0
     && description.trim().length > 0
@@ -334,9 +341,19 @@ export default function ReplaysScreen() {
 
         <View style={styles.optionGrid}>{filterOptions.map((option) => { const isSelected = activeFilter === option.filter; return (<Pressable key={option.filter} onPress={() => setActiveFilter(option.filter)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{option.label}</Text></Pressable>); })}</View>
 
-        {appData !== null && visibleReplays.length > 0 ? (
+        {visibleReplays.length > 5 ? (
+          <SearchField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Başlık veya açıklama ara..."
+            accessibilityLabel="Replaylerde ara"
+            style={styles.searchField}
+          />
+        ) : null}
+
+        {appData !== null && filteredReplays.length > 0 ? (
           <View style={styles.replayList}>
-            {visibleReplays.map((replay) => (
+            {filteredReplays.map((replay) => (
               <View key={replay.id} style={styles.replayCard}>
                 <View style={styles.replayTopRow}>
                   <View style={styles.replayInfo}>
@@ -360,6 +377,8 @@ export default function ReplaysScreen() {
               </View>
             ))}
           </View>
+        ) : visibleReplays.length > 0 ? (
+          <EmptyState title="Aramayla eşleşen replay yok" description="Farklı bir başlık veya kelime ile tekrar dene." />
         ) : (
           <EmptyState
             title="Henüz replay linki yok"
@@ -382,18 +401,19 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, lineHeight: theme.lineHeights.lg },
-  statusPill: { color: theme.colors.text.brand, backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md, fontWeight: theme.fontWeights.semibold, overflow: "hidden" },
+  statusPill: { color: theme.colors.text.brand, backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.sm, paddingVertical: theme.spacing.xs, paddingHorizontal: theme.spacing.md, fontWeight: theme.fontWeights.semibold, overflow: "hidden" },
   label: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.sm, marginTop: theme.spacing.md },
   field: { marginBottom: theme.spacing.sm },
   optionGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.md },
-  optionButton: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, backgroundColor: theme.colors.background.subtle },
+  optionButton: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.md, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, backgroundColor: theme.colors.background.subtle },
   optionButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   optionButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   optionButtonTextSelected: { color: theme.colors.text.inverse },
   pressed: { opacity: 0.72 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.lg },
-  replayList: { gap: theme.spacing.lg },
-  replayCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
+  searchField: { marginBottom: theme.spacing.md },
+  replayList: { gap: theme.spacing.md },
+  replayCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border.default },
   replayTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.md, marginBottom: theme.spacing.md },
   replayInfo: { flex: 1 },
   replayType: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, textTransform: "uppercase", marginBottom: theme.spacing.xs },
@@ -402,8 +422,8 @@ const styles = StyleSheet.create({
   replayDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, lineHeight: theme.lineHeights.lg, marginBottom: theme.spacing.md },
   linkPreview: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular, marginBottom: theme.spacing.md },
   cardActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
-  openButton: { backgroundColor: theme.colors.brand.primary, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
+  openButton: { backgroundColor: theme.colors.brand.primary, borderRadius: theme.radius.md, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
   openButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
-  deleteButton: { backgroundColor: theme.colors.danger.soft, borderRadius: theme.radius.full, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
+  deleteButton: { backgroundColor: theme.colors.danger.soft, borderRadius: theme.radius.md, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
   deleteButtonText: { color: theme.colors.danger.text, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
 });

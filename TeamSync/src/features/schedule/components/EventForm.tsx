@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   optionButton: {
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,

@@ -10,6 +10,7 @@ import {
 import type { User } from "firebase/auth";
 
 import { getFirebaseServices, isFirebaseConfigured } from "@/lib/firebase";
+import { withNetworkRetry } from "@/utils/retry";
 
 type RegisterInput = {
   fullName: string;
@@ -170,7 +171,9 @@ export const authService = {
 
   async registerWithEmail(input: RegisterInput) {
     const auth = getAuthOrThrow();
-    const credential = await createUserWithEmailAndPassword(auth, normalizeEmail(input.email), input.password);
+    const credential = await withNetworkRetry(() =>
+      createUserWithEmailAndPassword(auth, normalizeEmail(input.email), input.password)
+    );
     const cleanName = input.fullName.trim();
 
     if (cleanName !== "") {
@@ -182,7 +185,9 @@ export const authService = {
 
   async loginWithEmail(input: LoginInput) {
     const auth = getAuthOrThrow();
-    const credential = await signInWithEmailAndPassword(auth, normalizeEmail(input.email), input.password);
+    const credential = await withNetworkRetry(() =>
+      signInWithEmailAndPassword(auth, normalizeEmail(input.email), input.password)
+    );
     return credential.user;
   },
 
@@ -204,7 +209,7 @@ export const authService = {
 
   async sendPasswordReset(email: string) {
     const auth = getAuthOrThrow();
-    await sendPasswordResetEmail(auth, normalizeEmail(email));
+    await withNetworkRetry(() => sendPasswordResetEmail(auth, normalizeEmail(email)));
   },
 };
 

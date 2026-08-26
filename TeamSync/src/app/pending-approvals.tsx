@@ -1,12 +1,13 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
@@ -15,6 +16,7 @@ import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { JoinRequest, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type RequestRow = {
   request: JoinRequest;
@@ -60,6 +62,8 @@ export default function PendingApprovalsScreen() {
   const [statusMessage, setStatusMessage] = useState(
     "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet."
   );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const loadApprovalData = useCallback(async () => {
     try {
@@ -120,6 +124,13 @@ export default function PendingApprovalsScreen() {
     };
   }, [requestRows]);
 
+  const filteredRows = useMemo(() => {
+    return requestRows.filter((row) => matchesSearchQuery(searchQuery, row.user?.fullName, row.user?.email));
+  }, [requestRows, searchQuery]);
+
+  const pendingRows = useMemo(() => filteredRows.filter((row) => row.request.status === "pending"), [filteredRows]);
+  const resolvedRows = useMemo(() => filteredRows.filter((row) => row.request.status !== "pending"), [filteredRows]);
+
   async function handleApprove(requestId: string) {
     try {
       if (authService.isConfigured()) {
@@ -168,6 +179,46 @@ export default function PendingApprovalsScreen() {
     }
   }
 
+  function renderRequestRow(row: RequestRow, dense: boolean) {
+    const { request, user } = row;
+    const isPending = request.status === "pending";
+    const displayName = user?.fullName ?? "Kullanıcı bulunamadı";
+    const displayEmail = user?.email ?? "E-posta yok";
+
+    return (
+      <Card key={request.id} variant="subtle" padding={dense ? "sm" : "md"} style={styles.memberCard}>
+        <View style={styles.memberTopRow}>
+          <View style={styles.memberInfo}>
+            <Text style={styles.memberName}>{displayName}</Text>
+            <Text style={styles.memberMeta}>{displayEmail}</Text>
+            <Text style={styles.memberDate}>İstek zamanı: {formatDate(request.createdAt)}</Text>
+          </View>
+
+          <StatusBadge label={getStatusText(request.status)} tone={statusTones[request.status]} />
+        </View>
+
+        {isPending ? (
+          <View style={styles.actionRow}>
+            <AppButton
+              title="Onayla"
+              onPress={() => handleApprove(request.id)}
+              accessibilityLabel={`${displayName} kullanıcısını onayla`}
+              style={styles.actionButton}
+            />
+
+            <AppButton
+              title="Reddet"
+              variant="ghost"
+              onPress={() => handleReject(request.id)}
+              accessibilityLabel={`${displayName} kullanıcısını reddet`}
+              style={styles.actionButton}
+            />
+          </View>
+        ) : null}
+      </Card>
+    );
+  }
+
   return (
     <AppScreenLayout>
       <PageHeader title="Bekleyen üyeler" subtitle="Takım kodu ile katılmak isteyen kullanıcıları onayla veya reddet." />
@@ -213,47 +264,39 @@ export default function PendingApprovalsScreen() {
             description="Join Club ekranından doğru kulüp kodu ile başvuru gönderildiğinde burada görünecek."
           />
         ) : (
-          <View style={styles.memberList}>
-            {requestRows.map((row) => {
-              const { request, user } = row;
-              const isPending = request.status === "pending";
-              const displayName = user?.fullName ?? "Kullanıcı bulunamadı";
-              const displayEmail = user?.email ?? "E-posta yok";
+          <>
+            {requestRows.length > 5 ? (
+              <SearchField
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="İsim veya e-posta ara..."
+                accessibilityLabel="İsteklerde ara"
+                style={styles.searchField}
+              />
+            ) : null}
 
-              return (
-                <Card key={request.id} variant="subtle" style={styles.memberCard}>
-                  <View style={styles.memberTopRow}>
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>{displayName}</Text>
-                      <Text style={styles.memberMeta}>{displayEmail}</Text>
-                      <Text style={styles.memberDate}>İstek zamanı: {formatDate(request.createdAt)}</Text>
-                    </View>
+            {pendingRows.length === 0 ? (
+              <EmptyState title="Bekleyen istek yok" description="Şu anda onay bekleyen kimse yok." />
+            ) : (
+              <View style={styles.memberList}>{pendingRows.map((row) => renderRequestRow(row, false))}</View>
+            )}
 
-                    <StatusBadge label={getStatusText(request.status)} tone={statusTones[request.status]} />
-                  </View>
+            {resolvedRows.length > 0 ? (
+              <View style={styles.historySection}>
+                <Pressable
+                  onPress={() => setShowHistory((currentValue) => !currentValue)}
+                  style={({ pressed }) => [styles.historyToggle, pressed ? styles.pressed : null]}
+                >
+                  <Text style={styles.historyToggleText}>Geçmiş ({resolvedRows.length})</Text>
+                  <Text style={styles.historyToggleChevron}>{showHistory ? "▲" : "▼"}</Text>
+                </Pressable>
 
-                  {isPending ? (
-                    <View style={styles.actionRow}>
-                      <AppButton
-                        title="Onayla"
-                        onPress={() => handleApprove(request.id)}
-                        accessibilityLabel={`${displayName} kullanıcısını onayla`}
-                        style={styles.actionButton}
-                      />
-
-                      <AppButton
-                        title="Reddet"
-                        variant="ghost"
-                        onPress={() => handleReject(request.id)}
-                        accessibilityLabel={`${displayName} kullanıcısını reddet`}
-                        style={styles.actionButton}
-                      />
-                    </View>
-                  ) : null}
-                </Card>
-              );
-            })}
-          </View>
+                {showHistory ? (
+                  <View style={styles.memberList}>{resolvedRows.map((row) => renderRequestRow(row, true))}</View>
+                ) : null}
+              </View>
+            ) : null}
+          </>
         )}
 
         <AppButton
@@ -288,8 +331,9 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
-  memberList: { gap: theme.spacing.md },
-  memberCard: { padding: theme.spacing.lg },
+  searchField: { marginBottom: theme.spacing.md },
+  memberList: { gap: theme.spacing.sm },
+  memberCard: { padding: theme.spacing.md },
   memberTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.md },
   memberInfo: { flex: 1 },
   memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
@@ -298,4 +342,20 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.md },
   actionButton: { flexGrow: 1, minWidth: 130 },
   resetButton: { marginTop: theme.spacing["2xl"], alignSelf: "flex-start" },
+  historySection: { marginTop: theme.spacing.lg },
+  historyToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.subtle,
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+  },
+  historyToggleText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  historyToggleChevron: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
 });

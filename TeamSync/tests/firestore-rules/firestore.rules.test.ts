@@ -33,6 +33,12 @@ async function seedFixtures() {
   await testEnv.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
 
+    // belongsToCurrentUsersClub (used by nearly every collection's rules)
+    // now also checks the club's own document for a 'suspended' status, so
+    // every club referenced by a fixture user needs to actually exist.
+    await setDoc(doc(db, "clubs", CLUB_A), { id: CLUB_A, name: "Club A", ownerId: ADMIN_A });
+    await setDoc(doc(db, "clubs", CLUB_B), { id: CLUB_B, name: "Club B", ownerId: ADMIN_B });
+
     const users: Record<string, Record<string, unknown>> = {
       [ADMIN_A]: { role: "clubAdmin", status: "active", clubId: CLUB_A, teamIds: [] },
       [COACH_A]: { role: "coach", status: "active", clubId: CLUB_A, teamIds: [TEAM_A1] },
@@ -303,6 +309,68 @@ describe("attendanceSummaries", () => {
         years: { "2026": { present: 999, absent: 0, late: 0, excused: 0, total: 999 } },
       })
     );
+  });
+});
+
+describe("club suspension", () => {
+  async function suspendClubA() {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "clubs", CLUB_A), { status: "suspended" }, { merge: true });
+    });
+  }
+
+  it("an active club (no status field) behaves normally -- baseline sanity check", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(getDoc(doc(db, "attendanceRecords", "record-a1")));
+  });
+
+  it("clubAdmin loses access to their own club's data once suspended", async () => {
+    await suspendClubA();
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(getDoc(doc(db, "attendanceRecords", "record-a1")));
+  });
+
+  it("coach loses access to their own team's data once suspended", async () => {
+    await suspendClubA();
+    const db = authedFirestore(COACH_A);
+    await assertFails(getDoc(doc(db, "attendanceRecords", "record-a1")));
+  });
+
+  it("parent/athlete lose access to their own club's data once suspended", async () => {
+    await suspendClubA();
+    const db = authedFirestore(ATHLETE_A1);
+    await assertFails(getDoc(doc(db, "attendanceRecords", "record-a1")));
+    await assertFails(getDoc(doc(db, "scheduleEvents", "event-a-clubwide")));
+  });
+
+  it("a suspended club's own document is still readable by its owner", async () => {
+    await suspendClubA();
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDoc(doc(db, "clubs", CLUB_A)));
+  });
+
+  it("a suspended club's document is NOT readable by a non-owner member", async () => {
+    await suspendClubA();
+    const db = authedFirestore(COACH_A);
+    await assertFails(getDoc(doc(db, "clubs", CLUB_A)));
+  });
+
+  it("an unrelated club (club-b) is unaffected by club-a being suspended", async () => {
+    await suspendClubA();
+
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "attendanceRecords", "record-b1"), {
+        clubId: CLUB_B,
+        userId: ADMIN_B,
+        status: "present",
+        sessionDate: "2026-08-01T17:00:00.000Z",
+        recordedByUserId: ADMIN_B,
+        recordedAt: "2026-08-01T17:00:00.000Z",
+      });
+    });
+
+    const db = authedFirestore(ADMIN_B);
+    await assertSucceeds(getDoc(doc(db, "attendanceRecords", "record-b1")));
   });
 });
 

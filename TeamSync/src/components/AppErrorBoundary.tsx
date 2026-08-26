@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
+import { Sentry, isSentryConfigured } from "@/lib/sentry";
 
 const APP_BACKGROUND_COLOR = "#0f172a";
 
@@ -27,6 +28,10 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Unhandled render error caught by AppErrorBoundary:", error, errorInfo.componentStack);
+
+    if (isSentryConfigured) {
+      Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+    }
   }
 
   handleRetry = () => {

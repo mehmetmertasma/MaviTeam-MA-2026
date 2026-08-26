@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
   },
   compactToggle: {
     minHeight: 38,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     gap: theme.spacing.sm,
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   nextPill: {
     backgroundColor: theme.colors.brand.primarySoft,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.sm,
     paddingVertical: theme.spacing.xs,
     paddingHorizontal: theme.spacing.sm,
   },

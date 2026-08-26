@@ -16,39 +16,37 @@ const palette = {
   slate900: "#0F172A",
   slate950: "#020617",
 
-  blue50: "#EFF6FF",
-  blue100: "#DBEAFE",
-  blue500: "#3B82F6",
-  blue600: "#2563EB",
-  blue700: "#1D4ED8",
+  navy50: "#EEF2F6",
+  navy100: "#DCE4ED",
+  navy500: "#3E6A9E",
+  navy600: "#1F3B63",
+  navy700: "#16283F",
 
-  cyan50: "#ECFEFF",
-  cyan500: "#06B6D4",
-  cyan600: "#0891B2",
+  emerald50: "#E7F5EF",
+  emerald500: "#0F8B5F",
+  emerald600: "#0F8B5F",
+  emerald700: "#0B6E4A",
 
-  emerald50: "#ECFDF5",
-  emerald500: "#10B981",
-  emerald600: "#059669",
-  emerald700: "#047857",
+  amber50: "#FBF1E2",
+  amber500: "#B7791F",
+  amber600: "#B7791F",
+  amberText: "#8A5A16",
 
-  amber50: "#FFFBEB",
-  amber500: "#F59E0B",
-  amber600: "#D97706",
-
-  rose50: "#FFF1F2",
-  rose500: "#F43F5E",
-  rose600: "#E11D48",
+  rose50: "#FBEAEA",
+  rose500: "#C23B3B",
+  rose600: "#C23B3B",
+  roseText: "#9A2F2F",
 } as const;
 
 export const theme = {
   colors: {
     brand: {
-      primary: palette.blue600,
-      primaryPressed: palette.blue700,
-      primarySoft: palette.blue50,
-      secondary: palette.cyan600,
+      primary: palette.navy600,
+      primaryPressed: palette.navy700,
+      primarySoft: palette.navy50,
+      secondary: palette.slate600,
       secondaryPressed: palette.slate800,
-      secondarySoft: palette.cyan50,
+      secondarySoft: palette.slate100,
     },
 
     background: {
@@ -64,16 +62,16 @@ export const theme = {
       secondary: palette.slate600,
       muted: palette.slate500,
       inverse: palette.white,
-      brand: palette.blue700,
+      brand: palette.navy700,
       success: palette.emerald700,
-      warning: palette.amber600,
-      danger: palette.rose600,
+      warning: palette.amberText,
+      danger: palette.roseText,
     },
 
     border: {
       default: palette.slate200,
       strong: palette.slate300,
-      focus: palette.blue500,
+      focus: palette.navy500,
     },
 
     state: {
@@ -83,13 +81,13 @@ export const theme = {
       warningSoft: palette.amber50,
       danger: palette.rose500,
       dangerSoft: palette.rose50,
-      info: palette.blue600,
-      infoSoft: palette.blue50,
+      info: palette.navy600,
+      infoSoft: palette.navy50,
     },
 
     danger: {
       soft: palette.rose50,
-      text: palette.rose600,
+      text: palette.roseText,
     },
 
     disabled: {
@@ -181,24 +179,24 @@ export const theme = {
     },
     sm: {
       shadowColor: palette.slate950,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 5,
-      elevation: 2,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.04,
+      shadowRadius: 3,
+      elevation: 1,
     },
     md: {
       shadowColor: palette.slate950,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.1,
-      shadowRadius: 18,
-      elevation: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.06,
+      shadowRadius: 10,
+      elevation: 3,
     },
     lg: {
       shadowColor: palette.slate950,
-      shadowOffset: { width: 0, height: 16 },
-      shadowOpacity: 0.16,
-      shadowRadius: 30,
-      elevation: 8,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.09,
+      shadowRadius: 20,
+      elevation: 5,
     },
   },
 } as const;

@@ -64,9 +64,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
+    paddingVertical: theme.spacing.xs,
+    paddingHorizontal: theme.spacing.sm,
+    borderRadius: theme.radius.sm,
   },
   dot: {
     width: 6,
@@ -74,7 +74,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.full,
   },
   label: {
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.xs,
     fontWeight: theme.fontWeights.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
 });

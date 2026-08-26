@@ -13,6 +13,7 @@ import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
+import { accountDeletionService } from "@/services/accountDeletionService";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { TeamSyncAppData } from "@/types/teamSync";
@@ -83,6 +84,17 @@ function getProfileCopy(language: "tr" | "en") {
       logoutButton: "Log out",
       signingOut: "Logging out...",
       logoutFailed: "Logout failed. Please try again.",
+      deleteAccountTitle: "Delete account",
+      deleteAccountDescription: "Permanently delete your account and personal data. This cannot be undone.",
+      deleteAccountButton: "Delete my account",
+      deleteConfirmTitle: "This cannot be undone",
+      deleteConfirmDescription: "Your account, name, and email will be permanently deleted and you won't be able to log in again. Type your email to confirm:",
+      deleteConfirmPlaceholder: "Type your email",
+      deleteConfirmButton: "Permanently delete my account",
+      deletingAccount: "Deleting account...",
+      deleteCancelButton: "Cancel",
+      deleteFailedGeneric: "Something went wrong deleting your account. Please try again.",
+      deleteFailedOwner: "You're the club owner, so you can't delete your account from here yet. You'll need to transfer club ownership to another admin first -- contact support for help with that.",
       editingEnabled: "Edit mode enabled.",
       editingCancelled: "Changes cancelled.",
       defaultUser: "MaviTeam User",
@@ -114,6 +126,17 @@ function getProfileCopy(language: "tr" | "en") {
     logoutButton: "Çıkış yap",
     signingOut: "Çıkış yapılıyor...",
     logoutFailed: "Çıkış yapılamadı. Lütfen tekrar dene.",
+    deleteAccountTitle: "Hesabı sil",
+    deleteAccountDescription: "Hesabını ve kişisel bilgilerini kalıcı olarak sil. Bu işlem geri alınamaz.",
+    deleteAccountButton: "Hesabımı sil",
+    deleteConfirmTitle: "Bu işlem geri alınamaz",
+    deleteConfirmDescription: "Hesabın, adın ve e-postan kalıcı olarak silinir; bir daha giriş yapamazsın. Onaylamak için e-posta adresini yaz:",
+    deleteConfirmPlaceholder: "E-posta adresini yaz",
+    deleteConfirmButton: "Hesabımı kalıcı olarak sil",
+    deletingAccount: "Hesap siliniyor...",
+    deleteCancelButton: "Vazgeç",
+    deleteFailedGeneric: "Hesap silinirken bir sorun oluştu. Lütfen tekrar dene.",
+    deleteFailedOwner: "Kulüp sahibi olduğun için hesabını buradan silemezsin. Önce kulüp sahipliğini başka bir yöneticiye devretmen gerekiyor -- bunun için bizimle iletişime geç.",
     editingEnabled: "Düzenleme modu açık.",
     editingCancelled: "Değişiklikler iptal edildi.",
     defaultUser: "MaviTeam Kullanıcı",
@@ -133,6 +156,9 @@ export default function ProfileScreen() {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [statusMessage, setStatusMessage] = useState(t.common.loading);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -217,6 +243,34 @@ export default function ProfileScreen() {
     } catch (logoutError) {
       setStatusMessage(getAuthErrorMessage(logoutError) || copy.logoutFailed);
       setIsSigningOut(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    const currentUserEmail = appData?.currentUser.email ?? "";
+
+    if (isDeletingAccount || currentUserEmail === "" || deleteConfirmInput.trim().toLowerCase() !== currentUserEmail.trim().toLowerCase()) {
+      return;
+    }
+
+    try {
+      setIsDeletingAccount(true);
+      setStatusMessage(copy.deletingAccount);
+
+      await accountDeletionService.deleteMyAccount();
+
+      if (authService.isConfigured()) {
+        await authService.logout();
+      }
+
+      const resetData = await teamSyncService.resetAppData();
+      setAppData(resetData);
+      setDraftProfileData(emptyFormData);
+      router.replace("/" as never);
+    } catch (deleteError) {
+      const errorCode = deleteError instanceof Error && "code" in deleteError ? String((deleteError as { code?: unknown }).code) : "";
+      setStatusMessage(errorCode === "functions/failed-precondition" ? copy.deleteFailedOwner : copy.deleteFailedGeneric);
+      setIsDeletingAccount(false);
     }
   }
 
@@ -470,6 +524,51 @@ export default function ProfileScreen() {
           />
         </View>
 
+        <View style={styles.logoutCard}>
+          <View style={styles.logoutTextArea}>
+            <Text style={styles.logoutTitle}>{copy.deleteAccountTitle}</Text>
+            <Text style={styles.logoutDescription}>{copy.deleteAccountDescription}</Text>
+          </View>
+
+          <AppButton
+            title={showDeleteConfirm ? copy.deleteCancelButton : copy.deleteAccountButton}
+            variant="ghost"
+            accessibilityLabel={copy.deleteAccountButton}
+            style={styles.logoutButton}
+            textStyle={styles.logoutButtonText}
+            onPress={() => {
+              setShowDeleteConfirm((currentValue) => !currentValue);
+              setDeleteConfirmInput("");
+            }}
+            disabled={isDeletingAccount}
+          />
+        </View>
+
+        {showDeleteConfirm ? (
+          <Card variant="subtle" style={styles.deleteConfirmBox}>
+            <Text style={styles.deleteConfirmTitle}>{copy.deleteConfirmTitle}</Text>
+            <Text style={styles.deleteConfirmDescription}>{copy.deleteConfirmDescription}</Text>
+
+            <TextField
+              label={t.profile.email}
+              value={deleteConfirmInput}
+              onChangeText={setDeleteConfirmInput}
+              placeholder={copy.deleteConfirmPlaceholder}
+              autoCapitalize="none"
+              autoCorrect={false}
+              containerStyle={styles.deleteConfirmField}
+            />
+
+            <AppButton
+              title={isDeletingAccount ? copy.deletingAccount : copy.deleteConfirmButton}
+              variant="danger"
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount || deleteConfirmInput.trim().toLowerCase() !== currentUser.email.trim().toLowerCase()}
+              style={styles.deleteConfirmButton}
+            />
+          </Card>
+        ) : null}
+
         {!isEditing ? (
           <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.editBottomButton} />
         ) : null}
@@ -521,5 +620,10 @@ const styles = StyleSheet.create({
   logoutDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   logoutButton: { minWidth: 160, borderColor: "rgba(225, 29, 72, 0.28)" },
   logoutButtonText: { color: theme.colors.text.danger },
+  deleteConfirmBox: { marginTop: theme.spacing.lg, gap: theme.spacing.md },
+  deleteConfirmTitle: { color: theme.colors.text.danger, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
+  deleteConfirmDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
+  deleteConfirmField: { marginTop: theme.spacing.xs },
+  deleteConfirmButton: { alignSelf: "flex-start", minWidth: 220 },
   editBottomButton: { marginTop: theme.spacing.lg, alignSelf: "flex-start", minWidth: 180 },
 });

@@ -6,12 +6,14 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import type { ScheduleEvent, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type AvailabilityStatus = "available" | "notAvailable" | "notAnswered";
 
@@ -68,6 +70,7 @@ export default function AvailabilityScreen() {
   const [myNoteState, setMyNote] = useState("");
   const [statusMessage, setStatusMessage] = useState("Uygunluk bilgileri merkezi TeamSync datasından yüklendi.");
   const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
+  const [rosterSearchQuery, setRosterSearchQuery] = useState("");
 
   const events = appData?.scheduleEvents ?? EMPTY_EVENTS;
   const users = appData?.users ?? EMPTY_USERS;
@@ -88,6 +91,10 @@ export default function AvailabilityScreen() {
 
     return { availableCount, notAvailableCount, notAnsweredCount, totalCount, responseRate };
   }, [statusByUserId, visibleUsers]);
+
+  const filteredVisibleUsers = useMemo(() => {
+    return visibleUsers.filter((user) => matchesSearchQuery(rosterSearchQuery, user.fullName, user.email));
+  }, [visibleUsers, rosterSearchQuery]);
 
   function updateMyStatus(newStatus: AvailabilityStatus) {
     if (currentUserId.length === 0) {
@@ -201,9 +208,23 @@ export default function AvailabilityScreen() {
             <Text style={styles.statusPill}>{availabilitySummary.totalCount} kişi</Text>
           </View>
 
-          {visibleUsers.length > 0 ? (
+          {visibleUsers.length > 5 ? (
+            <SearchField
+              value={rosterSearchQuery}
+              onChangeText={setRosterSearchQuery}
+              placeholder="İsim veya e-posta ara..."
+              accessibilityLabel="Uygunluk listesinde ara"
+              style={styles.searchField}
+            />
+          ) : null}
+
+          {visibleUsers.length === 0 ? (
+            <EmptyState title="Bu etkinlikte kullanıcı yok" description="Takım üyeleri eklendiğinde burada görünecek." />
+          ) : filteredVisibleUsers.length === 0 ? (
+            <EmptyState title="Aramayla eşleşen kişi yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+          ) : (
             <View style={styles.athleteList}>
-              {visibleUsers.map((user) => {
+              {filteredVisibleUsers.map((user) => {
                 const status = statusByUserId[user.id] ?? "notAnswered";
 
                 return (
@@ -220,8 +241,6 @@ export default function AvailabilityScreen() {
                 );
               })}
             </View>
-          ) : (
-            <EmptyState title="Bu etkinlikte kullanıcı yok" description="Takım üyeleri eklendiğinde burada görünecek." />
           )}
         </Card>
       ) : null}
@@ -238,7 +257,7 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, color: theme.colors.text.primary, marginBottom: theme.spacing.xs },
   sectionSubtitle: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, color: theme.colors.text.secondary, lineHeight: theme.lineHeights.md },
-  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.full, overflow: "hidden" },
+  statusPill: { backgroundColor: theme.colors.brand.primarySoft, color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.sm, overflow: "hidden" },
   eventList: { gap: theme.spacing.md },
   eventCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
   eventCardActive: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
@@ -257,8 +276,9 @@ const styles = StyleSheet.create({
   statCard: { flexGrow: 1, flexBasis: 135 },
   statValue: { fontSize: theme.fontSizes["4xl"], fontWeight: theme.fontWeights.bold, color: theme.colors.brand.primary, marginBottom: theme.spacing.xs },
   statLabel: { fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.medium, color: theme.colors.text.secondary },
-  athleteList: { gap: theme.spacing.md },
-  athleteCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
+  searchField: { marginBottom: theme.spacing.md },
+  athleteList: { gap: theme.spacing.sm },
+  athleteCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.md, borderWidth: 1, borderColor: theme.colors.border.default },
   athleteTopRow: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.md },
   athleteInfo: { flex: 1 },
   athleteName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },

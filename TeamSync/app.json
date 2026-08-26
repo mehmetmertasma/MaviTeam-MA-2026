@@ -39,11 +39,26 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#2563EB"
+        }
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a5a5c066-b548-498f-a8b8-4bb3844a156d"
+      }
+    },
+    "owner": "mertasma"
   }
 }

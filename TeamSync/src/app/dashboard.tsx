@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   topBar: { backgroundColor: theme.colors.background.surface, borderRadius: theme.radius["2xl"], borderWidth: 1, borderColor: theme.colors.border.default, padding: theme.spacing.xl, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
   logo: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.bold },
   topBarSub: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular, marginTop: theme.spacing.xs },
-  systemBadge: { borderRadius: theme.radius.full, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
+  systemBadge: { borderRadius: theme.radius.md, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: "row", alignItems: "center", gap: theme.spacing.sm },
   systemDot: { width: 8, height: 8, borderRadius: theme.radius.full, backgroundColor: theme.colors.state.success },
   systemBadgeText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium },
 

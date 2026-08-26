@@ -7,6 +7,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
@@ -16,6 +17,10 @@ import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataSe
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Announcement, TeamSyncAppData, UserRole } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
+
+const ANNOUNCEMENTS_PAGE_SIZE = 10;
+const EMPTY_ANNOUNCEMENTS: Announcement[] = [];
 
 type TargetOption = {
   id: string;
@@ -60,6 +65,8 @@ export default function AnnouncementsScreen() {
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklendi.");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
 
   // Overlays a dedicated, targeted Firestore fetch on top of the shared
   // appData instead of pulling announcements from it directly, so this
@@ -121,7 +128,16 @@ export default function AnnouncementsScreen() {
     ];
   }, [appData]);
 
-  const announcements = appData?.announcements ?? [];
+  const announcements = appData?.announcements ?? EMPTY_ANNOUNCEMENTS;
+
+  const filteredAnnouncements = useMemo(() => {
+    return announcements.filter((announcement) => matchesSearchQuery(searchQuery, announcement.title, announcement.message));
+  }, [announcements, searchQuery]);
+
+  const visibleAnnouncements = showAllAnnouncements
+    ? filteredAnnouncements
+    : filteredAnnouncements.slice(0, ANNOUNCEMENTS_PAGE_SIZE);
+
   const userCanPublish = appData !== null && canPublishAnnouncements(appData.currentUser.role);
   const userCanDelete = appData?.currentUser.role === "clubAdmin";
   const canPublish = title.trim().length > 0 && message.trim().length > 0 && userCanPublish && !isSubmitting;
@@ -238,20 +254,17 @@ export default function AnnouncementsScreen() {
       </Card>
 
       <View style={styles.actionRowTop}>
-        <AppButton
-          title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
-          onPress={() => {
-            if (!userCanPublish) {
-              setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
-              return;
-            }
-
-            setShowCreateForm(true);
-            setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
-          }}
-          disabled={showCreateForm || !userCanPublish}
-          style={styles.actionButton}
-        />
+        {userCanPublish ? (
+          <AppButton
+            title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
+            onPress={() => {
+              setShowCreateForm(true);
+              setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
+            }}
+            disabled={showCreateForm}
+            style={styles.actionButton}
+          />
+        ) : null}
 
         <AppButton
           title="Merkezi datayı yenile"
@@ -261,7 +274,7 @@ export default function AnnouncementsScreen() {
         />
       </View>
 
-      {showCreateForm ? (
+      {showCreateForm && userCanPublish ? (
         <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
@@ -341,9 +354,19 @@ export default function AnnouncementsScreen() {
           <StatusBadge label={`${announcements.length} aktif`} tone="info" />
         </View>
 
+        {announcements.length > 5 ? (
+          <SearchField
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Başlık veya mesaj ara..."
+            accessibilityLabel="Duyurularda ara"
+            style={styles.searchField}
+          />
+        ) : null}
+
         <View style={styles.announcementList}>
-          {appData !== null && announcements.length > 0 ? (
-            announcements.map((announcement) => (
+          {appData !== null && visibleAnnouncements.length > 0 ? (
+            visibleAnnouncements.map((announcement) => (
               <Card key={announcement.id} variant="subtle" style={styles.announcementCard}>
                 <View style={styles.announcementHeaderRow}>
                   <View style={styles.announcementTextArea}>
@@ -367,10 +390,21 @@ export default function AnnouncementsScreen() {
                 <Text style={styles.announcementMessage}>{announcement.message}</Text>
               </Card>
             ))
+          ) : announcements.length > 0 ? (
+            <EmptyState title="Aramayla eşleşen duyuru yok" description="Farklı bir başlık veya kelime ile tekrar dene." />
           ) : (
             <EmptyState title="Henüz duyuru yok" description="Yeni duyuru oluştur butonuna basarak ilk duyurunu ekleyebilirsin." />
           )}
         </View>
+
+        {!showAllAnnouncements && filteredAnnouncements.length > visibleAnnouncements.length ? (
+          <AppButton
+            title={`Daha fazla göster (${filteredAnnouncements.length - visibleAnnouncements.length})`}
+            variant="ghost"
+            onPress={() => setShowAllAnnouncements(true)}
+            style={styles.showMoreButton}
+          />
+        ) : null}
 
         <Text style={styles.statusText}>{statusMessage}</Text>
       </Card>
@@ -436,7 +470,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   targetButton: {
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
@@ -454,8 +488,10 @@ const styles = StyleSheet.create({
   },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
   publishRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  announcementList: { gap: theme.spacing.md },
-  announcementCard: { padding: theme.spacing.lg },
+  searchField: { marginBottom: theme.spacing.lg },
+  showMoreButton: { alignSelf: "flex-start", marginTop: theme.spacing.md },
+  announcementList: { gap: theme.spacing.sm },
+  announcementCard: { padding: theme.spacing.md },
   announcementHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -13,6 +13,7 @@ type CalendarProps = {
   events: ScheduleEvent[];
   selectedDayNumber: string;
   onSelectDay: (dayNumber: number) => void;
+  onSelectEvent: (event: ScheduleEvent) => void;
 };
 
 export function Calendar({
@@ -20,6 +21,7 @@ export function Calendar({
   events,
   selectedDayNumber,
   onSelectDay,
+  onSelectEvent,
 }: CalendarProps) {
   const calendarCells = useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth]);
   const eventsByDate = useMemo(() => groupScheduleEventsByDate(events), [events]);
@@ -63,14 +65,22 @@ export function Calendar({
                 const typeStyles = getScheduleTypeStyles(event.type);
 
                 return (
-                  <View
+                  <Pressable
                     key={event.id}
-                    style={[
+                    onPress={(pressEvent) => {
+                      // Nested Pressables on react-native-web are backed by
+                      // real DOM click events, which bubble -- without this
+                      // the day cell's onSelectDay would also fire.
+                      pressEvent.stopPropagation();
+                      onSelectEvent(event);
+                    }}
+                    style={({ pressed }) => [
                       styles.calendarEventPill,
                       {
                         backgroundColor: typeStyles.backgroundColor,
                         borderColor: typeStyles.borderColor,
                       },
+                      pressed ? styles.calendarEventPillPressed : null,
                     ]}
                   >
                     <Text
@@ -79,7 +89,7 @@ export function Calendar({
                     >
                       {formatEventTime(event.startsAt)} {event.title}
                     </Text>
-                  </View>
+                  </Pressable>
                 );
               })}
 
@@ -169,6 +179,9 @@ const styles = StyleSheet.create({
   calendarEventText: {
     fontSize: 11,
     fontWeight: theme.fontWeights.semibold,
+  },
+  calendarEventPillPressed: {
+    opacity: 0.7,
   },
   moreEventsText: {
     color: theme.colors.text.secondary,

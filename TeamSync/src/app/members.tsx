@@ -6,6 +6,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
@@ -13,6 +14,7 @@ import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
 import type { Team, UserProfile, UserRole, UserStatus } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type EditableRole = Exclude<UserRole, "superAdmin">;
 
@@ -103,6 +105,7 @@ export default function MembersScreen() {
   const [draftTeamIds, setDraftTeamIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Üyeler MaviTeam kulüp datasından yüklendi.");
+  const [searchQuery, setSearchQuery] = useState("");
 
   async function refreshMembersData() {
     try {
@@ -123,6 +126,10 @@ export default function MembersScreen() {
     if (appData === null) return EMPTY_USERS;
     return sortMembers(users.filter((user) => user.clubId === appData.club.id));
   }, [appData, users]);
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => matchesSearchQuery(searchQuery, member.fullName, member.email));
+  }, [members, searchQuery]);
 
   const activeCount = members.filter((member) => member.status === "active").length;
   const coachCount = members.filter((member) => member.role === "coach" && member.status !== "removed").length;
@@ -230,8 +237,22 @@ export default function MembersScreen() {
         {members.length === 0 ? (
           <EmptyState title="Henüz üye yok" description="Kullanıcılar kulübe katıldıkça burada görünecek." />
         ) : (
+          <>
+            {members.length > 5 ? (
+              <SearchField
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="İsim veya e-posta ara..."
+                accessibilityLabel="Üyelerde ara"
+                style={styles.searchField}
+              />
+            ) : null}
+
+            {filteredMembers.length === 0 ? (
+              <EmptyState title="Aramayla eşleşen üye yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+            ) : (
           <View style={styles.memberList}>
-            {members.map((member) => {
+            {filteredMembers.map((member) => {
               const isSelected = selectedUserId === member.id;
               const isEditing = editingUserId === member.id;
               const isProtected = member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
@@ -291,6 +312,8 @@ export default function MembersScreen() {
               );
             })}
           </View>
+            )}
+          </>
         )}
       </Card>
     </AppScreenLayout>
@@ -312,10 +335,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   refreshButton: { alignSelf: "flex-start" },
-  memberList: { gap: theme.spacing.md },
+  searchField: { marginBottom: theme.spacing.md },
+  memberList: { gap: theme.spacing.sm },
   memberCard: { overflow: "hidden" },
   memberCardSelected: { borderColor: theme.colors.brand.primary },
-  memberSummary: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
+  memberSummary: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.md },
   avatar: { width: 42, height: 42, borderRadius: theme.radius.full, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.brand.primarySoft },
   avatarText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   memberInfo: { flex: 1, minWidth: 0 },
@@ -330,7 +354,7 @@ const styles = StyleSheet.create({
   editPanel: { gap: theme.spacing.md },
   editLabel: { color: theme.colors.text.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm },
-  chip: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.full, backgroundColor: theme.colors.background.surface, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
+  chip: { borderWidth: 1, borderColor: theme.colors.border.default, borderRadius: theme.radius.md, backgroundColor: theme.colors.background.surface, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg },
   chipSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   chipDisabled: { opacity: 0.45 },
   chipText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.medium },

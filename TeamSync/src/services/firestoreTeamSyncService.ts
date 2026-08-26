@@ -995,6 +995,26 @@ export const firestoreTeamSyncService = {
     );
   },
 
+  // Same isolated-write reasoning as updateCurrentUserProfile above: this
+  // must never be bundled with a club-level write. arrayUnion means a
+  // second device (or a reinstall that mints a new Expo push token) adds to
+  // the list instead of clobbering a token still in use elsewhere; stale
+  // tokens are left for Expo to report back as invalid rather than pruned
+  // here (see the plan's deferred-scope note on receipt polling).
+  async registerPushToken(firebaseUser: User, expoPushToken: string) {
+    const { db } = requireFirebaseServices();
+    const userRef = doc(db, "users", firebaseUser.uid);
+
+    await setDoc(
+      userRef,
+      {
+        expoPushTokens: arrayUnion(expoPushToken),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  },
+
   // Writes club-wide settings. Only a clubAdmin may do this (enforced both
   // here, for a clean error before hitting the network, and by
   // firestore.rules as the source of truth).

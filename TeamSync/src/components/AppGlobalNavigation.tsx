@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   backButton: {
     minWidth: 72,
     height: 44,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     backgroundColor: theme.colors.background.surface,
     borderWidth: 1,
     borderColor: theme.colors.border.default,

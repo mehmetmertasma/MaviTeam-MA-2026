@@ -58,7 +58,7 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData }: Ev
 }
 
 const styles = StyleSheet.create({
-  eventList: { gap: theme.spacing.md },
+  eventList: { gap: theme.spacing.sm },
   eventCard: {
     flexDirection: "row",
     backgroundColor: theme.colors.background.subtle,
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   eventContent: {
     flex: 1,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
   },
   eventHeaderRow: {
     flexDirection: "row",

@@ -54,8 +54,23 @@ service cloud.firestore {
       return currentUserIsClubAdmin() || currentUserIsCoach();
     }
 
+    function clubDoc(clubId) {
+      return get(/databases/$(database)/documents/clubs/$(clubId));
+    }
+
+    // Missing 'status' (every club written before the platform admin panel
+    // existed) is treated as active. A nonexistent clubId makes get() error,
+    // which Firestore treats as a denied request -- exactly what we want.
+    function clubIsActive(clubId) {
+      return clubDoc(clubId).data.get('status', 'active') != 'suspended';
+    }
+
+    // The one place a platform-admin "suspend club" action actually takes
+    // effect: nearly every collection's rules funnel through this function,
+    // so gating it here cuts off a suspended club's data everywhere at
+    // once, for every role, without touching each collection individually.
     function belongsToCurrentUsersClub(clubId) {
-      return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId;
+      return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId && clubIsActive(clubId);
     }
 
     function isCurrentUsersTeam(teamId) {
@@ -358,6 +373,14 @@ service cloud.firestore {
     // before sending, both via the Admin SDK. No client needs this and it's
     // keyed by email rather than uid, so there's no self-access case either.
     match /emailDeliveryStatus/{email} {
+      allow read, write: if false;
+    }
+
+    // Written only by the platform-admin Cloud Functions (getPlatformOverview
+    // is read-only, setClubStatus writes here) via the Admin SDK, which
+    // bypasses these rules entirely. No client, not even a clubAdmin, has
+    // any business reading another club's admin action history.
+    match /adminAuditLog/{logId} {
       allow read, write: if false;
     }
 

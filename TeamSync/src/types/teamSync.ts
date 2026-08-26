@@ -18,6 +18,8 @@ export type JoinRequestStatus = "pending" | "approved" | "rejected";
 
 export type TimestampString = string;
 
+export type ClubStatus = "active" | "suspended";
+
 export type Club = {
   id: string;
   name: string;
@@ -27,6 +29,11 @@ export type Club = {
   ownerId: string;
   logoUrl?: string;
   primaryColor?: string;
+  // Missing/undefined is treated as "active" everywhere that reads this --
+  // only the platform admin panel (functions/index.js's setClubStatus) ever
+  // writes it, via the Admin SDK, so every existing club document written
+  // before this field existed keeps working without a backfill.
+  status?: ClubStatus;
   createdAt: TimestampString;
   updatedAt: TimestampString;
 };
@@ -39,6 +46,12 @@ export type UserProfile = {
   status: UserStatus;
   clubId: string;
   teamIds: string[];
+  // Expo push tokens for every device this user is signed into -- an array,
+  // not a single token, since the same person can have a phone and a
+  // tablet, or reinstall and pick up a new token without invalidating an
+  // older one still in use elsewhere. Written only by the signed-in user
+  // themselves (see firestoreTeamSyncService.registerPushToken).
+  expoPushTokens?: string[];
   createdAt: TimestampString;
   updatedAt: TimestampString;
 };

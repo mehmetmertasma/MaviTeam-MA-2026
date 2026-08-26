@@ -1,6 +1,9 @@
+import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import { SearchField } from "@/components/SearchField";
 import { theme } from "@/constants/theme";
+import { matchesSearchQuery } from "@/utils/search";
 
 export type GroupMember = {
   id: string;
@@ -31,6 +34,12 @@ export function GroupMemberBubble({
   onClose,
   onQuickMessage,
 }: GroupMemberBubbleProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredMembers = useMemo(() => {
+    return members.filter((member) => matchesSearchQuery(searchQuery, member.name, member.teamName));
+  }, [members, searchQuery]);
+
   return (
     <View style={styles.panel}>
       <View style={styles.header}>
@@ -50,31 +59,45 @@ export function GroupMemberBubble({
         </Pressable>
       </View>
 
-      <ScrollView
-        nestedScrollEnabled
-        style={styles.memberList}
-        contentContainerStyle={styles.memberListContent}
-      >
-        {members.map((member) => (
-          <View key={member.id} style={styles.memberRow}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getInitials(member.name)}</Text>
-            </View>
+      {members.length > 5 ? (
+        <SearchField
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Üye ara..."
+          accessibilityLabel="Grup üyelerinde ara"
+          style={styles.searchField}
+        />
+      ) : null}
 
-            <View style={styles.memberInfo}>
-              <Text style={styles.memberName}>{member.name}</Text>
-              <Text style={styles.memberMeta}>{member.teamName}</Text>
-            </View>
+      {filteredMembers.length === 0 ? (
+        <Text style={styles.emptyText}>Aramayla eşleşen kişi yok.</Text>
+      ) : (
+        <ScrollView
+          nestedScrollEnabled
+          style={styles.memberList}
+          contentContainerStyle={styles.memberListContent}
+        >
+          {filteredMembers.map((member) => (
+            <View key={member.id} style={styles.memberRow}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{getInitials(member.name)}</Text>
+              </View>
 
-            <Pressable
-              onPress={() => onQuickMessage(member)}
-              style={({ pressed }) => [styles.quickButton, pressed ? styles.pressed : null]}
-            >
-              <Text style={styles.quickButtonText}>Hızlı mesaj</Text>
-            </Pressable>
-          </View>
-        ))}
-      </ScrollView>
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>{member.name}</Text>
+                <Text style={styles.memberMeta}>{member.teamName}</Text>
+              </View>
+
+              <Pressable
+                onPress={() => onQuickMessage(member)}
+                style={({ pressed }) => [styles.quickButton, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.quickButtonText}>Hızlı mesaj</Text>
+              </Pressable>
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -118,6 +141,14 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     marginTop: -2,
   },
+  searchField: { marginBottom: theme.spacing.md },
+  emptyText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.regular,
+    paddingVertical: theme.spacing.lg,
+    textAlign: "center",
+  },
   memberList: { maxHeight: 280 },
   memberListContent: { gap: theme.spacing.sm },
   memberRow: {
@@ -155,7 +186,7 @@ const styles = StyleSheet.create({
   },
   quickButton: {
     backgroundColor: theme.colors.brand.primary,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
   },

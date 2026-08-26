@@ -28,7 +28,6 @@ const variantStyles: Record<
     button: {
       backgroundColor: theme.colors.brand.primary,
       borderColor: theme.colors.brand.primary,
-      ...theme.shadows.sm,
     },
     pressed: {
       backgroundColor: theme.colors.brand.primaryPressed,
@@ -145,7 +144,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderRadius: theme.radius.xl,
+    borderRadius: theme.radius.lg,
     paddingHorizontal: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
   },

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -8,7 +9,9 @@ import type { ScheduleEvent } from "@/types/teamSync";
 import { MONTH_PICKER_OPTIONS, SCHEDULE_TYPE_OPTIONS, getScheduleTypeStyles } from "../constants/schedule.constants";
 import { formatMonthTitle } from "../utils/schedule-date.utils";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
+import type { ScheduleWorkspaceData } from "../types/schedule.types";
 import { Calendar } from "./Calendar";
+import { EventDetailsBubble } from "./EventDetailsBubble";
 
 type CalendarSectionProps = {
   visibleMonth: Date;
@@ -17,6 +20,7 @@ type CalendarSectionProps = {
   showMonthPicker: boolean;
   showEventForm: boolean;
   statusMessage: string;
+  scheduleData: ScheduleWorkspaceData | null;
   onToggleMonthPicker: () => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -27,6 +31,7 @@ type CalendarSectionProps = {
   onSelectDay: (dayNumber: number) => void;
   onOpenEventForm: () => void;
   onRefresh: () => void;
+  canManageEvents: boolean;
 };
 
 export function CalendarSection({
@@ -36,6 +41,7 @@ export function CalendarSection({
   showMonthPicker,
   showEventForm,
   statusMessage,
+  scheduleData,
   onToggleMonthPicker,
   onPrevMonth,
   onNextMonth,
@@ -46,14 +52,18 @@ export function CalendarSection({
   onSelectDay,
   onOpenEventForm,
   onRefresh,
+  canManageEvents,
 }: CalendarSectionProps) {
+  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<ScheduleEvent | null>(null);
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
         <View style={scheduleSharedStyles.sectionHeaderText}>
           <Text style={scheduleSharedStyles.sectionTitle}>Takvim · {formatMonthTitle(visibleMonth)}</Text>
           <Text style={scheduleSharedStyles.sectionSubtitle}>
-            Bir güne basınca etkinlik formu o tarih için açılır.
+            {canManageEvents
+              ? "Bir güne basınca etkinlik formu o tarih için açılır."
+              : "Antrenman ve maçları buradan görüntüleyebilirsin."}
           </Text>
         </View>
 
@@ -160,15 +170,26 @@ export function CalendarSection({
         events={visibleMonthEvents}
         selectedDayNumber={selectedDayNumber}
         onSelectDay={onSelectDay}
+        onSelectEvent={setSelectedCalendarEvent}
       />
 
-      <View style={scheduleSharedStyles.actionRow}>
-        <AppButton
-          title={showEventForm ? "Form açık" : "Etkinlik ekle"}
-          onPress={onOpenEventForm}
-          disabled={showEventForm}
-          style={scheduleSharedStyles.actionButton}
+      {selectedCalendarEvent !== null && scheduleData !== null ? (
+        <EventDetailsBubble
+          event={selectedCalendarEvent}
+          scheduleData={scheduleData}
+          onClose={() => setSelectedCalendarEvent(null)}
         />
+      ) : null}
+
+      <View style={scheduleSharedStyles.actionRow}>
+        {canManageEvents ? (
+          <AppButton
+            title={showEventForm ? "Form açık" : "Etkinlik ekle"}
+            onPress={onOpenEventForm}
+            disabled={showEventForm}
+            style={scheduleSharedStyles.actionButton}
+          />
+        ) : null}
 
         <AppButton
           title="Merkezi datayı yenile"
@@ -248,7 +269,7 @@ const styles = StyleSheet.create({
   },
   yearButton: {
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
@@ -274,7 +295,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     alignItems: "center",
     backgroundColor: theme.colors.background.surface,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
@@ -298,7 +319,7 @@ const styles = StyleSheet.create({
   },
   todayButton: {
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,

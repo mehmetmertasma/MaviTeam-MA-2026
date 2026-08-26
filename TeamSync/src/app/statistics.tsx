@@ -1,13 +1,17 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import type { AttendanceRecord, ScheduleEvent, TeamSyncAppData } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
+
+const EMPTY_PLAYERS: PlayerRow[] = [];
 
 type PlayerRow = {
   id: string;
@@ -134,10 +138,17 @@ function buildStats(appData: TeamSyncAppData): RosterStats | SelfStats {
 
 export default function StatisticsScreen() {
   const { appData } = useAppDataContext();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const stats = useMemo(() => {
     return appData === null ? null : buildStats(appData);
   }, [appData]);
+
+  const players = stats !== null && stats.mode === "roster" ? stats.players : EMPTY_PLAYERS;
+
+  const filteredPlayers = useMemo(() => {
+    return players.filter((player) => matchesSearchQuery(searchQuery, player.name, player.teamName));
+  }, [players, searchQuery]);
 
   return (
     <AppScreenLayout variant="standard">
@@ -189,8 +200,22 @@ export default function StatisticsScreen() {
                 description="Bir takıma sporcu eklendiğinde katılım oranları burada görünecek."
               />
             ) : (
+              <>
+                {stats.players.length > 5 ? (
+                  <SearchField
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholder="İsim veya takım ara..."
+                    accessibilityLabel="Sporcularda ara"
+                    style={styles.searchField}
+                  />
+                ) : null}
+
+                {filteredPlayers.length === 0 ? (
+                  <EmptyState title="Aramayla eşleşen sporcu yok" description="Farklı bir isim veya takım ile tekrar dene." />
+                ) : (
               <View style={styles.playerList}>
-                {stats.players.map((player) => (
+                {filteredPlayers.map((player) => (
                   <View key={player.id} style={styles.playerCard}>
                     <View style={styles.playerTopRow}>
                       <View style={styles.playerInfo}>
@@ -217,6 +242,8 @@ export default function StatisticsScreen() {
                   </View>
                 ))}
               </View>
+                )}
+              </>
             )}
           </Card>
         </>
@@ -334,14 +361,15 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.sm,
     overflow: "hidden",
   },
-  playerList: { gap: theme.spacing.md },
+  searchField: { marginBottom: theme.spacing.md },
+  playerList: { gap: theme.spacing.sm },
   playerCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
@@ -370,7 +398,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.sm,
     overflow: "hidden",
   },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },

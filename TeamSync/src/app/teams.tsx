@@ -7,6 +7,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
@@ -15,6 +16,7 @@ import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Team as TeamRecord, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 function getTeamMembershipErrorMessage(error: unknown) {
   const message = error instanceof Error ? error.message : "";
@@ -86,6 +88,8 @@ export default function TeamsScreen() {
   const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklendi.");
   const [addMemberOpenTeamId, setAddMemberOpenTeamId] = useState("");
   const [updatingMemberId, setUpdatingMemberId] = useState("");
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
+  const [addMemberSearchQuery, setAddMemberSearchQuery] = useState("");
 
   const teams = appData?.teams ?? EMPTY_TEAMS;
   const users = appData?.users ?? EMPTY_USERS;
@@ -157,6 +161,9 @@ export default function TeamsScreen() {
 
   function toggleTeamDetails(team: TeamRecord) {
     setPendingRemoveTeamId("");
+    setMemberSearchQuery("");
+    setAddMemberOpenTeamId("");
+    setAddMemberSearchQuery("");
 
     if (selectedTeamId === team.id) {
       setSelectedTeamId("");
@@ -276,12 +283,14 @@ export default function TeamsScreen() {
       </View>
 
       <View style={styles.topActions}>
-        <AppButton
-          title={showCreateForm ? "Form açık" : "Yeni takım oluştur"}
-          onPress={() => setShowCreateForm(true)}
-          disabled={showCreateForm}
-          style={styles.actionButton}
-        />
+        {userCanManageTeamRoster ? (
+          <AppButton
+            title={showCreateForm ? "Form açık" : "Yeni takım oluştur"}
+            onPress={() => setShowCreateForm(true)}
+            disabled={showCreateForm}
+            style={styles.actionButton}
+          />
+        ) : null}
         <AppButton
           title="Merkezi datayı yenile"
           variant="ghost"
@@ -290,7 +299,7 @@ export default function TeamsScreen() {
         />
       </View>
 
-      {showCreateForm ? (
+      {showCreateForm && userCanManageTeamRoster ? (
         <Card style={styles.section}>
           <Text style={styles.sectionTitle}>Yeni takım oluştur</Text>
           <Text style={styles.sectionSubtitle}>
@@ -399,7 +408,10 @@ export default function TeamsScreen() {
                             <AppButton
                               title={addMemberOpenTeamId === team.id ? "Kapat" : "Kişi ekle"}
                               variant="secondary"
-                              onPress={() => setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id)}
+                              onPress={() => {
+                                setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id);
+                                setAddMemberSearchQuery("");
+                              }}
                               style={styles.addMemberToggle}
                             />
                           ) : null}
@@ -410,40 +422,68 @@ export default function TeamsScreen() {
                             <Text style={styles.emptyText}>Bu takımda henüz kişi yok.</Text>
                           </Card>
                         ) : (
-                          <View style={styles.memberList}>
-                            {teamUsers.map((member) => {
-                              const isProtectedMember =
-                                member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
-                              const isUpdatingThisMember = updatingMemberId === member.id;
+                          <>
+                            {teamUsers.length > 5 ? (
+                              <SearchField
+                                value={memberSearchQuery}
+                                onChangeText={setMemberSearchQuery}
+                                placeholder="Takım içinde kişi ara..."
+                                accessibilityLabel="Takım üyelerinde ara"
+                                style={styles.memberSearchField}
+                              />
+                            ) : null}
+
+                            {(() => {
+                              const filteredTeamUsers = teamUsers.filter((member) =>
+                                matchesSearchQuery(memberSearchQuery, member.fullName, member.email)
+                              );
+
+                              if (filteredTeamUsers.length === 0) {
+                                return (
+                                  <Card variant="subtle" padding="sm">
+                                    <Text style={styles.emptyText}>Aramayla eşleşen kişi yok.</Text>
+                                  </Card>
+                                );
+                              }
 
                               return (
-                                <Card key={member.id} variant="subtle" padding="sm" style={styles.memberCard}>
-                                  <View style={styles.avatar}>
-                                    <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
-                                  </View>
-                                  <View style={styles.memberInfo}>
-                                    <Text style={styles.memberName}>{member.fullName}</Text>
-                                    <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
-                                  </View>
-                                  <AppButton
-                                    title="Mesaj"
-                                    variant="secondary"
-                                    onPress={() => openMessages(member.fullName)}
-                                    style={styles.memberButton}
-                                  />
-                                  {userCanManageTeamRoster && !isProtectedMember ? (
-                                    <AppButton
-                                      title={isUpdatingThisMember ? "..." : "Çıkar"}
-                                      variant="ghost"
-                                      disabled={isUpdatingThisMember}
-                                      onPress={() => setTeamMembership(team, member, false)}
-                                      style={styles.memberButton}
-                                    />
-                                  ) : null}
-                                </Card>
+                                <View style={styles.memberList}>
+                                  {filteredTeamUsers.map((member) => {
+                                    const isProtectedMember =
+                                      member.id === currentUser?.id || member.id === clubOwnerId || member.role === "superAdmin";
+                                    const isUpdatingThisMember = updatingMemberId === member.id;
+
+                                    return (
+                                      <Card key={member.id} variant="subtle" padding="sm" style={styles.memberCard}>
+                                        <View style={styles.avatar}>
+                                          <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                                        </View>
+                                        <View style={styles.memberInfo}>
+                                          <Text style={styles.memberName}>{member.fullName}</Text>
+                                          <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
+                                        </View>
+                                        <AppButton
+                                          title="Mesaj"
+                                          variant="secondary"
+                                          onPress={() => openMessages(member.fullName)}
+                                          style={styles.memberButton}
+                                        />
+                                        {userCanManageTeamRoster && !isProtectedMember ? (
+                                          <AppButton
+                                            title={isUpdatingThisMember ? "..." : "Çıkar"}
+                                            variant="ghost"
+                                            disabled={isUpdatingThisMember}
+                                            onPress={() => setTeamMembership(team, member, false)}
+                                            style={styles.memberButton}
+                                          />
+                                        ) : null}
+                                      </Card>
+                                    );
+                                  })}
+                                </View>
                               );
-                            })}
-                          </View>
+                            })()}
+                          </>
                         )}
 
                         {userCanManageTeamRoster && addMemberOpenTeamId === team.id ? (
@@ -460,24 +500,46 @@ export default function TeamsScreen() {
                                 return <Text style={styles.emptyText}>Eklenebilecek başka aktif üye yok.</Text>;
                               }
 
-                              return availableUsers.map((user) => {
-                                const isUpdatingThisUser = updatingMemberId === user.id;
+                              const filteredAvailableUsers = availableUsers.filter((user) =>
+                                matchesSearchQuery(addMemberSearchQuery, user.fullName, user.email)
+                              );
 
-                                return (
-                                  <View key={user.id} style={styles.addMemberRow}>
-                                    <View style={styles.memberInfo}>
-                                      <Text style={styles.memberName}>{user.fullName}</Text>
-                                      <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
-                                    </View>
-                                    <AppButton
-                                      title={isUpdatingThisUser ? "..." : "Ekle"}
-                                      disabled={isUpdatingThisUser}
-                                      onPress={() => setTeamMembership(team, user, true)}
-                                      style={styles.memberButton}
+                              return (
+                                <>
+                                  {availableUsers.length > 5 ? (
+                                    <SearchField
+                                      value={addMemberSearchQuery}
+                                      onChangeText={setAddMemberSearchQuery}
+                                      placeholder="Eklenecek kişi ara..."
+                                      accessibilityLabel="Eklenebilecek üyelerde ara"
+                                      style={styles.memberSearchField}
                                     />
-                                  </View>
-                                );
-                              });
+                                  ) : null}
+
+                                  {filteredAvailableUsers.length === 0 ? (
+                                    <Text style={styles.emptyText}>Aramayla eşleşen kişi yok.</Text>
+                                  ) : (
+                                    filteredAvailableUsers.map((user) => {
+                                      const isUpdatingThisUser = updatingMemberId === user.id;
+
+                                      return (
+                                        <View key={user.id} style={styles.addMemberRow}>
+                                          <View style={styles.memberInfo}>
+                                            <Text style={styles.memberName}>{user.fullName}</Text>
+                                            <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
+                                          </View>
+                                          <AppButton
+                                            title={isUpdatingThisUser ? "..." : "Ekle"}
+                                            disabled={isUpdatingThisUser}
+                                            onPress={() => setTeamMembership(team, user, true)}
+                                            style={styles.memberButton}
+                                          />
+                                        </View>
+                                      );
+                                    })
+                                  )}
+                                </>
+                              );
                             })()}
                           </Card>
                         ) : null}
@@ -566,6 +628,7 @@ const styles = StyleSheet.create({
   memberBlockHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.md },
   memberBlockTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
   addMemberToggle: { alignSelf: "flex-start" },
+  memberSearchField: { marginBottom: theme.spacing.md },
   memberList: { gap: theme.spacing.md },
   memberCard: { flexDirection: "row", alignItems: "center", gap: theme.spacing.md },
   avatar: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },

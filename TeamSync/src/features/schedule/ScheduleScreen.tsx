@@ -63,7 +63,12 @@ export default function ScheduleScreen() {
     return getEventsForMonth(scheduleEvents, visibleMonth);
   }, [scheduleEvents, visibleMonth]);
 
+  const canManageSchedule =
+    scheduleData !== null
+    && (scheduleData.currentUser.role === "clubAdmin" || scheduleData.currentUser.role === "coach");
+
   const canCreate =
+    canManageSchedule &&
     title.trim().length > 0 &&
     selectedDayNumber.trim().length > 0 &&
     time.trim().length > 0 &&
@@ -105,6 +110,10 @@ export default function ScheduleScreen() {
 
   function selectCalendarDay(dayNumber: number) {
     setSelectedDayNumber(`${dayNumber}`);
+
+    if (!canManageSchedule) {
+      return;
+    }
 
     if (!showEventForm) {
       setShowEventForm(true);
@@ -168,6 +177,10 @@ export default function ScheduleScreen() {
   }
 
   function openEventForm() {
+    if (!canManageSchedule) {
+      return;
+    }
+
     setShowEventForm(true);
     setStatusMessage("Takvimden gün seçip etkinlik bilgilerini doldurabilirsin.");
   }
@@ -204,6 +217,7 @@ export default function ScheduleScreen() {
         showMonthPicker={showMonthPicker}
         showEventForm={showEventForm}
         statusMessage={statusMessage}
+        scheduleData={scheduleData}
         onToggleMonthPicker={() => setShowMonthPicker((currentValue) => !currentValue)}
         onPrevMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -1))}
         onNextMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 1))}
@@ -217,9 +231,10 @@ export default function ScheduleScreen() {
         onSelectDay={selectCalendarDay}
         onOpenEventForm={openEventForm}
         onRefresh={loadScheduleData}
+        canManageEvents={canManageSchedule}
       />
 
-      {showEventForm ? (
+      {showEventForm && canManageSchedule ? (
         <EventForm
           selectedDateLabel={selectedDateLabel}
           title={title}

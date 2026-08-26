@@ -1,17 +1,22 @@
 import { useEffect } from "react";
 import type { PropsWithChildren } from "react";
 import { Stack, router, usePathname } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { theme } from "@/constants/theme";
+import { usePushNotificationRegistration } from "@/hooks/usePushNotificationRegistration";
 import { AppDataProvider } from "@/providers/AppDataProvider";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 import { LanguageProvider, useTranslation } from "@/localization";
+import { Sentry, initSentry } from "@/lib/sentry";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
+
+initSentry();
 
 export const unstable_settings = {
   initialRouteName: "index",
@@ -124,6 +129,28 @@ function AppContent() {
   const globalNavigationTopSpace = showGlobalNavigation
     ? insets.top + GLOBAL_NAV_TOP_OFFSET + GLOBAL_NAV_HEIGHT + GLOBAL_NAV_BOTTOM_GAP
     : 0;
+
+  usePushNotificationRegistration(user);
+
+  useEffect(() => {
+    Sentry.setUser(user === null ? null : { id: user.uid, email: user.email ?? undefined });
+  }, [user]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const route = response.notification.request.content.data?.route;
+
+      if (typeof route === "string" && route.startsWith("/")) {
+        router.push(route as never);
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseAuthConfigured || !isAuthReady) {

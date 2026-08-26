@@ -6,6 +6,7 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
@@ -13,6 +14,7 @@ import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { AttendanceStatus, ScheduleEvent, Team, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type AttendanceOption = {
   value: AttendanceStatus;
@@ -122,6 +124,7 @@ export default function AttendanceScreen() {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [showTeamPicker, setShowTeamPicker] = useState(false);
   const [pendingRemoveEventId, setPendingRemoveEventId] = useState("");
+  const [memberSearchQuery, setMemberSearchQuery] = useState("");
 
   const currentUser = appData?.currentUser;
   const canTakeAttendance = currentUser?.role === "clubAdmin" || currentUser?.role === "coach";
@@ -160,6 +163,10 @@ export default function AttendanceScreen() {
     return getTeamMembers(selectedTeam, users);
   }, [selectedTeam, users]);
 
+  const filteredTeamMembers = useMemo(() => {
+    return teamMembers.filter((member) => matchesSearchQuery(memberSearchQuery, member.fullName, member.email));
+  }, [teamMembers, memberSearchQuery]);
+
   const attendanceSummary = useMemo(() => {
     const counts = {
       present: 0,
@@ -191,6 +198,7 @@ export default function AttendanceScreen() {
     setSelectedEventId("");
     setAttendanceDraft({});
     setShowCreateSession(false);
+    setMemberSearchQuery("");
     setStatusMessage(`${team.name} seçildi. Şimdi antrenman veya maç oturumu seç.`);
   }
 
@@ -548,57 +556,73 @@ export default function AttendanceScreen() {
         ) : teamMembers.length === 0 ? (
           <EmptyState title="Bu takımda aktif kişi yok" description="Takıma üye eklenince yoklama listesi burada görünecek." />
         ) : (
-          <View style={styles.attendanceList}>
-            {teamMembers.map((member) => {
-              const savedStatus = getSavedStatus(appData, member.id, selectedTeam.id, selectedEvent.startsAt);
-              const currentStatus = attendanceDraft[member.id] ?? savedStatus ?? "present";
-              const displayStatus = canTakeAttendance ? currentStatus : savedStatus;
+          <>
+            {teamMembers.length > 5 ? (
+              <SearchField
+                value={memberSearchQuery}
+                onChangeText={setMemberSearchQuery}
+                placeholder="İsim veya e-posta ara..."
+                accessibilityLabel="Yoklama listesinde ara"
+                style={styles.memberSearchField}
+              />
+            ) : null}
 
-              return (
-                <View key={member.id} style={styles.memberCard}>
-                  <View style={styles.memberTopRow}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+            {filteredTeamMembers.length === 0 ? (
+              <EmptyState title="Aramayla eşleşen kişi yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+            ) : (
+              <View style={styles.attendanceList}>
+                {filteredTeamMembers.map((member) => {
+                  const savedStatus = getSavedStatus(appData, member.id, selectedTeam.id, selectedEvent.startsAt);
+                  const currentStatus = attendanceDraft[member.id] ?? savedStatus ?? "present";
+                  const displayStatus = canTakeAttendance ? currentStatus : savedStatus;
+
+                  return (
+                    <View key={member.id} style={styles.memberCard}>
+                      <View style={styles.memberTopRow}>
+                        <View style={styles.avatar}>
+                          <Text style={styles.avatarText}>{getInitials(member.fullName)}</Text>
+                        </View>
+
+                        <View style={styles.memberInfo}>
+                          <Text style={styles.memberName}>{member.fullName}</Text>
+                          <Text style={styles.memberMeta}>{member.email}</Text>
+                        </View>
+
+                        <StatusBadge
+                          label={displayStatus === undefined ? "Kaydedilmedi" : attendanceOptions.find((option) => option.value === displayStatus)?.label ?? ""}
+                          tone={displayStatus === undefined ? "neutral" : attendanceToneByStatus[displayStatus]}
+                        />
+                      </View>
+
+                      {canTakeAttendance ? (
+                        <View style={styles.statusGrid}>
+                          {attendanceOptions.map((option) => {
+                            const isSelected = currentStatus === option.value;
+
+                            return (
+                              <Pressable
+                                key={option.value}
+                                onPress={() => updateAttendanceStatus(member.id, option.value)}
+                                style={({ pressed }) => [
+                                  styles.statusButton,
+                                  isSelected ? styles.statusButtonSelected : null,
+                                  pressed ? styles.pressed : null,
+                                ]}
+                              >
+                                <Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>
+                                  {option.label}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      ) : null}
                     </View>
-
-                    <View style={styles.memberInfo}>
-                      <Text style={styles.memberName}>{member.fullName}</Text>
-                      <Text style={styles.memberMeta}>{member.email}</Text>
-                    </View>
-
-                    <StatusBadge
-                      label={displayStatus === undefined ? "Kaydedilmedi" : attendanceOptions.find((option) => option.value === displayStatus)?.label ?? ""}
-                      tone={displayStatus === undefined ? "neutral" : attendanceToneByStatus[displayStatus]}
-                    />
-                  </View>
-
-                  {canTakeAttendance ? (
-                    <View style={styles.statusGrid}>
-                      {attendanceOptions.map((option) => {
-                        const isSelected = currentStatus === option.value;
-
-                        return (
-                          <Pressable
-                            key={option.value}
-                            onPress={() => updateAttendanceStatus(member.id, option.value)}
-                            style={({ pressed }) => [
-                              styles.statusButton,
-                              isSelected ? styles.statusButtonSelected : null,
-                              pressed ? styles.pressed : null,
-                            ]}
-                          >
-                            <Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>
-                              {option.label}
-                            </Text>
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                  ) : null}
-                </View>
-              );
-            })}
-          </View>
+                  );
+                })}
+              </View>
+            )}
+          </>
         )}
 
         {canTakeAttendance ? (
@@ -766,7 +790,7 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.sm,
     overflow: "hidden",
   },
   eventList: { gap: theme.spacing.md },
@@ -792,7 +816,7 @@ const styles = StyleSheet.create({
   },
   eventDeleteButton: {
     alignSelf: "flex-start",
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     backgroundColor: theme.colors.background.surface,
@@ -844,11 +868,12 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.regular,
   },
-  attendanceList: { gap: theme.spacing.md },
+  memberSearchField: { marginBottom: theme.spacing.md },
+  attendanceList: { gap: theme.spacing.sm },
   memberCard: {
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.xl,
-    padding: theme.spacing.lg,
+    padding: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
@@ -856,7 +881,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
   },
   avatar: {
     width: 46,
@@ -889,11 +914,11 @@ const styles = StyleSheet.create({
     gap: theme.spacing.sm,
   },
   statusButton: {
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
     backgroundColor: theme.colors.background.surface,
   },
   statusButtonSelected: {

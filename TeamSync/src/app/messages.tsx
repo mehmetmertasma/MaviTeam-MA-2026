@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,11 +17,13 @@ import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { GroupMemberBubble, type GroupMember } from "@/components/GroupMemberBubble";
 import { PageHeader } from "@/components/PageHeader";
+import { SearchField } from "@/components/SearchField";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import { matchesSearchQuery } from "@/utils/search";
 
 type ActiveChat = { type: "group"; groupId: string } | { type: "direct"; userId: string };
 
@@ -112,6 +115,10 @@ export default function MessagesScreen() {
   const [newConversationMessage, setNewConversationMessage] = useState("");
   const [openMemberListGroupId, setOpenMemberListGroupId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("Mesajlar merkezi TeamSync datasından yüklendi.");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [directSearchQuery, setDirectSearchQuery] = useState("");
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
 
   const chatGroups = appData?.chatGroups ?? EMPTY_CHAT_GROUPS;
   const chatMessages = appData?.chatMessages ?? EMPTY_CHAT_MESSAGES;
@@ -126,6 +133,20 @@ export default function MessagesScreen() {
     return users.filter((user) => user.id !== currentUser.id && user.status !== "removed");
   }, [currentUser, users]);
 
+  const filteredDirectUsers = useMemo(() => {
+    return directUsers.filter((user) => matchesSearchQuery(directSearchQuery, user.fullName, user.email));
+  }, [directUsers, directSearchQuery]);
+
+  const filteredChatGroups = useMemo(() => {
+    if (appData === null) {
+      return chatGroups;
+    }
+
+    return chatGroups.filter((group) => matchesSearchQuery(groupSearchQuery, group.name, getGroupTeamName(group, appData)));
+  }, [appData, chatGroups, groupSearchQuery]);
+
+  const canCreateGroups = currentUser?.role === "clubAdmin" || currentUser?.role === "coach";
+
   const targetOptions = useMemo<TargetOption[]>(() => {
     const allClubOption: TargetOption = {
       id: "all-club",
@@ -134,6 +155,16 @@ export default function MessagesScreen() {
 
     if (appData === null) {
       return [allClubOption];
+    }
+
+    // A coach can only start a group for a team they actually coach (not
+    // club-wide, not another coach's team) -- matches
+    // canCreateOrUpdateChatGroupData in firestore.rules, which would reject
+    // anything else. clubAdmin keeps every option, including club-wide.
+    if (appData.currentUser.role === "coach") {
+      return appData.teams
+        .filter((team) => team.coachIds.includes(appData.currentUser.id))
+        .map((team) => ({ id: team.id, label: team.name, teamId: team.id }));
     }
 
     return [
@@ -201,6 +232,10 @@ export default function MessagesScreen() {
   }
 
   async function createConversation() {
+    if (isCreatingConversation) {
+      return;
+    }
+
     if (appData === null) {
       setStatusMessage("Önce merkezi data yüklenmeli.");
       return;
@@ -217,6 +252,8 @@ export default function MessagesScreen() {
       setStatusMessage("Bu konuşma için kullanıcı bulunamadı.");
       return;
     }
+
+    setIsCreatingConversation(true);
 
     try {
       const groupName = newConversationName.trim() || `${selectedTarget.label} Mesajları`;
@@ -249,11 +286,18 @@ export default function MessagesScreen() {
       setStatusMessage("Yeni grup konuşması oluşturuldu.");
     } catch {
       setStatusMessage("Yeni grup oluşturulurken bir sorun oluştu.");
+    } finally {
+      setIsCreatingConversation(false);
     }
   }
 
   async function sendMessage() {
-    if (appData === null || activeChat === null) {
+    // Guards against the double-send bug: sending a message round-trips
+    // through a full app-data reload (see teamSyncService.createChatMessage),
+    // which can take a couple seconds. Without this guard a second tap while
+    // that's in flight fires a second, independent createChatMessage call
+    // and both land -- the message shows up twice after the reload settles.
+    if (appData === null || activeChat === null || isSendingMessage) {
       return;
     }
 
@@ -262,6 +306,22 @@ export default function MessagesScreen() {
     if (trimmedText.length === 0) {
       return;
     }
+
+    const optimisticMessage: ChatMessage = {
+      id: `optimistic-${Date.now()}`,
+      clubId: appData.club.id,
+      groupId: activeChat.type === "group" ? activeChat.groupId : undefined,
+      directUserIds: activeChat.type === "direct" ? [appData.currentUser.id, activeChat.userId] : undefined,
+      senderUserId: appData.currentUser.id,
+      text: trimmedText,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Show the message immediately instead of waiting on the round trip --
+    // that wait is what made sends feel like they hadn't registered.
+    setAppData({ ...appData, chatMessages: [...appData.chatMessages, optimisticMessage] });
+    setDraftText("");
+    setIsSendingMessage(true);
 
     try {
       const nextAppData = await teamSyncService.createChatMessage({
@@ -273,9 +333,16 @@ export default function MessagesScreen() {
       });
 
       setAppData(nextAppData);
-      setDraftText("");
     } catch {
+      // Roll back the optimistic message and give the text back so nothing
+      // is silently lost, instead of leaving a message on screen that never
+      // actually made it to the server. `appData` here is still the
+      // pre-optimistic snapshot captured when this call started.
+      setAppData(appData);
+      setDraftText(trimmedText);
       setStatusMessage("Mesaj gönderilirken bir sorun oluştu.");
+    } finally {
+      setIsSendingMessage(false);
     }
   }
 
@@ -346,8 +413,20 @@ export default function MessagesScreen() {
               multiline
               style={styles.composerInput}
             />
-            <Pressable onPress={sendMessage} style={({ pressed }) => [styles.sendButton, pressed ? styles.pressed : null]}>
-              <Text style={styles.sendButtonText}>➤</Text>
+            <Pressable
+              onPress={sendMessage}
+              disabled={isSendingMessage}
+              style={({ pressed }) => [
+                styles.sendButton,
+                pressed && !isSendingMessage ? styles.pressed : null,
+                isSendingMessage ? styles.sendButtonDisabled : null,
+              ]}
+            >
+              {isSendingMessage ? (
+                <ActivityIndicator size="small" color={theme.colors.text.inverse} />
+              ) : (
+                <Text style={styles.sendButtonText}>➤</Text>
+              )}
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -385,32 +464,48 @@ export default function MessagesScreen() {
         ) : null}
 
         {appData !== null && directUsers.length > 0 ? (
-          <View style={styles.directList}>
-            {directUsers.map((user) => {
-              const lastMessage = getLastDirectMessage(appData.currentUser.id, user.id, chatMessages);
+          <>
+            {directUsers.length > 5 ? (
+              <SearchField
+                value={directSearchQuery}
+                onChangeText={setDirectSearchQuery}
+                placeholder="İsim veya e-posta ara..."
+                accessibilityLabel="Kişilerde ara"
+                style={styles.directSearchField}
+              />
+            ) : null}
 
-              return (
-                <Card key={user.id} padding="none" style={styles.directCard}>
-                  <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.directMainArea, pressed ? styles.pressed : null]}>
-                    <View style={styles.directAvatar}>
-                      <Text style={styles.directAvatarText}>{getInitials(user.fullName)}</Text>
-                    </View>
-                    <View style={styles.directInfo}>
-                      <Text style={styles.directName}>{user.fullName}</Text>
-                      <Text style={styles.directMeta}>{user.email}</Text>
-                      <Text style={styles.lastMessage} numberOfLines={1}>
-                        {lastMessage ? `${getSenderName(lastMessage.senderUserId, users)}: ${lastMessage.text}` : "Henüz bireysel mesaj yok."}
-                      </Text>
-                    </View>
-                  </Pressable>
+            {filteredDirectUsers.length === 0 ? (
+              <EmptyState title="Aramayla eşleşen kişi yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+            ) : (
+              <View style={styles.directList}>
+                {filteredDirectUsers.map((user) => {
+                  const lastMessage = getLastDirectMessage(appData.currentUser.id, user.id, chatMessages);
 
-                  <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.openMessageButton, pressed ? styles.pressed : null]}>
-                    <Text style={styles.openMessageButtonText}>Mesaj aç</Text>
-                  </Pressable>
-                </Card>
-              );
-            })}
-          </View>
+                  return (
+                    <Card key={user.id} padding="none" style={styles.directCard}>
+                      <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.directMainArea, pressed ? styles.pressed : null]}>
+                        <View style={styles.directAvatar}>
+                          <Text style={styles.directAvatarText}>{getInitials(user.fullName)}</Text>
+                        </View>
+                        <View style={styles.directInfo}>
+                          <Text style={styles.directName}>{user.fullName}</Text>
+                          <Text style={styles.directMeta}>{user.email}</Text>
+                          <Text style={styles.lastMessage} numberOfLines={1}>
+                            {lastMessage ? `${getSenderName(lastMessage.senderUserId, users)}: ${lastMessage.text}` : "Henüz bireysel mesaj yok."}
+                          </Text>
+                        </View>
+                      </Pressable>
+
+                      <Pressable onPress={() => openDirectChat(user)} style={({ pressed }) => [styles.openMessageButton, pressed ? styles.pressed : null]}>
+                        <Text style={styles.openMessageButtonText}>Mesaj aç</Text>
+                      </Pressable>
+                    </Card>
+                  );
+                })}
+              </View>
+            )}
+          </>
         ) : (
           <EmptyState title="Bireysel mesaj için kişi yok" description="Üyeler onaylandığında burada listelenecek." />
         )}
@@ -423,18 +518,20 @@ export default function MessagesScreen() {
             <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
           </View>
 
-          <AppButton
-            title={showCreateGroupForm ? "Kapat" : "Yeni grup oluştur"}
-            variant="secondary"
-            onPress={() => {
-              setShowCreateGroupForm((currentValue) => !currentValue);
-              setStatusMessage("Yeni grup konuşmasını bu bölümde oluşturabilirsin.");
-            }}
-            style={styles.smallActionButton}
-          />
+          {canCreateGroups ? (
+            <AppButton
+              title={showCreateGroupForm ? "Kapat" : "Yeni grup oluştur"}
+              variant="secondary"
+              onPress={() => {
+                setShowCreateGroupForm((currentValue) => !currentValue);
+                setStatusMessage("Yeni grup konuşmasını bu bölümde oluşturabilirsin.");
+              }}
+              style={styles.smallActionButton}
+            />
+          ) : null}
         </View>
 
-        {showCreateGroupForm ? (
+        {showCreateGroupForm && canCreateGroups ? (
           <Card variant="subtle" style={styles.inlineCreateBox}>
             <Text style={styles.inlineCreateTitle}>Yeni grup oluştur</Text>
             <Text style={styles.inlineCreateSubtitle}>Kulüp veya takım için yeni bir grup konuşması başlat.</Text>
@@ -478,7 +575,12 @@ export default function MessagesScreen() {
             />
 
             <View style={styles.formActions}>
-              <AppButton title="Grubu oluştur" onPress={createConversation} style={styles.actionButton} />
+              <AppButton
+                title="Grubu oluştur"
+                onPress={createConversation}
+                loading={isCreatingConversation}
+                style={styles.actionButton}
+              />
               <AppButton
                 title="Vazgeç"
                 variant="ghost"
@@ -487,14 +589,25 @@ export default function MessagesScreen() {
                   setShowCreateGroupForm(false);
                   setStatusMessage("Yeni grup oluşturma iptal edildi.");
                 }}
+                disabled={isCreatingConversation}
                 style={styles.actionButton}
               />
             </View>
           </Card>
         ) : null}
 
-        {appData !== null && chatGroups.length > 0 ? (
-          chatGroups.map((group) => {
+        {chatGroups.length > 5 ? (
+          <SearchField
+            value={groupSearchQuery}
+            onChangeText={setGroupSearchQuery}
+            placeholder="Grup veya takım ara..."
+            accessibilityLabel="Grup konuşmalarında ara"
+            style={styles.groupSearchField}
+          />
+        ) : null}
+
+        {appData !== null && filteredChatGroups.length > 0 ? (
+          filteredChatGroups.map((group) => {
             const lastMessage = getLastGroupMessage(group.id, chatMessages);
             const isMemberListOpen = openMemberListGroupId === group.id;
             const members = toGroupMembers(group, appData);
@@ -540,8 +653,17 @@ export default function MessagesScreen() {
               </View>
             );
           })
+        ) : chatGroups.length > 0 ? (
+          <EmptyState title="Aramayla eşleşen grup yok" description="Farklı bir isim ile tekrar dene." />
         ) : (
-          <EmptyState title="Henüz grup konuşması yok" description="Yeni grup oluştur butonuyla kulüp veya takım konuşması başlatabilirsin." />
+          <EmptyState
+            title="Henüz grup konuşması yok"
+            description={
+              canCreateGroups
+                ? "Yeni grup oluştur butonuyla kulüp veya takım konuşması başlatabilirsin."
+                : "Bir grup konuşması başlatıldığında burada görünecek."
+            }
+          />
         )}
       </Card>
     </AppScreenLayout>
@@ -562,12 +684,13 @@ const styles = StyleSheet.create({
   inlineCreateTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   inlineCreateSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md, marginBottom: theme.spacing.lg },
   targetGrid: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.sm, marginBottom: theme.spacing.xl },
-  targetButton: { borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.surface },
+  targetButton: { borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border.default, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, backgroundColor: theme.colors.background.surface },
   targetButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   targetButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
   formActions: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.sm },
   actionButton: { flexGrow: 1, minWidth: 150 },
+  directSearchField: { marginBottom: theme.spacing.lg },
   directList: { gap: theme.spacing.md },
   directCard: { flexDirection: "row", alignItems: "stretch", overflow: "hidden" },
   directMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
@@ -578,9 +701,10 @@ const styles = StyleSheet.create({
   directMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.regular },
   openMessageButton: { minWidth: 104, alignItems: "center", justifyContent: "center", paddingHorizontal: theme.spacing.md, borderLeftWidth: 1, borderLeftColor: theme.colors.border.default, backgroundColor: theme.colors.background.subtle },
   openMessageButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
-  groupWrapper: { marginBottom: theme.spacing.md },
+  groupSearchField: { marginBottom: theme.spacing.md },
+  groupWrapper: { marginBottom: theme.spacing.sm },
   groupCard: { flexDirection: "row", overflow: "hidden" },
-  groupMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.lg },
+  groupMainArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: theme.spacing.md, padding: theme.spacing.md },
   groupAvatar: { width: 48, height: 48, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
   groupAvatarText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
   groupInfo: { flex: 1 },
@@ -613,6 +737,7 @@ const styles = StyleSheet.create({
   composer: { flexDirection: "row", alignItems: "flex-end", gap: theme.spacing.md, padding: theme.spacing.lg, backgroundColor: theme.colors.background.surface, borderTopWidth: 1, borderTopColor: theme.colors.border.default },
   composerInput: { flex: 1, minHeight: 46, maxHeight: 120, borderRadius: theme.radius.xl, backgroundColor: theme.colors.background.subtle, borderWidth: 1, borderColor: theme.colors.border.default, paddingHorizontal: theme.spacing.lg, paddingVertical: theme.spacing.md, color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular },
   sendButton: { width: 46, height: 46, borderRadius: theme.radius.full, backgroundColor: theme.colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  sendButtonDisabled: { opacity: 0.7 },
   sendButtonText: { color: theme.colors.text.inverse, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

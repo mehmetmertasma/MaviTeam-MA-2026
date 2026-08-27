@@ -62,6 +62,71 @@ async function seedFixtures() {
       recordedAt: "2026-08-01T17:00:00.000Z",
     });
 
+    await setDoc(doc(db, "attendanceRecords", "record-a2"), {
+      clubId: CLUB_A,
+      teamId: TEAM_A2,
+      userId: PARENT_A2,
+      status: "present",
+      sessionDate: "2026-08-01T17:00:00.000Z",
+      recordedByUserId: ADMIN_A,
+      recordedAt: "2026-08-01T17:00:00.000Z",
+    });
+
+    await setDoc(doc(db, "announcements", "announcement-a1-team"), {
+      clubId: CLUB_A,
+      targetType: "team",
+      targetTeamId: TEAM_A1,
+      title: "U17 antrenman iptal",
+      message: "Bugunku antrenman iptal edildi.",
+      createdByUserId: COACH_A,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+
+    await setDoc(doc(db, "announcements", "announcement-a-clubwide"), {
+      clubId: CLUB_A,
+      targetType: "allClub",
+      title: "Kulup duyurusu",
+      message: "Tum kulube duyuru.",
+      createdByUserId: ADMIN_A,
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+
+    await setDoc(doc(db, "chatGroups", "chatgroup-a1-team"), {
+      clubId: CLUB_A,
+      teamId: TEAM_A1,
+      name: "U17 Grubu",
+      visibleUserIds: [COACH_A, PARENT_A1, ATHLETE_A1],
+    });
+
+    await setDoc(doc(db, "chatGroups", "chatgroup-a-clubwide"), {
+      clubId: CLUB_A,
+      name: "Kulup Grubu",
+      visibleUserIds: [ADMIN_A, COACH_A, PARENT_A1, ATHLETE_A1, PARENT_A2],
+    });
+
+    await setDoc(doc(db, "replays", "replay-a1-team"), {
+      clubId: CLUB_A,
+      teamId: TEAM_A1,
+      title: "Mac analizi",
+      description: "Gecen haftaki mac analizi.",
+      type: "match",
+      videoUrl: "https://example.com/replay-a1",
+      createdByUserId: COACH_A,
+      visibleUserIds: [COACH_A, PARENT_A1, ATHLETE_A1],
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+
+    await setDoc(doc(db, "replays", "replay-a-clubwide"), {
+      clubId: CLUB_A,
+      title: "Kulup videosu",
+      description: "Kulup geneli video.",
+      type: "practice",
+      videoUrl: "https://example.com/replay-clubwide",
+      createdByUserId: ADMIN_A,
+      visibleUserIds: [ADMIN_A, COACH_A, PARENT_A1, ATHLETE_A1, PARENT_A2],
+      createdAt: "2026-08-01T00:00:00.000Z",
+    });
+
     await setDoc(doc(db, "scheduleEvents", "event-a1-team"), {
       clubId: CLUB_A,
       teamId: TEAM_A1,
@@ -201,6 +266,26 @@ describe("attendanceRecords", () => {
       })
     );
   });
+
+  it("coach can delete an attendance record for their own team", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(deleteDoc(doc(db, "attendanceRecords", "record-a1")));
+  });
+
+  it("coach cannot delete an attendance record for a team they don't coach", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertFails(deleteDoc(doc(db, "attendanceRecords", "record-a2")));
+  });
+
+  it("clubAdmin can delete any attendance record in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "attendanceRecords", "record-a2")));
+  });
+
+  it("parent cannot delete an attendance record", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(deleteDoc(doc(db, "attendanceRecords", "record-a1")));
+  });
 });
 
 describe("scheduleEvents", () => {
@@ -264,6 +349,77 @@ describe("scheduleEvents", () => {
   it("parent cannot delete a schedule event", async () => {
     const db = authedFirestore(PARENT_A1);
     await assertFails(deleteDoc(doc(db, "scheduleEvents", "event-a1-team")));
+  });
+});
+
+describe("announcements", () => {
+  it("coach can delete an announcement targeted at their own team", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(deleteDoc(doc(db, "announcements", "announcement-a1-team")));
+  });
+
+  it("coach cannot delete a club-wide announcement", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertFails(deleteDoc(doc(db, "announcements", "announcement-a-clubwide")));
+  });
+
+  it("clubAdmin can delete any announcement in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "announcements", "announcement-a-clubwide")));
+  });
+
+  it("parent cannot delete an announcement", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(deleteDoc(doc(db, "announcements", "announcement-a1-team")));
+  });
+
+  it("athlete cannot delete an announcement", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertFails(deleteDoc(doc(db, "announcements", "announcement-a1-team")));
+  });
+});
+
+describe("chatGroups", () => {
+  it("coach can delete a chat group for their own team", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(deleteDoc(doc(db, "chatGroups", "chatgroup-a1-team")));
+  });
+
+  it("coach cannot delete a club-wide chat group", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertFails(deleteDoc(doc(db, "chatGroups", "chatgroup-a-clubwide")));
+  });
+
+  it("clubAdmin can delete any chat group in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "chatGroups", "chatgroup-a-clubwide")));
+  });
+
+  it("parent cannot delete a chat group", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(deleteDoc(doc(db, "chatGroups", "chatgroup-a1-team")));
+  });
+});
+
+describe("replays", () => {
+  it("coach can delete a replay for their own team", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertSucceeds(deleteDoc(doc(db, "replays", "replay-a1-team")));
+  });
+
+  it("coach cannot delete a club-wide replay", async () => {
+    const db = authedFirestore(COACH_A);
+    await assertFails(deleteDoc(doc(db, "replays", "replay-a-clubwide")));
+  });
+
+  it("clubAdmin can delete any replay in their club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "replays", "replay-a-clubwide")));
+  });
+
+  it("athlete cannot delete a replay", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertFails(deleteDoc(doc(db, "replays", "replay-a1-team")));
   });
 });
 

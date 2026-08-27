@@ -337,8 +337,7 @@ service cloud.firestore {
     match /announcements/{announcementId} {
       allow read: if canReadAnnouncement(resource.data);
       allow create, update: if canCreateOrUpdateAnnouncement(request.resource.data);
-      allow delete: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+      allow delete: if canCreateOrUpdateAnnouncement(resource.data);
     }
 
     match /scheduleEvents/{scheduleEventId} {
@@ -354,8 +353,9 @@ service cloud.firestore {
     match /attendanceRecords/{attendanceRecordId} {
       allow read: if canReadAttendance(resource.data);
       allow create, update: if canCreateOrUpdateAttendance(request.resource.data);
-      allow delete: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+      allow delete: if (currentUserIsClubAdmin()
+          && resource.data.clubId == currentUserClubId())
+        || canCoachManageOwnTeamData(resource.data);
     }
 
     // Written only by the scheduled cleanupOldAttendance Cloud Function via
@@ -413,8 +413,9 @@ service cloud.firestore {
     match /chatGroups/{chatGroupId} {
       allow read: if canReadChatGroupData(resource.data);
       allow create, update: if canCreateOrUpdateChatGroupData(request.resource.data);
-      allow delete: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+      allow delete: if (currentUserIsClubAdmin()
+          && resource.data.clubId == currentUserClubId())
+        || canCoachManageOwnTeamData(resource.data);
     }
 
     match /chatMessages/{chatMessageId} {
@@ -426,8 +427,9 @@ service cloud.firestore {
     match /replays/{replayId} {
       allow read: if canReadReplay(resource.data);
       allow create, update: if canCreateOrUpdateReplay(request.resource.data);
-      allow delete: if currentUserIsClubAdmin()
-        && resource.data.clubId == currentUserClubId();
+      allow delete: if (currentUserIsClubAdmin()
+          && resource.data.clubId == currentUserClubId())
+        || canCoachManageOwnTeamData(resource.data);
     }
 
     match /{document=**} {

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -9,9 +8,7 @@ import type { ScheduleEvent } from "@/types/teamSync";
 import { MONTH_PICKER_OPTIONS, SCHEDULE_TYPE_OPTIONS, getScheduleTypeStyles } from "../constants/schedule.constants";
 import { formatMonthTitle } from "../utils/schedule-date.utils";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
-import type { ScheduleWorkspaceData } from "../types/schedule.types";
 import { Calendar } from "./Calendar";
-import { EventDetailsBubble } from "./EventDetailsBubble";
 
 type CalendarSectionProps = {
   visibleMonth: Date;
@@ -20,7 +17,6 @@ type CalendarSectionProps = {
   showMonthPicker: boolean;
   showEventForm: boolean;
   statusMessage: string;
-  scheduleData: ScheduleWorkspaceData | null;
   onToggleMonthPicker: () => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -29,6 +25,7 @@ type CalendarSectionProps = {
   onSelectMonth: (monthIndex: number) => void;
   onGoToday: () => void;
   onSelectDay: (dayNumber: number) => void;
+  onSelectEvent: (event: ScheduleEvent) => void;
   onOpenEventForm: () => void;
   onRefresh: () => void;
   canManageEvents: boolean;
@@ -41,7 +38,6 @@ export function CalendarSection({
   showMonthPicker,
   showEventForm,
   statusMessage,
-  scheduleData,
   onToggleMonthPicker,
   onPrevMonth,
   onNextMonth,
@@ -50,11 +46,11 @@ export function CalendarSection({
   onSelectMonth,
   onGoToday,
   onSelectDay,
+  onSelectEvent,
   onOpenEventForm,
   onRefresh,
   canManageEvents,
 }: CalendarSectionProps) {
-  const [selectedCalendarEvent, setSelectedCalendarEvent] = useState<ScheduleEvent | null>(null);
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
@@ -170,16 +166,8 @@ export function CalendarSection({
         events={visibleMonthEvents}
         selectedDayNumber={selectedDayNumber}
         onSelectDay={onSelectDay}
-        onSelectEvent={setSelectedCalendarEvent}
+        onSelectEvent={onSelectEvent}
       />
-
-      {selectedCalendarEvent !== null && scheduleData !== null ? (
-        <EventDetailsBubble
-          event={selectedCalendarEvent}
-          scheduleData={scheduleData}
-          onClose={() => setSelectedCalendarEvent(null)}
-        />
-      ) : null}
 
       <View style={scheduleSharedStyles.actionRow}>
         {canManageEvents ? (

@@ -67,10 +67,13 @@ export function Calendar({
                 return (
                   <Pressable
                     key={event.id}
+                    hitSlop={6}
                     onPress={(pressEvent) => {
-                      // Nested Pressables on react-native-web are backed by
-                      // real DOM click events, which bubble -- without this
-                      // the day cell's onSelectDay would also fire.
+                      // react-native-web's own PressResponder already stops
+                      // propagation internally when a nested Pressable claims
+                      // the tap, but calling it here too is a harmless no-op
+                      // safety net -- without it (on some RN Web versions)
+                      // the day cell's onSelectDay could also fire.
                       pressEvent.stopPropagation();
                       onSelectEvent(event);
                     }}
@@ -173,8 +176,8 @@ const styles = StyleSheet.create({
   calendarEventPill: {
     borderWidth: 1,
     borderRadius: theme.radius.md,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 5,
   },
   calendarEventText: {
     fontSize: 11,

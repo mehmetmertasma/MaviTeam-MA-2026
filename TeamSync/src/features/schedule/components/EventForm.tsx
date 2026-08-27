@@ -10,6 +10,7 @@ import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
 import type { TeamOption } from "../types/schedule.types";
 
 type EventFormProps = {
+  isEditing: boolean;
   selectedDateLabel: string;
   title: string;
   onChangeTitle: (value: string) => void;
@@ -30,6 +31,7 @@ type EventFormProps = {
 };
 
 export function EventForm({
+  isEditing,
   selectedDateLabel,
   title,
   onChangeTitle,
@@ -52,13 +54,13 @@ export function EventForm({
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
         <View style={scheduleSharedStyles.sectionHeaderText}>
-          <Text style={scheduleSharedStyles.sectionTitle}>Etkinlik ekle</Text>
+          <Text style={scheduleSharedStyles.sectionTitle}>{isEditing ? "Etkinliği düzenle" : "Etkinlik ekle"}</Text>
           <Text style={scheduleSharedStyles.sectionSubtitle}>
             Seçili tarih: {selectedDateLabel}. Değiştirmek için takvimden başka bir gün seç.
           </Text>
         </View>
 
-        <StatusBadge label="Yeni" tone="info" />
+        <StatusBadge label={isEditing ? "Düzenle" : "Yeni"} tone={isEditing ? "warning" : "info"} />
       </View>
 
       <View style={styles.selectedDateCard}>
@@ -167,7 +169,7 @@ export function EventForm({
 
       <View style={scheduleSharedStyles.actionRow}>
         <AppButton
-          title="Etkinliği kaydet"
+          title={isEditing ? "Değişiklikleri kaydet" : "Etkinliği kaydet"}
           onPress={onSave}
           disabled={!canCreate}
           style={scheduleSharedStyles.actionButton}

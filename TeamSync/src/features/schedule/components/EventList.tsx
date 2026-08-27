@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
@@ -14,9 +14,10 @@ type EventListProps = {
   visibleMonth: Date;
   visibleMonthEvents: ScheduleEvent[];
   scheduleData: ScheduleWorkspaceData | null;
+  onSelectEvent: (event: ScheduleEvent) => void;
 };
 
-export function EventList({ visibleMonth, visibleMonthEvents, scheduleData }: EventListProps) {
+export function EventList({ visibleMonth, visibleMonthEvents, scheduleData, onSelectEvent }: EventListProps) {
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
@@ -31,7 +32,11 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData }: Ev
         {scheduleData !== null && visibleMonthEvents.length > 0 ? (
           visibleMonthEvents.map((event) => {
             return (
-              <View key={event.id} style={styles.eventCard}>
+              <Pressable
+                key={event.id}
+                onPress={() => onSelectEvent(event)}
+                style={({ pressed }) => [styles.eventCard, pressed ? scheduleSharedStyles.pressed : null]}
+              >
                 <View style={styles.eventContent}>
                   <View style={styles.eventHeaderRow}>
                     <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} />
@@ -43,7 +48,7 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData }: Ev
                   </Text>
                   <Text style={styles.eventNote}>{event.note ?? "Ek not yok."}</Text>
                 </View>
-              </View>
+              </Pressable>
             );
           })
         ) : (

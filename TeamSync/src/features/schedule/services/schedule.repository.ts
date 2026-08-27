@@ -14,6 +14,7 @@ export type ScheduleRepository = {
     eventId: string,
     updates: UpdateScheduleEventInput
   ) => Promise<ScheduleWorkspaceData>;
+  removeScheduleEvent: (eventId: string) => Promise<ScheduleWorkspaceData>;
 };
 
 function toScheduleWorkspaceData(appData: TeamSyncAppData): ScheduleWorkspaceData {
@@ -36,6 +37,10 @@ const legacyTeamSyncScheduleRepository: ScheduleRepository = {
 
   async updateScheduleEvent(eventId, updates) {
     return toScheduleWorkspaceData(await teamSyncService.updateScheduleEvent(eventId, updates));
+  },
+
+  async removeScheduleEvent(eventId) {
+    return toScheduleWorkspaceData(await teamSyncService.removeScheduleEvent(eventId));
   },
 };
 

@@ -1,5 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { AppButton } from "@/components/AppButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
@@ -12,63 +14,113 @@ import { getScheduleTeamLabel } from "../utils/schedule-selectors.utils";
 type EventDetailsBubbleProps = {
   event: ScheduleEvent;
   scheduleData: ScheduleWorkspaceData;
+  canManage: boolean;
+  onEdit: (event: ScheduleEvent) => void;
+  onDelete: (event: ScheduleEvent) => void;
   onClose: () => void;
 };
 
-export function EventDetailsBubble({ event, scheduleData, onClose }: EventDetailsBubbleProps) {
+// A real Modal (not an inline View) -- this popup is triggered from deep
+// inside a scrollable screen (ScheduleScreen -> CalendarSection), so it
+// needs to float over the whole page regardless of scroll position, and
+// closing it must leave the page exactly where it was. Modal is the
+// component built for that; a hand-positioned absolute View only escapes
+// as far as its nearest scroll container, not the real viewport.
+export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onDelete, onClose }: EventDetailsBubbleProps) {
+  const [pendingDelete, setPendingDelete] = useState(false);
+
+  function handleDeletePress() {
+    if (!pendingDelete) {
+      setPendingDelete(true);
+      return;
+    }
+
+    onDelete(event);
+  }
+
   return (
-    <View style={styles.panel}>
-      <View style={styles.header}>
-        <View style={styles.titleArea}>
-          <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} style={styles.typeBadge} />
-          <Text style={styles.title}>{event.title}</Text>
-        </View>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Etkinlik detayını kapat">
+        {/* Swallows taps so pressing the card itself doesn't also close the modal via the backdrop underneath it. */}
+        <Pressable style={styles.panel} onPress={(pressEvent) => pressEvent.stopPropagation()}>
+          <View style={styles.header}>
+            <View style={styles.titleArea}>
+              <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} style={styles.typeBadge} />
+              <Text style={styles.title}>{event.title}</Text>
+            </View>
 
-        <Pressable
-          onPress={onClose}
-          style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}
-          accessibilityLabel="Etkinlik detayını kapat"
-        >
-          <Text style={styles.closeButtonText}>×</Text>
+            <Pressable
+              onPress={onClose}
+              style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}
+              accessibilityLabel="Etkinlik detayını kapat"
+            >
+              <Text style={styles.closeButtonText}>×</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.metaGrid}>
+            <View style={styles.metaBox}>
+              <Text style={styles.metaLabel}>Tarih</Text>
+              <Text style={styles.metaValue}>{formatEventDate(event.startsAt)}</Text>
+            </View>
+            <View style={styles.metaBox}>
+              <Text style={styles.metaLabel}>Saat</Text>
+              <Text style={styles.metaValue}>{formatEventTime(event.startsAt)}</Text>
+            </View>
+            <View style={styles.metaBox}>
+              <Text style={styles.metaLabel}>Takım</Text>
+              <Text style={styles.metaValue}>{getScheduleTeamLabel(event, scheduleData)}</Text>
+            </View>
+            <View style={styles.metaBox}>
+              <Text style={styles.metaLabel}>Konum</Text>
+              <Text style={styles.metaValue}>{event.location}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.noteLabel}>Not</Text>
+          <Text style={styles.noteText}>{event.note ?? "Ek not yok."}</Text>
+
+          {canManage ? (
+            <View style={styles.manageRow}>
+              <AppButton
+                title="Düzenle"
+                variant="secondary"
+                onPress={() => onEdit(event)}
+                style={styles.manageButton}
+              />
+              <AppButton
+                title={pendingDelete ? "Emin misin?" : "Sil"}
+                variant="danger"
+                onPress={handleDeletePress}
+                style={styles.manageButton}
+              />
+            </View>
+          ) : null}
         </Pressable>
-      </View>
-
-      <View style={styles.metaGrid}>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaLabel}>Tarih</Text>
-          <Text style={styles.metaValue}>{formatEventDate(event.startsAt)}</Text>
-        </View>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaLabel}>Saat</Text>
-          <Text style={styles.metaValue}>{formatEventTime(event.startsAt)}</Text>
-        </View>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaLabel}>Takım</Text>
-          <Text style={styles.metaValue}>{getScheduleTeamLabel(event, scheduleData)}</Text>
-        </View>
-        <View style={styles.metaBox}>
-          <Text style={styles.metaLabel}>Konum</Text>
-          <Text style={styles.metaValue}>{event.location}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.noteLabel}>Not</Text>
-      <Text style={styles.noteText}>{event.note ?? "Ek not yok."}</Text>
-    </View>
+      </Pressable>
+    </Modal>
   );
 }
 
 export default EventDetailsBubble;
 
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.overlay,
+  },
   panel: {
+    width: "100%",
+    maxWidth: 420,
     backgroundColor: theme.colors.background.surface,
     borderRadius: theme.radius.xl,
     borderWidth: 1,
     borderColor: theme.colors.brand.primarySoft,
     padding: theme.spacing.lg,
-    marginTop: theme.spacing.md,
-    ...theme.shadows.md,
+    ...theme.shadows.lg,
   },
   header: {
     flexDirection: "row",
@@ -137,5 +189,12 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.regular,
     lineHeight: theme.lineHeights.md,
   },
+  manageRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
+  },
+  manageButton: { flexGrow: 1, minWidth: 120 },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

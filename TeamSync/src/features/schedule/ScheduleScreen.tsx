@@ -8,19 +8,22 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import { ALL_CLUB_TEAM_OPTION_ID } from "./constants/schedule.constants";
 import { CalendarSection } from "./components/CalendarSection";
+import { EventDetailsBubble } from "./components/EventDetailsBubble";
 import { EventForm } from "./components/EventForm";
 import { EventList } from "./components/EventList";
 import { useScheduleData } from "./hooks/useScheduleData";
 import {
   addMonths,
   buildStartsAt,
+  formatEventTime,
   formatMonthTitle,
+  getDateFromValue,
   getDaysInMonth,
   getMonthStart,
 } from "./utils/schedule-date.utils";
 import { getEventsForMonth } from "./utils/schedule-selectors.utils";
 import { scheduleRepository } from "./services/schedule.repository";
-import type { ScheduleEventType } from "@/types/teamSync";
+import type { ScheduleEvent, ScheduleEventType } from "@/types/teamSync";
 import type { TeamOption } from "./types/schedule.types";
 
 export default function ScheduleScreen() {
@@ -36,6 +39,8 @@ export default function ScheduleScreen() {
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [note, setNote] = useState("");
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [selectedEventForDetails, setSelectedEventForDetails] = useState<ScheduleEvent | null>(null);
 
   const teamOptions = useMemo<TeamOption[]>(() => {
     const allClubOption: TeamOption = {
@@ -106,6 +111,7 @@ export default function ScheduleScreen() {
     setTime("");
     setLocation("");
     setNote("");
+    setEditingEventId(null);
   }
 
   function selectCalendarDay(dayNumber: number) {
@@ -122,7 +128,7 @@ export default function ScheduleScreen() {
     setStatusMessage(`${dayNumber} ${formatMonthTitle(visibleMonth)} için etkinlik ekleyebilirsin.`);
   }
 
-  async function handleCreateScheduleItem() {
+  async function handleSaveScheduleItem() {
     if (scheduleData === null) {
       setStatusMessage("Önce merkezi data yüklenmeli.");
       return;
@@ -156,6 +162,23 @@ export default function ScheduleScreen() {
     const selectedTeam = teamOptions.find((team) => team.id === selectedTeamId) ?? teamOptions[0];
 
     try {
+      if (editingEventId !== null) {
+        const nextScheduleData = await scheduleRepository.updateScheduleEvent(editingEventId, {
+          teamId: selectedTeam.teamId,
+          title: title.trim(),
+          type: selectedType,
+          startsAt,
+          location: location.trim(),
+          note: note.trim() || "Ek not yok.",
+        });
+
+        setScheduleData(nextScheduleData);
+        clearForm();
+        setShowEventForm(false);
+        setStatusMessage("Etkinlik güncellendi.");
+        return;
+      }
+
       const nextScheduleData = await scheduleRepository.createScheduleEvent({
         clubId: scheduleData.club.id,
         teamId: selectedTeam.teamId,
@@ -172,7 +195,42 @@ export default function ScheduleScreen() {
       setShowEventForm(false);
       setStatusMessage("Yeni etkinlik seçili ayın takvimine eklendi.");
     } catch {
-      setStatusMessage("Etkinlik oluşturulurken bir sorun oluştu.");
+      setStatusMessage(editingEventId !== null ? "Etkinlik güncellenirken bir sorun oluştu." : "Etkinlik oluşturulurken bir sorun oluştu.");
+    }
+  }
+
+  function openEditForm(event: ScheduleEvent) {
+    if (!canManageSchedule) {
+      return;
+    }
+
+    const eventDate = getDateFromValue(event.startsAt);
+
+    if (eventDate !== null) {
+      setVisibleMonth(getMonthStart(eventDate));
+      setSelectedDayNumber(`${eventDate.getDate()}`);
+    }
+
+    setTitle(event.title);
+    setSelectedType(event.type);
+    setSelectedTeamId(event.teamId ?? ALL_CLUB_TEAM_OPTION_ID);
+    setTime(eventDate === null ? "" : formatEventTime(event.startsAt));
+    setLocation(event.location);
+    setNote(event.note ?? "");
+    setEditingEventId(event.id);
+    setShowEventForm(true);
+    setSelectedEventForDetails(null);
+    setStatusMessage("Etkinlik bilgilerini düzenleyip kaydedebilirsin.");
+  }
+
+  async function handleDeleteEvent(event: ScheduleEvent) {
+    try {
+      const nextScheduleData = await scheduleRepository.removeScheduleEvent(event.id);
+      setScheduleData(nextScheduleData);
+      setSelectedEventForDetails(null);
+      setStatusMessage("Etkinlik silindi.");
+    } catch {
+      setStatusMessage("Etkinlik silinirken bir sorun oluştu.");
     }
   }
 
@@ -217,7 +275,6 @@ export default function ScheduleScreen() {
         showMonthPicker={showMonthPicker}
         showEventForm={showEventForm}
         statusMessage={statusMessage}
-        scheduleData={scheduleData}
         onToggleMonthPicker={() => setShowMonthPicker((currentValue) => !currentValue)}
         onPrevMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -1))}
         onNextMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 1))}
@@ -229,13 +286,27 @@ export default function ScheduleScreen() {
         }}
         onGoToday={goToToday}
         onSelectDay={selectCalendarDay}
+        onSelectEvent={setSelectedEventForDetails}
         onOpenEventForm={openEventForm}
         onRefresh={loadScheduleData}
         canManageEvents={canManageSchedule}
       />
 
+      {selectedEventForDetails !== null && scheduleData !== null ? (
+        <EventDetailsBubble
+          key={selectedEventForDetails.id}
+          event={selectedEventForDetails}
+          scheduleData={scheduleData}
+          canManage={canManageSchedule}
+          onEdit={openEditForm}
+          onDelete={handleDeleteEvent}
+          onClose={() => setSelectedEventForDetails(null)}
+        />
+      ) : null}
+
       {showEventForm && canManageSchedule ? (
         <EventForm
+          isEditing={editingEventId !== null}
           selectedDateLabel={selectedDateLabel}
           title={title}
           onChangeTitle={setTitle}
@@ -251,7 +322,7 @@ export default function ScheduleScreen() {
           note={note}
           onChangeNote={setNote}
           canCreate={canCreate}
-          onSave={handleCreateScheduleItem}
+          onSave={handleSaveScheduleItem}
           onCancel={closeEventForm}
         />
       ) : null}
@@ -260,6 +331,7 @@ export default function ScheduleScreen() {
         visibleMonth={visibleMonth}
         visibleMonthEvents={visibleMonthEvents}
         scheduleData={scheduleData}
+        onSelectEvent={setSelectedEventForDetails}
       />
     </AppScreenLayout>
   );

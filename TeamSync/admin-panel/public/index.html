@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>MaviTeam · Platform Admin</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1120;
+      --surface: #131c2e;
+      --border: #253046;
+      --text: #e7ebf3;
+      --text-muted: #8b95a8;
+      --brand: #1f3b63;
+      --brand-light: #7fa3d6;
+      --danger: #c23b3b;
+      --danger-light: #e0908f;
+      --success: #0f8b5f;
+      --success-light: #5fcfa0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
+    .subtitle { color: var(--text-muted); font-size: 14px; margin: 0 0 28px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+    }
+
+    /* --- sign-in --- */
+    #signin-view { max-width: 360px; margin: 80px auto 0; }
+    #signin-view h1 { text-align: center; }
+    #signin-view .subtitle { text-align: center; }
+    label { display: block; font-size: 13px; color: var(--text-muted); margin: 14px 0 6px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0e1626;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    input:focus { outline: 2px solid var(--brand-light); }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 16px;
+    }
+    .btn-primary { background: var(--brand); color: white; width: 100%; margin-top: 18px; }
+    .btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-success { background: var(--success); color: white; }
+    .error-text { color: var(--danger-light); font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+    /* --- app view --- */
+    #app-view { display: none; }
+    .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card { flex: 1; min-width: 140px; }
+    .stat-value { font-size: 28px; font-weight: 700; color: var(--brand-light); }
+    .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .club-name { font-weight: 600; }
+    .club-meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+    .badge-active { background: rgba(15,139,95,0.2); color: var(--success-light); }
+    .badge-suspended { background: rgba(194,59,59,0.2); color: var(--danger-light); }
+    .status-text { color: var(--text-muted); font-size: 13px; margin-top: 16px; min-height: 16px; }
+    .empty { color: var(--text-muted); padding: 40px 0; text-align: center; }
+    .row-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* --- delete confirmation modal --- */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 10;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box { max-width: 420px; width: 100%; }
+    .modal-box h2 { font-size: 17px; margin: 0 0 8px; }
+    .modal-warning { color: var(--danger-light); font-size: 13px; line-height: 1.5; margin: 0 0 4px; }
+    .modal-hint { color: var(--text-muted); font-size: 13px; margin: 12px 0 0; }
+    .modal-hint b { color: var(--text); }
+    .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .modal-actions button { flex: 1; margin-top: 0; }
+    #delete-confirm-button:disabled { opacity: 0.4; cursor: default; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="signin-view" class="card">
+      <h1>MaviTeam Platform Admin</h1>
+      <p class="subtitle">Internal tool. Sign in with your admin account.</p>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" />
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+      <button id="signin-button" class="btn-primary">Sign in</button>
+      <p id="signin-error" class="error-text"></p>
+    </div>
+
+    <div id="app-view">
+      <div class="top-row">
+        <div>
+          <h1>Platform Overview</h1>
+          <p class="subtitle">Every club on MaviTeam.</p>
+        </div>
+        <button id="signout-button" class="btn-ghost">Sign out</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="card stat-card">
+          <div id="stat-clubs" class="stat-value">—</div>
+          <div class="stat-label">Total clubs</div>
+        </div>
+        <div class="card stat-card">
+          <div id="stat-members" class="stat-value">—</div>
+          <div class="stat-label">Total members</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Club</th>
+              <th>Status</th>
+              <th>Members</th>
+              <th>Teams</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="clubs-table-body"></tbody>
+        </table>
+        <div id="empty-state" class="empty" style="display: none;">No clubs yet.</div>
+        <p id="app-status" class="status-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="delete-modal-overlay" class="modal-overlay">
+    <div class="card modal-box">
+      <h2>Delete club</h2>
+      <p class="modal-warning">This permanently deletes every team, schedule, attendance record, chat, payment, and replay tied to this club. It cannot be undone. Members keep their login but lose this club.</p>
+      <p class="modal-hint">Type <b id="delete-modal-club-name"></b> to confirm.</p>
+      <input id="delete-confirm-input" type="text" autocomplete="off" />
+      <div class="modal-actions">
+        <button id="delete-cancel-button" class="btn-ghost">Cancel</button>
+        <button id="delete-confirm-button" class="btn-danger" disabled>Delete permanently</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+    import {
+      getAuth,
+      onAuthStateChanged,
+      signInWithEmailAndPassword,
+      signOut,
+    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+    import {
+      getFunctions,
+      httpsCallable,
+    } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-functions.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBCQEbVcb1IU66b2xDNflAmuW_pQ3SbDTg",
+      authDomain: "teamsync-29ea1.firebaseapp.com",
+      projectId: "teamsync-29ea1",
+      storageBucket: "teamsync-29ea1.firebasestorage.app",
+      messagingSenderId: "525548705366",
+      appId: "1:525548705366:web:375f3d7c81e1d11f400df7",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const functions = getFunctions(app);
+    const getPlatformOverview = httpsCallable(functions, "getPlatformOverview");
+    const setClubStatus = httpsCallable(functions, "setClubStatus");
+    const deleteClub = httpsCallable(functions, "deleteClub");
+
+    const signinView = document.getElementById("signin-view");
+    const appView = document.getElementById("app-view");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const signinButton = document.getElementById("signin-button");
+    const signinError = document.getElementById("signin-error");
+    const signoutButton = document.getElementById("signout-button");
+    const statClubs = document.getElementById("stat-clubs");
+    const statMembers = document.getElementById("stat-members");
+    const tableBody = document.getElementById("clubs-table-body");
+    const emptyState = document.getElementById("empty-state");
+    const appStatus = document.getElementById("app-status");
+    const deleteModalOverlay = document.getElementById("delete-modal-overlay");
+    const deleteModalClubName = document.getElementById("delete-modal-club-name");
+    const deleteConfirmInput = document.getElementById("delete-confirm-input");
+    const deleteConfirmButton = document.getElementById("delete-confirm-button");
+    const deleteCancelButton = document.getElementById("delete-cancel-button");
+
+    let clubPendingDelete = null;
+
+    function formatDate(isoString) {
+      if (!isoString) return "—";
+      const date = new Date(isoString);
+      if (Number.isNaN(date.getTime())) return "—";
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    // Club name/city/sport are free text set by any authenticated user
+    // (firestore.rules only validates ownerId on create) and end up here via
+    // getPlatformOverview, so they must never be interpolated into innerHTML
+    // unescaped -- this is the platform admin's own authenticated session.
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[char]));
+    }
+
+    function renderClubs(overview) {
+      statClubs.textContent = overview.totalClubs;
+      statMembers.textContent = overview.totalMembers;
+
+      tableBody.innerHTML = "";
+      emptyState.style.display = overview.clubs.length === 0 ? "block" : "none";
+
+      for (const club of overview.clubs) {
+        const row = document.createElement("tr");
+        const isSuspended = club.status === "suspended";
+        const clubName = escapeHtml(club.name || "(unnamed club)");
+        const clubCity = escapeHtml(club.city || "");
+        const clubSport = escapeHtml(club.sport || "");
+
+        row.innerHTML = `
+          <td>
+            <div class="club-name">${clubName}</div>
+            <div class="club-meta">${clubCity}${clubSport ? " · " + clubSport : ""}</div>
+          </td>
+          <td><span class="badge ${isSuspended ? "badge-suspended" : "badge-active"}">${isSuspended ? "Suspended" : "Active"}</span></td>
+          <td>${club.memberCount}</td>
+          <td>${club.teamCount}</td>
+          <td>${formatDate(club.createdAt)}</td>
+          <td></td>
+        `;
+
+        const actionCell = row.lastElementChild;
+        actionCell.className = "row-actions";
+
+        const statusButton = document.createElement("button");
+        statusButton.className = isSuspended ? "btn-success" : "btn-danger";
+        statusButton.textContent = isSuspended ? "Reactivate" : "Suspend";
+        statusButton.addEventListener("click", () => handleToggleStatus(club, isSuspended));
+        actionCell.appendChild(statusButton);
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "btn-ghost";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener("click", () => openDeleteModal(club));
+        actionCell.appendChild(deleteButton);
+
+        tableBody.appendChild(row);
+      }
+    }
+
+    async function loadOverview() {
+      appStatus.textContent = "Loading...";
+
+      try {
+        const result = await getPlatformOverview();
+        renderClubs(result.data);
+        appStatus.textContent = "";
+      } catch (error) {
+        appStatus.textContent = error?.message || "Failed to load platform overview.";
+      }
+    }
+
+    async function handleToggleStatus(club, isSuspended) {
+      const nextStatus = isSuspended ? "active" : "suspended";
+      const confirmed = window.confirm(
+        `${nextStatus === "suspended" ? "Suspend" : "Reactivate"} "${club.name}"? ${
+          nextStatus === "suspended" ? "Its members will immediately lose access." : "Its members will regain access."
+        }`
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      appStatus.textContent = "Updating...";
+
+      try {
+        await setClubStatus({ clubId: club.id, status: nextStatus });
+        await loadOverview();
+      } catch (error) {
+        appStatus.textContent = error?.message || "Failed to update club status.";
+      }
+    }
+
+    function openDeleteModal(club) {
+      clubPendingDelete = club;
+      deleteModalClubName.textContent = club.name || "(unnamed club)";
+      deleteConfirmInput.value = "";
+      deleteConfirmButton.disabled = true;
+      deleteModalOverlay.classList.add("open");
+      deleteConfirmInput.focus();
+    }
+
+    function closeDeleteModal() {
+      clubPendingDelete = null;
+      deleteModalOverlay.classList.remove("open");
+    }
+
+    deleteConfirmInput.addEventListener("input", () => {
+      deleteConfirmButton.disabled = clubPendingDelete === null
+        || deleteConfirmInput.value !== (clubPendingDelete.name || "(unnamed club)");
+    });
+
+    deleteCancelButton.addEventListener("click", closeDeleteModal);
+
+    deleteConfirmButton.addEventListener("click", async () => {
+      if (clubPendingDelete === null) {
+        return;
+      }
+
+      const club = clubPendingDelete;
+      deleteConfirmButton.disabled = true;
+      deleteConfirmButton.textContent = "Deleting...";
+
+      try {
+        await deleteClub({ clubId: club.id });
+        closeDeleteModal();
+        await loadOverview();
+      } catch (error) {
+        appStatus.textContent = error?.message || "Failed to delete club.";
+        closeDeleteModal();
+      } finally {
+        deleteConfirmButton.textContent = "Delete permanently";
+      }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        signinView.style.display = "none";
+        appView.style.display = "block";
+        loadOverview();
+      } else {
+        signinView.style.display = "block";
+        appView.style.display = "none";
+      }
+    });
+
+    signinButton.addEventListener("click", async () => {
+      signinError.textContent = "";
+      signinButton.disabled = true;
+
+      try {
+        await signInWithEmailAndPassword(auth, emailInput.value.trim(), passwordInput.value);
+        passwordInput.value = "";
+      } catch (error) {
+        signinError.textContent = "Sign-in failed. Check your email and password.";
+      } finally {
+        signinButton.disabled = false;
+      }
+    });
+
+    passwordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        signinButton.click();
+      }
+    });
+
+    signoutButton.addEventListener("click", () => signOut(auth));
+  </script>
+</body>
+</html>

@@ -241,7 +241,7 @@ export default function ProfileScreen() {
       setDraftProfileData(emptyFormData);
       router.replace("/login" as never);
     } catch (logoutError) {
-      setStatusMessage(getAuthErrorMessage(logoutError) || copy.logoutFailed);
+      setStatusMessage(getAuthErrorMessage(logoutError, language) || copy.logoutFailed);
       setIsSigningOut(false);
     }
   }

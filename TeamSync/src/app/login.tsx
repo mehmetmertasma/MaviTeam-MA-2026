@@ -22,7 +22,7 @@ function isValidEmail(value: string) {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
 
   const [email, setEmail] = useState("");
@@ -100,7 +100,7 @@ export default function LoginScreen() {
       setStatusMessage(t.auth.loginSuccess);
       router.replace("/dashboard" as never);
     } catch (loginError) {
-      setError(getAuthErrorMessage(loginError));
+      setError(getAuthErrorMessage(loginError, language));
       setStatusMessage(t.auth.loginFailed);
     } finally {
       setIsSubmitting(false);
@@ -126,7 +126,7 @@ export default function LoginScreen() {
       await authService.sendPasswordReset(trimmedEmail);
       setStatusMessage(t.auth.resetLinkSent);
     } catch (resetError) {
-      setError(getAuthErrorMessage(resetError));
+      setError(getAuthErrorMessage(resetError, language));
     } finally {
       setIsSubmitting(false);
     }
@@ -143,7 +143,7 @@ export default function LoginScreen() {
         <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{t.auth.loginBadge}</Text>
+          <Text style={styles.infoTitle}>{t.auth.loginStatusTitle}</Text>
           <Text style={styles.infoText}>{statusMessage}</Text>
         </View>
 

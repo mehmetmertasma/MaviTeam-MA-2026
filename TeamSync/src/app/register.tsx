@@ -166,7 +166,7 @@ export default function RegisterScreen() {
         },
       } as never);
     } catch (registerError) {
-      setStatusMessage(getAuthErrorMessage(registerError));
+      setStatusMessage(getAuthErrorMessage(registerError, language));
     } finally {
       setIsSubmitting(false);
     }

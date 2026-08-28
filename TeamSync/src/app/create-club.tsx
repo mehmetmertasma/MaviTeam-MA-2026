@@ -34,7 +34,7 @@ function generatePreviewCode(clubName: string, fallbackPrefix: string) {
 export default function CreateClubScreen() {
   const router = useRouter();
   const { fullName, email } = useLocalSearchParams();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const ownerFullName = getParamValue(fullName);
   const ownerEmail = getParamValue(email);
@@ -104,7 +104,7 @@ export default function CreateClubScreen() {
 
       router.replace("/dashboard");
     } catch (createClubError) {
-      setError(getAuthErrorMessage(createClubError));
+      setError(getAuthErrorMessage(createClubError, language));
     } finally {
       setIsSubmitting(false);
     }

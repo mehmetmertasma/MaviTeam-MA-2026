@@ -73,78 +73,83 @@ function getErrorCode(error: unknown) {
   return "UNKNOWN_AUTH_ERROR";
 }
 
-export function getAuthErrorMessage(error: unknown) {
+export function getAuthErrorMessage(error: unknown, language: "tr" | "en" = "tr") {
   const code = getErrorCode(error);
+  const en = language === "en";
 
   switch (code) {
     case "FIREBASE_CONFIG_MISSING":
-      return "Firebase ayarları eksik. Gerçek giriş için .env dosyasına Firebase bilgilerini ekleyip uygulamayı yeniden başlat.";
+      return en ? "Couldn't connect to the server. Please try again in a moment." : "Sunucuya bağlanılamadı. Lütfen birazdan tekrar dene.";
     case "AUTH_USER_MISSING":
-      return "Oturum bulunamadı. Lütfen tekrar giriş yap.";
+      return en ? "Your session has expired. Please sign in again." : "Oturum bulunamadı. Lütfen tekrar giriş yap.";
     case "WORKSPACE_PROFILE_MISSING":
-      return "Giriş başarılı ama kullanıcı profili Firestore içinde bulunamadı. Tekrar giriş yap veya hesabı yeniden oluştur.";
+      return en
+        ? "You're signed in, but we couldn't find your account profile. Try signing in again or recreate your account."
+        : "Giriş başarılı ama hesabına ait profil bulunamadı. Tekrar giriş yap veya hesabı yeniden oluştur.";
     case "WORKSPACE_SETUP_REQUIRED":
-      return "Giriş başarılı. Bu hesap için henüz gerçek kulüp kurulumu yok.";
+      return en ? "You're signed in. This account doesn't have a club set up yet." : "Giriş başarılı. Bu hesap için henüz bir kulüp kurulumu yok.";
     case "CLUB_CODE_ALREADY_EXISTS":
-      return "Bu kulüp kodu zaten kullanılıyor. Kulüp adını biraz değiştirip tekrar dene.";
+      return en ? "That club code is already taken. Adjust the club name slightly and try again." : "Bu kulüp kodu zaten kullanılıyor. Kulüp adını biraz değiştirip tekrar dene.";
     case "CLUB_CODE_REQUIRED":
-      return "Kulüp kodu oluşturulamadı. Kulüp adını kontrol edip tekrar dene.";
+      return en ? "Couldn't generate a club code. Check the club name and try again." : "Kulüp kodu oluşturulamadı. Kulüp adını kontrol edip tekrar dene.";
     case "EMAIL_SUPPRESSED":
-      return "Bu email adresine doğrulama kodu gönderilemiyor (önceki bir teslimat sorunu var). Farklı bir email adresi dene ya da bizimle iletişime geç.";
+      return en
+        ? "We can't send a verification code to this email address right now. Try a different address or contact us."
+        : "Bu email adresine doğrulama kodu gönderilemiyor. Farklı bir email adresi dene ya da bizimle iletişime geç.";
     case "FIRESTORE_WORKSPACE_MISSING":
-      return "Kulüp çalışma alanı yüklenemedi. Oturumunu yenileyip tekrar dene.";
+      return en ? "Couldn't load your club workspace. Refresh your session and try again." : "Kulüp çalışma alanı yüklenemedi. Oturumunu yenileyip tekrar dene.";
     case "TEAM_PERMISSION_DENIED":
-      return "Takım oluşturmak için aktif kulüp admin yetkisi gerekiyor.";
+      return en ? "You need club admin access to create a team." : "Takım oluşturmak için kulüp admin yetkisi gerekiyor.";
     case "TEAM_REQUIRED_FIELDS_MISSING":
-      return "Takım adı boş bırakılamaz.";
+      return en ? "The team name can't be empty." : "Takım adı boş bırakılamaz.";
     case "auth/invalid-email":
-      return "Lütfen geçerli bir e-posta adresi gir.";
+      return en ? "Please enter a valid email address." : "Lütfen geçerli bir e-posta adresi gir.";
     case "auth/user-disabled":
-      return "Bu hesap devre dışı bırakılmış.";
+      return en ? "This account has been disabled." : "Bu hesap devre dışı bırakılmış.";
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":
-      return "E-posta veya şifre hatalı. Bilgilerini kontrol edip tekrar dene.";
+      return en ? "Incorrect email or password. Check your details and try again." : "E-posta veya şifre hatalı. Bilgilerini kontrol edip tekrar dene.";
     case "auth/email-already-in-use":
-      return "Bu e-posta ile zaten bir hesap var. Giriş yapmayı deneyebilirsin.";
+      return en ? "An account already exists with this email. Try signing in instead." : "Bu e-posta ile zaten bir hesap var. Giriş yapmayı deneyebilirsin.";
     case "auth/weak-password":
-      return "Şifre en az 6 karakter olmalı.";
+      return en ? "Password must be at least 6 characters." : "Şifre en az 6 karakter olmalı.";
     case "auth/network-request-failed":
-      return "Ağ bağlantısı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.";
+      return en ? "Couldn't connect to the network. Check your connection and try again." : "Ağ bağlantısı kurulamadı. İnternet bağlantını kontrol edip tekrar dene.";
     case "auth/too-many-requests":
-      return "Çok fazla deneme yapıldı. Bir süre bekleyip tekrar dene.";
+      return en ? "Too many attempts. Please wait a moment and try again." : "Çok fazla deneme yapıldı. Bir süre bekleyip tekrar dene.";
     case "functions/resource-exhausted":
     case "resource-exhausted":
-      return "Çok fazla doğrulama kodu istendi. Biraz bekleyip tekrar dene.";
+      return en ? "Too many verification codes were requested. Wait a bit and try again." : "Çok fazla doğrulama kodu istendi. Biraz bekleyip tekrar dene.";
     case "functions/failed-precondition":
     case "failed-precondition":
-      return "E-posta doğrulama servisi henüz hazır değil. Lütfen daha sonra tekrar dene.";
+      return en ? "The email verification service isn't ready yet. Please try again later." : "E-posta doğrulama servisi henüz hazır değil. Lütfen daha sonra tekrar dene.";
     case "functions/internal":
     case "internal":
-      return "Doğrulama emaili gönderilemedi. Biraz bekleyip tekrar dene.";
+      return en ? "Couldn't send the verification email. Wait a bit and try again." : "Doğrulama emaili gönderilemedi. Biraz bekleyip tekrar dene.";
     case "functions/invalid-argument":
     case "invalid-argument":
-      return "Doğrulama kodu hatalı veya eksik. 6 haneli kodu kontrol et.";
+      return en ? "That verification code is invalid or incomplete. Check the 6-digit code." : "Doğrulama kodu hatalı veya eksik. 6 haneli kodu kontrol et.";
     case "functions/not-found":
     case "not-found":
-      return "Aktif doğrulama kodu bulunamadı. Yeni kod iste.";
+      return en ? "No active verification code was found. Request a new one." : "Aktif doğrulama kodu bulunamadı. Yeni kod iste.";
     case "functions/deadline-exceeded":
-      return "Doğrulama kodunun süresi doldu. Yeni kod iste.";
+      return en ? "That verification code has expired. Request a new one." : "Doğrulama kodunun süresi doldu. Yeni kod iste.";
     case "functions/permission-denied":
-      return "Bu doğrulama kodu bu hesaba ait değil. Hesabını kontrol edip tekrar dene.";
+      return en ? "That verification code doesn't belong to this account. Check your account and try again." : "Bu doğrulama kodu bu hesaba ait değil. Hesabını kontrol edip tekrar dene.";
     case "functions/unauthenticated":
-      return "Doğrulama için tekrar giriş yapman gerekiyor.";
+      return en ? "Please sign in again to continue verification." : "Doğrulama için tekrar giriş yapman gerekiyor.";
     case "permission-denied":
     case "firestore/permission-denied":
-      return "Firestore izin hatası var. Firestore rules veya kullanıcı club/status alanları bu işlem için izin vermiyor.";
+      return en ? "You don't have permission to do this." : "Bu işlem için yetkin yok.";
     case "unavailable":
     case "firestore/unavailable":
-      return "Firestore bağlantısı şu anda kullanılamıyor. İnternet bağlantını kontrol edip tekrar dene.";
+      return en ? "The service is temporarily unavailable. Check your connection and try again." : "Servis şu anda kullanılamıyor. İnternet bağlantını kontrol edip tekrar dene.";
     case "deadline-exceeded":
     case "firestore/deadline-exceeded":
-      return "Firestore isteği zaman aşımına uğradı. Biraz bekleyip tekrar dene.";
+      return en ? "The request timed out. Wait a moment and try again." : "İstek zaman aşımına uğradı. Biraz bekleyip tekrar dene.";
     default:
-      return `Giriş sistemi hatası: ${code}`;
+      return en ? "Something went wrong. Please try again." : "Beklenmeyen bir hata oluştu. Lütfen tekrar dene.";
   }
 }
 

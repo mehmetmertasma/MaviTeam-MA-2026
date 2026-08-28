@@ -23,6 +23,8 @@ export const tr = {
     success: "İşlem başarıyla tamamlandı.",
     error: "Bir sorun oluştu. Lütfen tekrar deneyin.",
     home: "Ana sayfa",
+    openMenu: "Menüyü aç",
+    openProfile: "Profili aç",
   },
 
   language: {
@@ -62,6 +64,7 @@ export const tr = {
 
   auth: {
     loginBadge: "Güvenli hesap girişi",
+    loginStatusTitle: "Durum",
     loginTitle: "Giriş yap",
     loginSubtitle:
       "Kulübünüzü, takımlarınızı ve antrenman planlarınızı doğrulanmış MaviTeam hesabınızla yönetmeye devam edin.",
@@ -138,7 +141,7 @@ export const tr = {
     ownerNameFallback: "İsim hesabınızdan alınacak",
     ownerEmailFallback: "E-posta hesabınızdan alınacak",
     ownerFallbackName: "Kulüp Yöneticisi",
-    ownerFallbackEmail: "demo@maviteam.app",
+    ownerFallbackEmail: "",
     clubNameLabel: "Kulüp adı",
     clubNamePlaceholder: "Örn. İstanbul Voleybol Kulübü",
     sportLabel: "Branş",

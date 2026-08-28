@@ -25,6 +25,8 @@ export const en = {
     success: "Action completed successfully.",
     error: "Something went wrong. Please try again.",
     home: "Home",
+    openMenu: "Open menu",
+    openProfile: "Open profile",
   },
 
   language: {
@@ -64,6 +66,7 @@ export const en = {
 
   auth: {
     loginBadge: "Secure account sign in",
+    loginStatusTitle: "Status",
     loginTitle: "Sign in",
     loginSubtitle:
       "Continue managing your club, teams, and practice plans with your verified MaviTeam account.",
@@ -140,7 +143,7 @@ export const en = {
     ownerNameFallback: "Name will be taken from your account",
     ownerEmailFallback: "Email will be taken from your account",
     ownerFallbackName: "Club Admin",
-    ownerFallbackEmail: "demo@maviteam.app",
+    ownerFallbackEmail: "",
     clubNameLabel: "Club name",
     clubNamePlaceholder: "E.g. Istanbul Volleyball Club",
     sportLabel: "Sport",

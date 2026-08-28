@@ -24,7 +24,7 @@ function getParamValue(value: string | string[] | undefined) {
 export default function JoinClubScreen() {
   const router = useRouter();
   const { fullName, email } = useLocalSearchParams();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
 
   const requestFullName = getParamValue(fullName);
   const requestEmail = getParamValue(email);
@@ -91,7 +91,7 @@ export default function JoinClubScreen() {
     } catch (joinError) {
       const message = joinError instanceof Error && joinError.message === "INVALID_CLUB_CODE"
         ? t.joinClub.messages.invalidCode
-        : getAuthErrorMessage(joinError);
+        : getAuthErrorMessage(joinError, language);
 
       setError(message);
     } finally {

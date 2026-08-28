@@ -70,7 +70,7 @@ export function AppGlobalNavigation() {
           <Pressable
             onPress={() => setDrawerIsOpen(true)}
             style={({ pressed }) => [styles.iconButton, pressed ? styles.pressed : null]}
-            accessibilityLabel="Open main menu"
+            accessibilityLabel={t.common.openMenu}
           >
             <Text style={styles.menuIcon}>☰</Text>
           </Pressable>
@@ -92,7 +92,7 @@ export function AppGlobalNavigation() {
             <Pressable
               onPress={() => router.push("/profile" as never)}
               style={({ pressed }) => [styles.profileButton, pressed ? styles.pressed : null]}
-              accessibilityLabel="Open profile"
+              accessibilityLabel={t.common.openProfile}
             >
               <Text style={styles.profileText}>{profileInitials}</Text>
             </Pressable>

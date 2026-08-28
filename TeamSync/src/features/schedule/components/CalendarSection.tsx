@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -5,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
 
-import { MONTH_PICKER_OPTIONS, SCHEDULE_TYPE_OPTIONS, getScheduleTypeStyles } from "../constants/schedule.constants";
+import { getMonthPickerOptions, getScheduleTypeOptions, getScheduleTypeStyles } from "../constants/schedule.constants";
 import { formatMonthTitle } from "../utils/schedule-date.utils";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
 import { Calendar } from "./Calendar";
@@ -29,7 +30,29 @@ type CalendarSectionProps = {
   onOpenEventForm: () => void;
   onRefresh: () => void;
   canManageEvents: boolean;
+  language: "tr" | "en";
 };
+
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    sectionTitlePrefix: en ? "Calendar" : "Takvim",
+    subtitleManage: en
+      ? "Tapping a day opens the event form for that date."
+      : "Bir güne basınca etkinlik formu o tarih için açılır.",
+    subtitleView: en
+      ? "You can view practices and matches here."
+      : "Antrenman ve maçları buradan görüntüleyebilirsin.",
+    eventsCount: (count: number) => (en ? `${count} events` : `${count} etkinlik`),
+    previous: en ? "‹ Previous" : "‹ Önceki",
+    next: en ? "Next ›" : "Sonraki ›",
+    selectMonth: en ? "Select month" : "Ay seç",
+    goToToday: en ? "Go to today" : "Bugüne dön",
+    formOpen: en ? "Form open" : "Form açık",
+    addEvent: en ? "Add event" : "Etkinlik ekle",
+    refreshData: en ? "Refresh central data" : "Merkezi datayı yenile",
+  };
+}
 
 export function CalendarSection({
   visibleMonth,
@@ -50,20 +73,23 @@ export function CalendarSection({
   onOpenEventForm,
   onRefresh,
   canManageEvents,
+  language,
 }: CalendarSectionProps) {
+  const copy = useMemo(() => getCopy(language), [language]);
+  const monthPickerOptions = useMemo(() => getMonthPickerOptions(language), [language]);
+  const scheduleTypeOptions = useMemo(() => getScheduleTypeOptions(language), [language]);
+
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
         <View style={scheduleSharedStyles.sectionHeaderText}>
-          <Text style={scheduleSharedStyles.sectionTitle}>Takvim · {formatMonthTitle(visibleMonth)}</Text>
+          <Text style={scheduleSharedStyles.sectionTitle}>{copy.sectionTitlePrefix} · {formatMonthTitle(visibleMonth, language)}</Text>
           <Text style={scheduleSharedStyles.sectionSubtitle}>
-            {canManageEvents
-              ? "Bir güne basınca etkinlik formu o tarih için açılır."
-              : "Antrenman ve maçları buradan görüntüleyebilirsin."}
+            {canManageEvents ? copy.subtitleManage : copy.subtitleView}
           </Text>
         </View>
 
-        <StatusBadge label={`${visibleMonthEvents.length} etkinlik`} tone="info" />
+        <StatusBadge label={copy.eventsCount(visibleMonthEvents.length)} tone="info" />
       </View>
 
       <View style={styles.monthControlRow}>
@@ -71,22 +97,22 @@ export function CalendarSection({
           onPress={onPrevMonth}
           style={({ pressed }) => [styles.monthNavButton, pressed ? scheduleSharedStyles.pressed : null]}
         >
-          <Text style={styles.monthNavText}>‹ Önceki</Text>
+          <Text style={styles.monthNavText}>{copy.previous}</Text>
         </Pressable>
 
         <Pressable
           onPress={onToggleMonthPicker}
           style={({ pressed }) => [styles.monthSelectButton, pressed ? scheduleSharedStyles.pressed : null]}
         >
-          <Text style={styles.monthSelectText}>{formatMonthTitle(visibleMonth)}</Text>
-          <Text style={styles.monthSelectHint}>Ay seç</Text>
+          <Text style={styles.monthSelectText}>{formatMonthTitle(visibleMonth, language)}</Text>
+          <Text style={styles.monthSelectHint}>{copy.selectMonth}</Text>
         </Pressable>
 
         <Pressable
           onPress={onNextMonth}
           style={({ pressed }) => [styles.monthNavButton, pressed ? scheduleSharedStyles.pressed : null]}
         >
-          <Text style={styles.monthNavText}>Sonraki ›</Text>
+          <Text style={styles.monthNavText}>{copy.next}</Text>
         </Pressable>
       </View>
 
@@ -111,7 +137,7 @@ export function CalendarSection({
           </View>
 
           <View style={styles.monthGrid}>
-            {MONTH_PICKER_OPTIONS.map((month) => {
+            {monthPickerOptions.map((month) => {
               const isSelectedMonth = visibleMonth.getMonth() === month.monthIndex;
 
               return (
@@ -144,12 +170,12 @@ export function CalendarSection({
           onPress={onGoToday}
           style={({ pressed }) => [styles.todayButton, pressed ? scheduleSharedStyles.pressed : null]}
         >
-          <Text style={styles.todayButtonText}>Bugüne dön</Text>
+          <Text style={styles.todayButtonText}>{copy.goToToday}</Text>
         </Pressable>
       </View>
 
       <View style={styles.legendRow}>
-        {SCHEDULE_TYPE_OPTIONS.map((type) => {
+        {scheduleTypeOptions.map((type) => {
           const typeStyles = getScheduleTypeStyles(type.value);
 
           return (
@@ -167,12 +193,13 @@ export function CalendarSection({
         selectedDayNumber={selectedDayNumber}
         onSelectDay={onSelectDay}
         onSelectEvent={onSelectEvent}
+        language={language}
       />
 
       <View style={scheduleSharedStyles.actionRow}>
         {canManageEvents ? (
           <AppButton
-            title={showEventForm ? "Form açık" : "Etkinlik ekle"}
+            title={showEventForm ? copy.formOpen : copy.addEvent}
             onPress={onOpenEventForm}
             disabled={showEventForm}
             style={scheduleSharedStyles.actionButton}
@@ -180,7 +207,7 @@ export function CalendarSection({
         ) : null}
 
         <AppButton
-          title="Merkezi datayı yenile"
+          title={copy.refreshData}
           variant="ghost"
           onPress={onRefresh}
           style={scheduleSharedStyles.actionButton}

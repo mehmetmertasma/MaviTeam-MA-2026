@@ -3,23 +3,34 @@ import { theme } from "@/constants/theme";
 import type { ScheduleTypeOption } from "../types/schedule.types";
 import type { ScheduleEventType } from "@/types/teamSync";
 
-export const SCHEDULE_TYPE_OPTIONS: ScheduleTypeOption[] = [
-  { label: "Antrenman", value: "practice" },
-  { label: "Maç", value: "match" },
-  { label: "Toplantı", value: "meeting" },
-];
+export function getScheduleTypeOptions(language: "tr" | "en"): ScheduleTypeOption[] {
+  const en = language === "en";
+  return [
+    { label: en ? "Practice" : "Antrenman", value: "practice" },
+    { label: en ? "Match" : "Maç", value: "match" },
+    { label: en ? "Meeting" : "Toplantı", value: "meeting" },
+  ];
+}
 
-export const WEEK_DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"] as const;
+export function getWeekDays(language: "tr" | "en") {
+  return language === "en"
+    ? (["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const)
+    : (["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"] as const);
+}
 
-export const MONTH_PICKER_OPTIONS = Array.from({ length: 12 }, (_, monthIndex) => ({
-  monthIndex,
-  label: new Date(2026, monthIndex, 1).toLocaleDateString("tr-TR", { month: "short" }),
-}));
+export function getMonthPickerOptions(language: "tr" | "en") {
+  const locale = language === "tr" ? "tr-TR" : "en-US";
+  return Array.from({ length: 12 }, (_, monthIndex) => ({
+    monthIndex,
+    label: new Date(2026, monthIndex, 1).toLocaleDateString(locale, { month: "short" }),
+  }));
+}
 
 export const ALL_CLUB_TEAM_OPTION_ID = "all-club";
 
-export function getScheduleTypeLabel(type: ScheduleEventType) {
-  return SCHEDULE_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? "Etkinlik";
+export function getScheduleTypeLabel(type: ScheduleEventType, language: "tr" | "en") {
+  const en = language === "en";
+  return getScheduleTypeOptions(language).find((option) => option.value === type)?.label ?? (en ? "Event" : "Etkinlik");
 }
 
 export function getScheduleTypeTone(type: ScheduleEventType): StatusBadgeTone {

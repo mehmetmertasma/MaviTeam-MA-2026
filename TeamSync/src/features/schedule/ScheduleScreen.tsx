@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { ALL_CLUB_TEAM_OPTION_ID } from "./constants/schedule.constants";
 import { CalendarSection } from "./components/CalendarSection";
 import { EventDetailsBubble } from "./components/EventDetailsBubble";
@@ -26,7 +27,51 @@ import { scheduleRepository } from "./services/schedule.repository";
 import type { ScheduleEvent, ScheduleEventType } from "@/types/teamSync";
 import type { TeamOption } from "./types/schedule.types";
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    pageTitle: en ? "Schedule" : "Program",
+    pageSubtitle: en
+      ? "Manage practices, matches, and meetings from the central data."
+      : "Antrenman, maç ve toplantıları merkezi data üzerinden yönet.",
+    heroLabel: en ? "Calendar management" : "Takvim yönetimi",
+    heroTitle: en ? "Monthly schedule view" : "Aylık program görünümü",
+    heroSubtitle: en
+      ? "Switch between months, pick the one you want, and save the event straight to the selected date."
+      : "Aylar arasında geçiş yap, istediğin ayı seç ve etkinliği doğrudan seçili tarihe kaydet.",
+    allClub: en ? "Whole club" : "Tüm Kulüp",
+    noDateSelected: en ? "No date selected" : "Tarih seçilmedi",
+    statusSelectDay: (dayNumber: number, monthTitle: string) =>
+      en ? `You can add an event for ${monthTitle} ${dayNumber}.` : `${dayNumber} ${monthTitle} için etkinlik ekleyebilirsin.`,
+    statusDataNotLoaded: en ? "Central data must be loaded first." : "Önce merkezi data yüklenmeli.",
+    statusMissingFields: en
+      ? "Title, date, time, and location cannot be empty."
+      : "Başlık, tarih, saat ve konum boş bırakılamaz.",
+    statusInvalidDay: en ? "Please select a valid day on the calendar." : "Lütfen takvimden geçerli bir gün seçiniz.",
+    statusInvalidTime: en
+      ? "Time must be in HH:mm format. E.g. 18:30"
+      : "Saat formatı HH:mm şeklinde olmalı. Örn. 18:30",
+    statusUpdated: en ? "Event updated." : "Etkinlik güncellendi.",
+    statusCreated: en ? "New event added to the selected month's calendar." : "Yeni etkinlik seçili ayın takvimine eklendi.",
+    statusUpdateFailed: en ? "There was a problem updating the event." : "Etkinlik güncellenirken bir sorun oluştu.",
+    statusCreateFailed: en ? "There was a problem creating the event." : "Etkinlik oluşturulurken bir sorun oluştu.",
+    statusEditReady: en
+      ? "You can edit the event details and save."
+      : "Etkinlik bilgilerini düzenleyip kaydedebilirsin.",
+    statusDeleted: en ? "Event deleted." : "Etkinlik silindi.",
+    statusDeleteFailed: en ? "There was a problem deleting the event." : "Etkinlik silinirken bir sorun oluştu.",
+    statusFormReady: en
+      ? "Pick a day on the calendar and fill in the event details."
+      : "Takvimden gün seçip etkinlik bilgilerini doldurabilirsin.",
+    statusFormCancelled: en ? "Adding the event was cancelled." : "Etkinlik ekleme iptal edildi.",
+    statusBackToToday: en ? "Returned to the month containing today." : "Bugünün olduğu aya dönüldü.",
+  };
+}
+
 export default function ScheduleScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const { scheduleData, loadScheduleData, setScheduleData, setStatusMessage, statusMessage } =
     useScheduleData();
   const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(new Date()));
@@ -45,7 +90,7 @@ export default function ScheduleScreen() {
   const teamOptions = useMemo<TeamOption[]>(() => {
     const allClubOption: TeamOption = {
       id: ALL_CLUB_TEAM_OPTION_ID,
-      label: "Tüm Kulüp",
+      label: copy.allClub,
     };
 
     if (scheduleData === null) {
@@ -60,7 +105,7 @@ export default function ScheduleScreen() {
         teamId: team.id,
       })),
     ];
-  }, [scheduleData]);
+  }, [scheduleData, copy.allClub]);
 
   const scheduleEvents = useMemo(() => scheduleData?.scheduleEvents ?? [], [scheduleData]);
 
@@ -81,12 +126,12 @@ export default function ScheduleScreen() {
 
   const selectedDay = Number(selectedDayNumber);
   const selectedDateLabel = Number.isInteger(selectedDay)
-    ? new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), selectedDay).toLocaleDateString("tr-TR", {
+    ? new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), selectedDay).toLocaleDateString(locale, {
         day: "2-digit",
         month: "long",
         year: "numeric",
       })
-    : "Tarih seçilmedi";
+    : copy.noDateSelected;
 
   function setMonthAndKeepValidDay(nextMonth: Date) {
     const nextMonthStart = getMonthStart(nextMonth);
@@ -125,12 +170,12 @@ export default function ScheduleScreen() {
       setShowEventForm(true);
     }
 
-    setStatusMessage(`${dayNumber} ${formatMonthTitle(visibleMonth)} için etkinlik ekleyebilirsin.`);
+    setStatusMessage(copy.statusSelectDay(dayNumber, formatMonthTitle(visibleMonth, language)));
   }
 
   async function handleSaveScheduleItem() {
     if (scheduleData === null) {
-      setStatusMessage("Önce merkezi data yüklenmeli.");
+      setStatusMessage(copy.statusDataNotLoaded);
       return;
     }
 
@@ -138,12 +183,12 @@ export default function ScheduleScreen() {
     const maxDay = getDaysInMonth(visibleMonth.getFullYear(), visibleMonth.getMonth());
 
     if (!canCreate) {
-      setStatusMessage("Başlık, tarih, saat ve konum boş bırakılamaz.");
+      setStatusMessage(copy.statusMissingFields);
       return;
     }
 
     if (!Number.isInteger(parsedDayNumber) || parsedDayNumber < 1 || parsedDayNumber > maxDay) {
-      setStatusMessage("Lütfen takvimden geçerli bir gün seçiniz.");
+      setStatusMessage(copy.statusInvalidDay);
       return;
     }
 
@@ -155,7 +200,7 @@ export default function ScheduleScreen() {
     );
 
     if (startsAt === null) {
-      setStatusMessage("Saat formatı HH:mm şeklinde olmalı. Örn. 18:30");
+      setStatusMessage(copy.statusInvalidTime);
       return;
     }
 
@@ -169,13 +214,13 @@ export default function ScheduleScreen() {
           type: selectedType,
           startsAt,
           location: location.trim(),
-          note: note.trim() || "Ek not yok.",
+          note: note.trim(),
         });
 
         setScheduleData(nextScheduleData);
         clearForm();
         setShowEventForm(false);
-        setStatusMessage("Etkinlik güncellendi.");
+        setStatusMessage(copy.statusUpdated);
         return;
       }
 
@@ -186,16 +231,16 @@ export default function ScheduleScreen() {
         type: selectedType,
         startsAt,
         location: location.trim(),
-        note: note.trim() || "Ek not yok.",
+        note: note.trim(),
         createdByUserId: scheduleData.currentUser.id,
       });
 
       setScheduleData(nextScheduleData);
       clearForm();
       setShowEventForm(false);
-      setStatusMessage("Yeni etkinlik seçili ayın takvimine eklendi.");
+      setStatusMessage(copy.statusCreated);
     } catch {
-      setStatusMessage(editingEventId !== null ? "Etkinlik güncellenirken bir sorun oluştu." : "Etkinlik oluşturulurken bir sorun oluştu.");
+      setStatusMessage(editingEventId !== null ? copy.statusUpdateFailed : copy.statusCreateFailed);
     }
   }
 
@@ -214,13 +259,13 @@ export default function ScheduleScreen() {
     setTitle(event.title);
     setSelectedType(event.type);
     setSelectedTeamId(event.teamId ?? ALL_CLUB_TEAM_OPTION_ID);
-    setTime(eventDate === null ? "" : formatEventTime(event.startsAt));
+    setTime(eventDate === null ? "" : formatEventTime(event.startsAt, language));
     setLocation(event.location);
     setNote(event.note ?? "");
     setEditingEventId(event.id);
     setShowEventForm(true);
     setSelectedEventForDetails(null);
-    setStatusMessage("Etkinlik bilgilerini düzenleyip kaydedebilirsin.");
+    setStatusMessage(copy.statusEditReady);
   }
 
   async function handleDeleteEvent(event: ScheduleEvent) {
@@ -228,9 +273,9 @@ export default function ScheduleScreen() {
       const nextScheduleData = await scheduleRepository.removeScheduleEvent(event.id);
       setScheduleData(nextScheduleData);
       setSelectedEventForDetails(null);
-      setStatusMessage("Etkinlik silindi.");
+      setStatusMessage(copy.statusDeleted);
     } catch {
-      setStatusMessage("Etkinlik silinirken bir sorun oluştu.");
+      setStatusMessage(copy.statusDeleteFailed);
     }
   }
 
@@ -240,35 +285,34 @@ export default function ScheduleScreen() {
     }
 
     setShowEventForm(true);
-    setStatusMessage("Takvimden gün seçip etkinlik bilgilerini doldurabilirsin.");
+    setStatusMessage(copy.statusFormReady);
   }
 
   function closeEventForm() {
     clearForm();
     setShowEventForm(false);
-    setStatusMessage("Etkinlik ekleme iptal edildi.");
+    setStatusMessage(copy.statusFormCancelled);
   }
 
   function goToToday() {
     const today = new Date();
     setVisibleMonth(getMonthStart(today));
     setSelectedDayNumber(`${today.getDate()}`);
-    setStatusMessage("Bugünün olduğu aya dönüldü.");
+    setStatusMessage(copy.statusBackToToday);
   }
 
   return (
     <AppScreenLayout variant="wide">
-      <PageHeader title="Program" subtitle="Antrenman, maç ve toplantıları merkezi data üzerinden yönet." />
+      <PageHeader title={copy.pageTitle} subtitle={copy.pageSubtitle} />
 
       <Card variant="elevated" style={styles.heroCard}>
-        <StatusBadge label="Takvim yönetimi" tone="info" style={styles.heroLabel} />
-        <Text style={styles.heroTitle}>Aylık program görünümü</Text>
-        <Text style={styles.heroSubtitle}>
-          Aylar arasında geçiş yap, istediğin ayı seç ve etkinliği doğrudan seçili tarihe kaydet.
-        </Text>
+        <StatusBadge label={copy.heroLabel} tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <CalendarSection
+        language={language}
         visibleMonth={visibleMonth}
         visibleMonthEvents={visibleMonthEvents}
         selectedDayNumber={selectedDayNumber}
@@ -301,11 +345,13 @@ export default function ScheduleScreen() {
           onEdit={openEditForm}
           onDelete={handleDeleteEvent}
           onClose={() => setSelectedEventForDetails(null)}
+          language={language}
         />
       ) : null}
 
       {showEventForm && canManageSchedule ? (
         <EventForm
+          language={language}
           isEditing={editingEventId !== null}
           selectedDateLabel={selectedDateLabel}
           title={title}
@@ -332,6 +378,7 @@ export default function ScheduleScreen() {
         visibleMonthEvents={visibleMonthEvents}
         scheduleData={scheduleData}
         onSelectEvent={setSelectedEventForDetails}
+        language={language}
       />
     </AppScreenLayout>
   );

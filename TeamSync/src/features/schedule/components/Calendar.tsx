@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
 
-import { WEEK_DAYS, getScheduleTypeStyles } from "../constants/schedule.constants";
+import { getWeekDays, getScheduleTypeStyles } from "../constants/schedule.constants";
 import { buildCalendarCells, formatEventTime } from "../utils/schedule-date.utils";
 import { groupScheduleEventsByDate } from "../utils/schedule-selectors.utils";
 
@@ -14,7 +14,16 @@ type CalendarProps = {
   selectedDayNumber: string;
   onSelectDay: (dayNumber: number) => void;
   onSelectEvent: (event: ScheduleEvent) => void;
+  language: "tr" | "en";
 };
+
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    today: en ? "Today" : "Bugün",
+    more: (count: number) => (en ? `+${count} more` : `+${count} daha`),
+  };
+}
 
 export function Calendar({
   visibleMonth,
@@ -22,13 +31,16 @@ export function Calendar({
   selectedDayNumber,
   onSelectDay,
   onSelectEvent,
+  language,
 }: CalendarProps) {
+  const copy = useMemo(() => getCopy(language), [language]);
+  const weekDays = useMemo(() => getWeekDays(language), [language]);
   const calendarCells = useMemo(() => buildCalendarCells(visibleMonth), [visibleMonth]);
   const eventsByDate = useMemo(() => groupScheduleEventsByDate(events), [events]);
 
   return (
     <View style={styles.calendarGrid}>
-      {WEEK_DAYS.map((day) => (
+      {weekDays.map((day) => (
         <View key={day} style={styles.weekDayCell}>
           <Text style={styles.weekDayText}>{day}</Text>
         </View>
@@ -57,7 +69,7 @@ export function Calendar({
               <Text style={[styles.dayNumber, isSelectedDay ? styles.selectedDayText : null]}>
                 {calendarDay.dayNumber}
               </Text>
-              {calendarDay.isToday ? <Text style={styles.todayBadge}>Bugün</Text> : null}
+              {calendarDay.isToday ? <Text style={styles.todayBadge}>{copy.today}</Text> : null}
             </View>
 
             <View style={styles.dayEventList}>
@@ -90,14 +102,14 @@ export function Calendar({
                       numberOfLines={1}
                       style={[styles.calendarEventText, { color: typeStyles.textColor }]}
                     >
-                      {formatEventTime(event.startsAt)} {event.title}
+                      {formatEventTime(event.startsAt, language)} {event.title}
                     </Text>
                   </Pressable>
                 );
               })}
 
               {dayEvents.length > 2 ? (
-                <Text style={styles.moreEventsText}>+{dayEvents.length - 2} daha</Text>
+                <Text style={styles.moreEventsText}>{copy.more(dayEvents.length - 2)}</Text>
               ) : null}
             </View>
           </Pressable>

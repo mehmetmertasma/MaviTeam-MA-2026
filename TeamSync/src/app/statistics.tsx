@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
 import { SearchField } from "@/components/SearchField";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import type { AttendanceRecord, ScheduleEvent, TeamSyncAppData } from "@/types/teamSync";
 import { matchesSearchQuery } from "@/utils/search";
@@ -82,7 +83,7 @@ function countEventsThisMonth(
   }).length;
 }
 
-function buildStats(appData: TeamSyncAppData): RosterStats | SelfStats {
+function buildStats(appData: TeamSyncAppData, noTeamLabel: string): RosterStats | SelfStats {
   const { currentUser, teams, users, scheduleEvents, attendanceRecords } = appData;
   const canViewRoster = currentUser.role === "clubAdmin" || currentUser.role === "coach";
   const now = new Date();
@@ -118,7 +119,7 @@ function buildStats(appData: TeamSyncAppData): RosterStats | SelfStats {
     return {
       id: athlete.id,
       name: athlete.fullName,
-      teamName: teamNames.length > 0 ? teamNames.join(", ") : "Takımsız",
+      teamName: teamNames.length > 0 ? teamNames.join(", ") : noTeamLabel,
       attendanceRate: getAttendanceRate(records),
       presentCount: records.filter((record) => record.status === "present").length,
       absentCount: records.filter((record) => record.status === "absent").length,
@@ -136,13 +137,61 @@ function buildStats(appData: TeamSyncAppData): RosterStats | SelfStats {
   };
 }
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  return {
+    eyebrow: en ? "Performance center" : "Performans merkezi",
+    pageTitle: en ? "Statistics" : "İstatistikler",
+    pageSubtitle: en
+      ? "View athlete attendance and this month's schedule summary in one screen."
+      : "Sporcu katılımı ve bu ayki program özetini tek ekranda görüntüle.",
+    loadingTitle: en ? "Loading..." : "Yükleniyor...",
+    loadingDescription: en ? "Preparing statistics." : "İstatistikler hazırlanıyor.",
+    totalAthletes: en ? "Total athletes" : "Toplam sporcu",
+    averageAttendance: en ? "Average attendance" : "Ortalama katılım",
+    matchesThisMonth: en ? "Matches this month" : "Bu ay maç",
+    practicesThisMonth: en ? "Practices this month" : "Bu ay antrenman",
+    athleteAttendanceTitle: en ? "Athlete attendance" : "Sporcu katılımı",
+    athleteAttendanceSubtitle: en
+      ? "Calculated from recent attendance records."
+      : "Yakın zamandaki yoklama kayıtlarına göre hesaplanır.",
+    athletesCount: (count: number) => (en ? `${count} athletes` : `${count} sporcu`),
+    noAthletesTitle: en ? "No athletes yet" : "Henüz sporcu yok",
+    noAthletesDescription: en
+      ? "Attendance rates will appear here once athletes are added to a team."
+      : "Bir takıma sporcu eklendiğinde katılım oranları burada görünecek.",
+    searchPlaceholder: en ? "Search name or team..." : "İsim veya takım ara...",
+    searchA11y: en ? "Search athletes" : "Sporcularda ara",
+    noSearchMatchesTitle: en ? "No athletes match your search" : "Aramayla eşleşen sporcu yok",
+    noSearchMatchesDescription: en ? "Try a different name or team." : "Farklı bir isim veya takım ile tekrar dene.",
+    present: en ? "Present" : "Katıldı",
+    absent: en ? "Absent" : "Katılmadı",
+    totalRecords: en ? "Total records" : "Toplam kayıt",
+    yourAttendanceTitle: en ? "Your attendance" : "Senin katılım durumun",
+    yourAttendanceSubtitle: en
+      ? "Calculated from recent attendance records."
+      : "Yakın zamandaki yoklama kayıtlarına göre hesaplanır.",
+    attendanceRate: en ? "Attendance rate" : "Katılım oranı",
+    late: en ? "Late" : "Geç kaldı",
+    excused: en ? "Excused" : "Mazeretli",
+    noRecordsTitle: en ? "No attendance records yet" : "Henüz yoklama kaydın yok",
+    noRecordsDescription: en
+      ? "Records will appear here once you're checked in for a practice or match."
+      : "Bir antrenman veya maçta yoklaman alındığında burada görünecek.",
+    noTeam: en ? "No team" : "Takımsız",
+  };
+}
+
 export default function StatisticsScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
   const { appData } = useAppDataContext();
   const [searchQuery, setSearchQuery] = useState("");
 
   const stats = useMemo(() => {
-    return appData === null ? null : buildStats(appData);
-  }, [appData]);
+    return appData === null ? null : buildStats(appData, copy.noTeam);
+  }, [appData, copy.noTeam]);
 
   const players = stats !== null && stats.mode === "roster" ? stats.players : EMPTY_PLAYERS;
 
@@ -153,51 +202,51 @@ export default function StatisticsScreen() {
   return (
     <AppScreenLayout variant="standard">
       <PageHeader
-        eyebrow="Performans merkezi"
-        title="İstatistikler"
-        subtitle="Sporcu katılımı ve bu ayki program özetini tek ekranda görüntüle."
+        eyebrow={copy.eyebrow}
+        title={copy.pageTitle}
+        subtitle={copy.pageSubtitle}
       />
 
       {stats === null ? (
         <Card>
-          <EmptyState title="Yükleniyor..." description="İstatistikler hazırlanıyor." />
+          <EmptyState title={copy.loadingTitle} description={copy.loadingDescription} />
         </Card>
       ) : stats.mode === "roster" ? (
         <>
           <View style={styles.statsGrid}>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.totalAthletes}</Text>
-              <Text style={styles.statLabel}>Toplam sporcu</Text>
+              <Text style={styles.statLabel}>{copy.totalAthletes}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{formatRate(stats.attendanceRate)}</Text>
-              <Text style={styles.statLabel}>Ortalama katılım</Text>
+              <Text style={styles.statLabel}>{copy.averageAttendance}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.matchesThisMonth}</Text>
-              <Text style={styles.statLabel}>Bu ay maç</Text>
+              <Text style={styles.statLabel}>{copy.matchesThisMonth}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.practicesThisMonth}</Text>
-              <Text style={styles.statLabel}>Bu ay antrenman</Text>
+              <Text style={styles.statLabel}>{copy.practicesThisMonth}</Text>
             </Card>
           </View>
 
           <Card style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <View style={styles.sectionHeaderText}>
-                <Text style={styles.sectionTitle}>Sporcu katılımı</Text>
+                <Text style={styles.sectionTitle}>{copy.athleteAttendanceTitle}</Text>
                 <Text style={styles.sectionSubtitle}>
-                  Yakın zamandaki yoklama kayıtlarına göre hesaplanır.
+                  {copy.athleteAttendanceSubtitle}
                 </Text>
               </View>
-              <Text style={styles.statusPill}>{stats.players.length} sporcu</Text>
+              <Text style={styles.statusPill}>{copy.athletesCount(stats.players.length)}</Text>
             </View>
 
             {stats.players.length === 0 ? (
               <EmptyState
-                title="Henüz sporcu yok"
-                description="Bir takıma sporcu eklendiğinde katılım oranları burada görünecek."
+                title={copy.noAthletesTitle}
+                description={copy.noAthletesDescription}
               />
             ) : (
               <>
@@ -205,14 +254,14 @@ export default function StatisticsScreen() {
                   <SearchField
                     value={searchQuery}
                     onChangeText={setSearchQuery}
-                    placeholder="İsim veya takım ara..."
-                    accessibilityLabel="Sporcularda ara"
+                    placeholder={copy.searchPlaceholder}
+                    accessibilityLabel={copy.searchA11y}
                     style={styles.searchField}
                   />
                 ) : null}
 
                 {filteredPlayers.length === 0 ? (
-                  <EmptyState title="Aramayla eşleşen sporcu yok" description="Farklı bir isim veya takım ile tekrar dene." />
+                  <EmptyState title={copy.noSearchMatchesTitle} description={copy.noSearchMatchesDescription} />
                 ) : (
               <View style={styles.playerList}>
                 {filteredPlayers.map((player) => (
@@ -227,15 +276,15 @@ export default function StatisticsScreen() {
 
                     <View style={styles.infoGrid}>
                       <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Katıldı</Text>
+                        <Text style={styles.infoLabel}>{copy.present}</Text>
                         <Text style={styles.infoValue}>{player.presentCount}</Text>
                       </View>
                       <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Katılmadı</Text>
+                        <Text style={styles.infoLabel}>{copy.absent}</Text>
                         <Text style={styles.infoValue}>{player.absentCount}</Text>
                       </View>
                       <View style={styles.infoBox}>
-                        <Text style={styles.infoLabel}>Toplam kayıt</Text>
+                        <Text style={styles.infoLabel}>{copy.totalRecords}</Text>
                         <Text style={styles.infoValue}>{player.recordCount}</Text>
                       </View>
                     </View>
@@ -250,46 +299,46 @@ export default function StatisticsScreen() {
       ) : (
         <>
           <Card style={styles.heroCard}>
-            <Text style={styles.heroTitle}>Senin katılım durumun</Text>
-            <Text style={styles.heroSubtitle}>Yakın zamandaki yoklama kayıtlarına göre hesaplanır.</Text>
+            <Text style={styles.heroTitle}>{copy.yourAttendanceTitle}</Text>
+            <Text style={styles.heroSubtitle}>{copy.yourAttendanceSubtitle}</Text>
           </Card>
 
           <View style={styles.statsGrid}>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{formatRate(stats.attendanceRate)}</Text>
-              <Text style={styles.statLabel}>Katılım oranı</Text>
+              <Text style={styles.statLabel}>{copy.attendanceRate}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.presentCount}</Text>
-              <Text style={styles.statLabel}>Katıldı</Text>
+              <Text style={styles.statLabel}>{copy.present}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.absentCount}</Text>
-              <Text style={styles.statLabel}>Katılmadı</Text>
+              <Text style={styles.statLabel}>{copy.absent}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.lateCount}</Text>
-              <Text style={styles.statLabel}>Geç kaldı</Text>
+              <Text style={styles.statLabel}>{copy.late}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.excusedCount}</Text>
-              <Text style={styles.statLabel}>Mazeretli</Text>
+              <Text style={styles.statLabel}>{copy.excused}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.matchesThisMonth}</Text>
-              <Text style={styles.statLabel}>Bu ay maç</Text>
+              <Text style={styles.statLabel}>{copy.matchesThisMonth}</Text>
             </Card>
             <Card style={styles.statCard}>
               <Text style={styles.statValue}>{stats.practicesThisMonth}</Text>
-              <Text style={styles.statLabel}>Bu ay antrenman</Text>
+              <Text style={styles.statLabel}>{copy.practicesThisMonth}</Text>
             </Card>
           </View>
 
           {stats.recordCount === 0 ? (
             <Card>
               <EmptyState
-                title="Henüz yoklama kaydın yok"
-                description="Bir antrenman veya maçta yoklaman alındığında burada görünecek."
+                title={copy.noRecordsTitle}
+                description={copy.noRecordsDescription}
               />
             </Card>
           ) : null}

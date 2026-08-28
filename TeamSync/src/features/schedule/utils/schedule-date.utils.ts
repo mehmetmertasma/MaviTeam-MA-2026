@@ -35,18 +35,25 @@ export function isEventInMonth(event: ScheduleEvent, visibleMonth: Date) {
   return date !== null && date.getFullYear() === visibleMonth.getFullYear() && date.getMonth() === visibleMonth.getMonth();
 }
 
-export function formatMonthTitle(date: Date) {
-  return date.toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
+export function formatMonthTitle(date: Date, language: "tr" | "en" = "tr") {
+  const locale = language === "tr" ? "tr-TR" : "en-US";
+  return date.toLocaleDateString(locale, { month: "long", year: "numeric" });
 }
 
-export function formatEventDate(value: string) {
+export function formatEventDate(value: string, language: "tr" | "en" = "tr") {
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const date = getDateFromValue(value);
-  return date === null ? "Tarih yok" : date.toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
+  return date === null
+    ? (language === "en" ? "No date" : "Tarih yok")
+    : date.toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" });
 }
 
-export function formatEventTime(value: string) {
+export function formatEventTime(value: string, language: "tr" | "en" = "tr") {
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const date = getDateFromValue(value);
-  return date === null ? "Saat yok" : date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+  return date === null
+    ? (language === "en" ? "No time" : "Saat yok")
+    : date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function buildStartsAt(year: number, monthIndex: number, dayNumber: number, timeValue: string) {

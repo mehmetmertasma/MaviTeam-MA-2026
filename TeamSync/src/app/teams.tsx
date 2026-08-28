@@ -11,6 +11,7 @@ import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
@@ -18,16 +19,17 @@ import { teamSyncService } from "@/services/teamSyncService";
 import type { Team as TeamRecord, UserProfile } from "@/types/teamSync";
 import { matchesSearchQuery } from "@/utils/search";
 
-function getTeamMembershipErrorMessage(error: unknown) {
+function getTeamMembershipErrorMessage(error: unknown, language: "tr" | "en") {
+  const en = language === "en";
   const message = error instanceof Error ? error.message : "";
 
-  if (message === "MEMBER_SELF_EDIT_DENIED") return "Kendi takım üyeliğini buradan değiştiremezsin.";
-  if (message === "MEMBER_OWNER_EDIT_DENIED") return "Kulüp sahibinin takım üyeliği buradan değiştirilemez.";
-  if (message === "MEMBER_PERMISSION_DENIED") return "Bu işlem için kulüp admin yetkisi gerekli.";
-  if (message === "MEMBER_TEAM_MISSING") return "Seçilen takım artık mevcut değil.";
-  if (message === "MEMBER_MISSING") return "Kullanıcı bulunamadı.";
+  if (message === "MEMBER_SELF_EDIT_DENIED") return en ? "You can't change your own team membership here." : "Kendi takım üyeliğini buradan değiştiremezsin.";
+  if (message === "MEMBER_OWNER_EDIT_DENIED") return en ? "The club owner's team membership can't be changed here." : "Kulüp sahibinin takım üyeliği buradan değiştirilemez.";
+  if (message === "MEMBER_PERMISSION_DENIED") return en ? "You need club admin access to do this." : "Bu işlem için kulüp admin yetkisi gerekli.";
+  if (message === "MEMBER_TEAM_MISSING") return en ? "The selected team no longer exists." : "Seçilen takım artık mevcut değil.";
+  if (message === "MEMBER_MISSING") return en ? "User not found." : "Kullanıcı bulunamadı.";
 
-  return "Takım üyeliği güncellenirken bir sorun oluştu.";
+  return en ? "Something went wrong while updating team membership." : "Takım üyeliği güncellenirken bir sorun oluştu.";
 }
 
 const EMPTY_TEAMS: TeamRecord[] = [];
@@ -46,37 +48,138 @@ function getInitials(name: string) {
   return initials || "TS";
 }
 
-function getUserStatusLabel(status: UserProfile["status"]) {
-  if (status === "active") {
-    return "Aktif";
-  }
-
-  if (status === "pending") {
-    return "Onay bekliyor";
-  }
-
-  return "Kaldırıldı";
-}
-
 function getTeamUsers(team: TeamRecord, users: UserProfile[]) {
   const userIds = new Set([...team.coachIds, ...team.memberIds]);
 
   return users.filter((user) => userIds.has(user.id) && user.status !== "removed");
 }
 
-function getTeamCoachNames(team: TeamRecord, users: UserProfile[]) {
-  const coachNames = users
-    .filter((user) => team.coachIds.includes(user.id))
-    .map((user) => user.fullName);
-
-  return coachNames.length > 0 ? coachNames.join(", ") : "Koç atanmadı";
-}
-
 function getAthleteCount(team: TeamRecord, users: UserProfile[]) {
   return getTeamUsers(team, users).filter((user) => user.role === "athlete").length;
 }
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  function getUserStatusLabel(status: UserProfile["status"]) {
+    if (status === "active") {
+      return en ? "Active" : "Aktif";
+    }
+
+    if (status === "pending") {
+      return en ? "Pending approval" : "Onay bekliyor";
+    }
+
+    return en ? "Removed" : "Kaldırıldı";
+  }
+
+  function getTeamCoachNames(team: TeamRecord, users: UserProfile[]) {
+    const coachNames = users
+      .filter((user) => team.coachIds.includes(user.id))
+      .map((user) => user.fullName);
+
+    return coachNames.length > 0 ? coachNames.join(", ") : en ? "No coach assigned" : "Koç atanmadı";
+  }
+
+  return {
+    pageTitle: en ? "Teams" : "Takımlar",
+    pageSubtitle: en ? "Manage teams, coaches, and team members." : "Takımları, koçları ve takım üyelerini yönet.",
+    heroLabel: en ? "Club organization" : "Kulüp organizasyonu",
+    heroTitle: en ? "Team management center" : "Takım yönetim merkezi",
+    heroSubtitle: en
+      ? "Tap a team to expand its details in place. You can safely remove a team if needed."
+      : "Takıma tıklayınca detaylar aynı kartın içinde açılır. Gerekirse takımı güvenli şekilde kaldırabilirsin.",
+    statTeams: en ? "Teams" : "Takım",
+    statAthletes: en ? "Athletes" : "Sporcu",
+    statMembers: en ? "Members" : "Üye",
+    formOpen: en ? "Form open" : "Form açık",
+    newTeam: en ? "Create new team" : "Yeni takım oluştur",
+    refresh: en ? "Refresh" : "Yenile",
+    createFormTitle: en ? "Create new team" : "Yeni takım oluştur",
+    createFormSubtitle: en
+      ? "Enter a team name. If age group is left blank, General is used. Coach name is optional — it's assigned if it matches an existing coach account."
+      : "Takım adını gir. Yaş grubu boş kalırsa Genel kullanılır. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.",
+    teamNameLabel: en ? "Team name" : "Takım adı",
+    teamNamePlaceholder: en ? "e.g. U16 Boys" : "Örn. U16 Erkek",
+    ageGroupLabel: en ? "Age group (optional)" : "Yaş grubu opsiyonel",
+    ageGroupPlaceholder: en ? "e.g. U16 or General" : "Örn. U16 veya Genel",
+    coachNameLabel: en ? "Coach name (optional)" : "Koç adı opsiyonel",
+    coachNamePlaceholder: en ? "e.g. Jane Smith" : "Örn. Can Demir",
+    creating: en ? "Creating..." : "Oluşturuluyor...",
+    createTeamButton: en ? "Create team" : "Takımı oluştur",
+    cancel: en ? "Cancel" : "Vazgeç",
+    clubTeamsTitle: en ? "Club teams" : "Kulüp takımları",
+    clubTeamsSubtitle: en
+      ? "Tap a team to expand its details, members, and removal option in place."
+      : "Takıma tıkla; detay, üyeler ve kaldırma işlemi kartın içinde açılacak.",
+    noTeamsTitle: en ? "No teams yet" : "Henüz takım yok",
+    noTeamsDescription: en
+      ? "Use the Create new team button to add a team."
+      : "Yeni takım oluştur butonuyla takım ekleyebilirsin.",
+    coachPrefix: en ? "Coach" : "Koç",
+    peopleCount: (count: number) => (en ? `${count} people` : `${count} kişi`),
+    detailOpen: en ? "Details open" : "Detay açık",
+    tapForDetails: en ? "Tap for details" : "Detay için tıkla",
+    athletesCount: (count: number) => (en ? `${count} athletes` : `${count} sporcu`),
+    ageGroupDetailLabel: en ? "Age group" : "Yaş grubu",
+    totalPeopleLabel: en ? "Total people" : "Toplam kişi",
+    athletesDetailLabel: en ? "Athletes" : "Sporcu",
+    teamPeopleTitle: en ? "Team members" : "Takım içi kişiler",
+    close: en ? "Close" : "Kapat",
+    addPerson: en ? "Add person" : "Kişi ekle",
+    noTeamPeople: en ? "This team has no people yet." : "Bu takımda henüz kişi yok.",
+    searchInTeamPlaceholder: en ? "Search people in team..." : "Takım içinde kişi ara...",
+    searchInTeamA11y: en ? "Search team members" : "Takım üyelerinde ara",
+    noSearchMatches: en ? "No people match your search." : "Aramayla eşleşen kişi yok.",
+    message: en ? "Message" : "Mesaj",
+    remove: en ? "Remove" : "Çıkar",
+    processing: en ? "Processing..." : "İşleniyor...",
+    noAvailableMembers: en ? "No other active members are available to add." : "Eklenebilecek başka aktif üye yok.",
+    searchToAddPlaceholder: en ? "Search people to add..." : "Eklenecek kişi ara...",
+    searchToAddA11y: en ? "Search available members" : "Eklenebilecek üyelerde ara",
+    add: en ? "Add" : "Ekle",
+    removeConfirmTitle: en ? "Are you sure you want to remove this team?" : "Bu takımı kaldırmak istediğine emin misin?",
+    removeConfirmText: en
+      ? "The team card will be removed from the list and users will lose their connection to it."
+      : "Takım kartı listeden kalkacak ve kullanıcıların takım bağlantısı temizlenecek.",
+    confirmRemove: en ? "Yes, remove" : "Evet, kaldır",
+    removeTeamButton: en ? "Remove team" : "Takımı kaldır",
+    userStatusLabel: getUserStatusLabel,
+    // Status messages
+    teamsUpdated: en ? "Teams updated." : "Takımlar güncellendi.",
+    firebaseRequiredForTeamMembership: en
+      ? "Signing in is required to manage team membership."
+      : "Takım üyeliği yönetimi için Firebase girişi gerekli.",
+    cannotChangeMembershipForUser: en
+      ? "Team membership can't be changed for this user."
+      : "Bu kullanıcı için takım üyeliği değiştirilemez.",
+    memberAdded: (memberName: string, teamName: string) =>
+      en ? `${memberName} was added to ${teamName}.` : `${memberName} ${teamName} takımına eklendi.`,
+    memberRemoved: (memberName: string, teamName: string) =>
+      en ? `${memberName} was removed from ${teamName}.` : `${memberName} ${teamName} takımından çıkarıldı.`,
+    teamDetailsClosed: (teamName: string) => (en ? `${teamName} details closed.` : `${teamName} detayları kapatıldı.`),
+    teamDetailsOpened: (teamName: string) => (en ? `${teamName} details opened.` : `${teamName} detayları açıldı.`),
+    pleaseWaitForLoad: en ? "Please wait for the page to finish loading." : "Sayfanın yüklenmesini bekle.",
+    teamNameRequired: en ? "The team name can't be empty." : "Takım adı boş bırakılamaz.",
+    ageGroupDefault: en ? "General" : "Genel",
+    savingTeam: en ? "Creating team..." : "Takım oluşturuluyor...",
+    teamCreatedWithCoach: en ? "New team created and coach assigned." : "Yeni takım oluşturuldu ve koç atandı.",
+    teamCreatedNoCoach: en ? "New team created. You can assign a coach later." : "Yeni takım oluşturuldu. Koç daha sonra atanabilir.",
+    createTeamCancelled: en ? "Team creation cancelled." : "Takım oluşturma iptal edildi.",
+    confirmRemoveTeam: (teamName: string) =>
+      en ? `${teamName} will be removed. Tap remove again to confirm.` : `${teamName} kaldırılacak. Eminsen tekrar Kaldır'a bas.`,
+    teamRemoved: (teamName: string) => (en ? `${teamName} was removed.` : `${teamName} kaldırıldı.`),
+    teamRemoveFailed: en ? "Something went wrong while removing the team." : "Takım kaldırılırken bir sorun oluştu.",
+    removeTeamCancelled: en ? "Team removal cancelled." : "Takım kaldırma iptal edildi.",
+    openingMessagesFor: (memberName: string) =>
+      en ? `Opening messages for ${memberName}.` : `${memberName} için mesaj ekranı açılıyor.`,
+    getTeamCoachNames,
+  };
+}
+
 export default function TeamsScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
   const { appData, refresh, setAppData } = useAppDataContext();
   const [selectedTeamIdState, setSelectedTeamId] = useState("");
   const [pendingRemoveTeamId, setPendingRemoveTeamId] = useState("");
@@ -85,7 +188,7 @@ export default function TeamsScreen() {
   const [ageGroup, setAgeGroup] = useState("");
   const [coachName, setCoachName] = useState("");
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Takımlar merkezi TeamSync datasından yüklendi.");
+  const [statusMessage, setStatusMessage] = useState(copy.teamsUpdated);
   const [addMemberOpenTeamId, setAddMemberOpenTeamId] = useState("");
   const [updatingMemberId, setUpdatingMemberId] = useState("");
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
@@ -100,14 +203,14 @@ export default function TeamsScreen() {
 
   async function setTeamMembership(team: TeamRecord, member: UserProfile, isAdding: boolean) {
     if (!authService.isConfigured()) {
-      setStatusMessage("Takım üyeliği yönetimi için Firebase girişi gerekli.");
+      setStatusMessage(copy.firebaseRequiredForTeamMembership);
       return;
     }
 
     const firebaseUser = authService.getCurrentUser();
 
     if (firebaseUser === null || member.role === "superAdmin") {
-      setStatusMessage("Bu kullanıcı için takım üyeliği değiştirilemez.");
+      setStatusMessage(copy.cannotChangeMembershipForUser);
       return;
     }
 
@@ -126,9 +229,9 @@ export default function TeamsScreen() {
       });
 
       await refresh();
-      setStatusMessage(isAdding ? `${member.fullName} ${team.name} takımına eklendi.` : `${member.fullName} ${team.name} takımından çıkarıldı.`);
+      setStatusMessage(isAdding ? copy.memberAdded(member.fullName, team.name) : copy.memberRemoved(member.fullName, team.name));
     } catch (membershipError) {
-      setStatusMessage(getTeamMembershipErrorMessage(membershipError));
+      setStatusMessage(getTeamMembershipErrorMessage(membershipError, language));
     } finally {
       setUpdatingMemberId("");
     }
@@ -138,10 +241,10 @@ export default function TeamsScreen() {
     try {
       await refresh();
       setPendingRemoveTeamId("");
-      setStatusMessage("Takımlar merkezi TeamSync datasından yüklendi.");
+      setStatusMessage(copy.teamsUpdated);
     } catch (loadError) {
       console.warn("Teams data could not be loaded.", loadError);
-      setStatusMessage(getAuthErrorMessage(loadError));
+      setStatusMessage(getAuthErrorMessage(loadError, language));
     }
   }
 
@@ -167,26 +270,26 @@ export default function TeamsScreen() {
 
     if (selectedTeamId === team.id) {
       setSelectedTeamId("");
-      setStatusMessage(`${team.name} detayları kapatıldı.`);
+      setStatusMessage(copy.teamDetailsClosed(team.name));
       return;
     }
 
     setSelectedTeamId(team.id);
-    setStatusMessage(`${team.name} detayları açıldı.`);
+    setStatusMessage(copy.teamDetailsOpened(team.name));
   }
 
   async function createTeam() {
     if (appData === null) {
-      setStatusMessage("Önce merkezi data yüklenmeli.");
+      setStatusMessage(copy.pleaseWaitForLoad);
       return;
     }
 
     const cleanTeamName = teamName.trim();
-    const cleanAgeGroup = ageGroup.trim() || "Genel";
+    const cleanAgeGroup = ageGroup.trim() || copy.ageGroupDefault;
     const cleanCoachName = coachName.trim().toLowerCase();
 
     if (cleanTeamName === "") {
-      setStatusMessage("Takım adı boş bırakılamaz.");
+      setStatusMessage(copy.teamNameRequired);
       return;
     }
 
@@ -199,7 +302,7 @@ export default function TeamsScreen() {
 
     try {
       setIsCreatingTeam(true);
-      setStatusMessage("Takım merkezi dataya kaydediliyor...");
+      setStatusMessage(copy.savingTeam);
 
       const nextAppData = await teamSyncService.createTeam({
         clubId: appData.club.id,
@@ -215,14 +318,10 @@ export default function TeamsScreen() {
       setPendingRemoveTeamId("");
       clearForm();
       setShowCreateForm(false);
-      setStatusMessage(
-        matchingCoach
-          ? "Yeni takım merkezi dataya kaydedildi ve koç atandı."
-          : "Yeni takım merkezi dataya kaydedildi. Koç daha sonra atanabilir."
-      );
+      setStatusMessage(matchingCoach ? copy.teamCreatedWithCoach : copy.teamCreatedNoCoach);
     } catch (createTeamError) {
       console.warn("Team creation failed.", createTeamError);
-      setStatusMessage(getAuthErrorMessage(createTeamError));
+      setStatusMessage(getAuthErrorMessage(createTeamError, language));
     } finally {
       setIsCreatingTeam(false);
     }
@@ -232,7 +331,7 @@ export default function TeamsScreen() {
     if (pendingRemoveTeamId !== team.id) {
       setSelectedTeamId(team.id);
       setPendingRemoveTeamId(team.id);
-      setStatusMessage(`${team.name} kaldırılacak. Eminsen tekrar Kaldır'a bas.`);
+      setStatusMessage(copy.confirmRemoveTeam(team.name));
       return;
     }
 
@@ -241,58 +340,58 @@ export default function TeamsScreen() {
       setAppData(nextAppData);
       setSelectedTeamId("");
       setPendingRemoveTeamId("");
-      setStatusMessage(`${team.name} kaldırıldı.`);
+      setStatusMessage(copy.teamRemoved(team.name));
     } catch {
-      setStatusMessage("Takım kaldırılırken bir sorun oluştu.");
+      setStatusMessage(copy.teamRemoveFailed);
     }
   }
 
   function openMessages(memberName: string) {
-    setStatusMessage(`${memberName} için mesaj ekranı açılıyor.`);
+    setStatusMessage(copy.openingMessagesFor(memberName));
     router.push("/messages" as never);
   }
 
   return (
     <AppScreenLayout>
       <PageHeader
-        title="Takımlar"
-        subtitle="Takımları, koçları ve takım üyelerini merkezi data üzerinden yönet."
+        title={copy.pageTitle}
+        subtitle={copy.pageSubtitle}
       />
 
       <Card style={styles.heroCard} padding="lg">
-        <StatusBadge label="Kulüp organizasyonu" tone="info" style={styles.heroLabel} />
-        <Text style={styles.heroTitle}>Takım yönetim merkezi</Text>
+        <StatusBadge label={copy.heroLabel} tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
         <Text style={styles.heroSubtitle}>
-          Takıma tıklayınca detaylar aynı kartın içinde açılır. Gerekirse takımı güvenli şekilde kaldırabilirsin.
+          {copy.heroSubtitle}
         </Text>
       </Card>
 
       <View style={styles.statsGrid}>
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{teams.length}</Text>
-          <Text style={styles.statLabel}>Takım</Text>
+          <Text style={styles.statLabel}>{copy.statTeams}</Text>
         </Card>
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{totalAthletes}</Text>
-          <Text style={styles.statLabel}>Sporcu</Text>
+          <Text style={styles.statLabel}>{copy.statAthletes}</Text>
         </Card>
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{totalMembers}</Text>
-          <Text style={styles.statLabel}>Üye</Text>
+          <Text style={styles.statLabel}>{copy.statMembers}</Text>
         </Card>
       </View>
 
       <View style={styles.topActions}>
         {userCanManageTeamRoster ? (
           <AppButton
-            title={showCreateForm ? "Form açık" : "Yeni takım oluştur"}
+            title={showCreateForm ? copy.formOpen : copy.newTeam}
             onPress={() => setShowCreateForm(true)}
             disabled={showCreateForm}
             style={styles.actionButton}
           />
         ) : null}
         <AppButton
-          title="Merkezi datayı yenile"
+          title={copy.refresh}
           variant="ghost"
           onPress={refreshTeamsData}
           style={styles.actionButton}
@@ -301,14 +400,14 @@ export default function TeamsScreen() {
 
       {showCreateForm && userCanManageTeamRoster ? (
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Yeni takım oluştur</Text>
+          <Text style={styles.sectionTitle}>{copy.createFormTitle}</Text>
           <Text style={styles.sectionSubtitle}>
-            Takım adını gir. Yaş grubu boş kalırsa Genel kullanılır. Koç adı opsiyonel; yazdığın ad mevcut koç kullanıcıyla eşleşirse atanır.
+            {copy.createFormSubtitle}
           </Text>
 
           <TextField
-            label="Takım adı"
-            placeholder="Örn. U16 Erkek"
+            label={copy.teamNameLabel}
+            placeholder={copy.teamNamePlaceholder}
             value={teamName}
             onChangeText={setTeamName}
             containerStyle={styles.field}
@@ -316,15 +415,15 @@ export default function TeamsScreen() {
 
           <View style={styles.formGrid}>
             <TextField
-              label="Yaş grubu opsiyonel"
-              placeholder="Örn. U16 veya Genel"
+              label={copy.ageGroupLabel}
+              placeholder={copy.ageGroupPlaceholder}
               value={ageGroup}
               onChangeText={setAgeGroup}
               containerStyle={styles.formField}
             />
             <TextField
-              label="Koç adı opsiyonel"
-              placeholder="Örn. Can Demir"
+              label={copy.coachNameLabel}
+              placeholder={copy.coachNamePlaceholder}
               value={coachName}
               onChangeText={setCoachName}
               containerStyle={styles.formField}
@@ -333,18 +432,18 @@ export default function TeamsScreen() {
 
           <View style={styles.topActions}>
             <AppButton
-              title={isCreatingTeam ? "Oluşturuluyor..." : "Takımı oluştur"}
+              title={isCreatingTeam ? copy.creating : copy.createTeamButton}
               onPress={createTeam}
               disabled={isCreatingTeam}
               style={styles.actionButton}
             />
             <AppButton
-              title="Vazgeç"
+              title={copy.cancel}
               variant="ghost"
               onPress={() => {
                 clearForm();
                 setShowCreateForm(false);
-                setStatusMessage("Takım oluşturma iptal edildi.");
+                setStatusMessage(copy.createTeamCancelled);
               }}
               style={styles.actionButton}
             />
@@ -353,17 +452,17 @@ export default function TeamsScreen() {
       ) : null}
 
       <Card style={styles.section}>
-        <Text style={styles.sectionTitle}>Kulüp takımları</Text>
-        <Text style={styles.sectionSubtitle}>Takıma tıkla; detay, üyeler ve kaldırma işlemi kartın içinde açılacak.</Text>
+        <Text style={styles.sectionTitle}>{copy.clubTeamsTitle}</Text>
+        <Text style={styles.sectionSubtitle}>{copy.clubTeamsSubtitle}</Text>
 
         {teams.length === 0 ? (
-          <EmptyState title="Henüz takım yok" description="Yeni takım oluştur butonu ile merkezi dataya takım ekleyebilirsin." />
+          <EmptyState title={copy.noTeamsTitle} description={copy.noTeamsDescription} />
         ) : (
           <View style={styles.teamList}>
             {teams.map((team) => {
               const isSelected = selectedTeamId === team.id;
               const teamUsers = getTeamUsers(team, users);
-              const coachNames = getTeamCoachNames(team, users);
+              const coachNames = copy.getTeamCoachNames(team, users);
               const isPendingRemove = pendingRemoveTeamId === team.id;
 
               return (
@@ -375,12 +474,12 @@ export default function TeamsScreen() {
                     <View style={styles.teamTopRow}>
                       <View style={styles.teamInfo}>
                         <Text style={styles.teamName}>{team.name}</Text>
-                        <Text style={styles.teamMeta}>{team.ageGroup} · Koç: {coachNames}</Text>
+                        <Text style={styles.teamMeta}>{team.ageGroup} · {copy.coachPrefix}: {coachNames}</Text>
                       </View>
-                      <StatusBadge label={`${teamUsers.length} kişi`} tone="neutral" />
+                      <StatusBadge label={copy.peopleCount(teamUsers.length)} tone="neutral" />
                     </View>
                     <Text style={styles.teamHint}>
-                      {getAthleteCount(team, users)} sporcu · {isSelected ? "Detay açık" : "Detay için tıkla"}
+                      {copy.athletesCount(getAthleteCount(team, users))} · {isSelected ? copy.detailOpen : copy.tapForDetails}
                     </Text>
                   </Pressable>
 
@@ -388,25 +487,25 @@ export default function TeamsScreen() {
                     <View style={styles.expandedArea}>
                       <View style={styles.detailGrid}>
                         <Card variant="subtle" padding="sm" style={styles.detailCard}>
-                          <Text style={styles.detailLabel}>Yaş grubu</Text>
+                          <Text style={styles.detailLabel}>{copy.ageGroupDetailLabel}</Text>
                           <Text style={styles.detailValue}>{team.ageGroup}</Text>
                         </Card>
                         <Card variant="subtle" padding="sm" style={styles.detailCard}>
-                          <Text style={styles.detailLabel}>Toplam kişi</Text>
+                          <Text style={styles.detailLabel}>{copy.totalPeopleLabel}</Text>
                           <Text style={styles.detailValue}>{teamUsers.length}</Text>
                         </Card>
                         <Card variant="subtle" padding="sm" style={styles.detailCard}>
-                          <Text style={styles.detailLabel}>Sporcu</Text>
+                          <Text style={styles.detailLabel}>{copy.athletesDetailLabel}</Text>
                           <Text style={styles.detailValue}>{getAthleteCount(team, users)}</Text>
                         </Card>
                       </View>
 
                       <View style={styles.memberBlock}>
                         <View style={styles.memberBlockHeaderRow}>
-                          <Text style={styles.memberBlockTitle}>Takım içi kişiler</Text>
+                          <Text style={styles.memberBlockTitle}>{copy.teamPeopleTitle}</Text>
                           {userCanManageTeamRoster ? (
                             <AppButton
-                              title={addMemberOpenTeamId === team.id ? "Kapat" : "Kişi ekle"}
+                              title={addMemberOpenTeamId === team.id ? copy.close : copy.addPerson}
                               variant="secondary"
                               onPress={() => {
                                 setAddMemberOpenTeamId(addMemberOpenTeamId === team.id ? "" : team.id);
@@ -419,7 +518,7 @@ export default function TeamsScreen() {
 
                         {teamUsers.length === 0 ? (
                           <Card variant="subtle" padding="sm">
-                            <Text style={styles.emptyText}>Bu takımda henüz kişi yok.</Text>
+                            <Text style={styles.emptyText}>{copy.noTeamPeople}</Text>
                           </Card>
                         ) : (
                           <>
@@ -427,8 +526,8 @@ export default function TeamsScreen() {
                               <SearchField
                                 value={memberSearchQuery}
                                 onChangeText={setMemberSearchQuery}
-                                placeholder="Takım içinde kişi ara..."
-                                accessibilityLabel="Takım üyelerinde ara"
+                                placeholder={copy.searchInTeamPlaceholder}
+                                accessibilityLabel={copy.searchInTeamA11y}
                                 style={styles.memberSearchField}
                               />
                             ) : null}
@@ -441,7 +540,7 @@ export default function TeamsScreen() {
                               if (filteredTeamUsers.length === 0) {
                                 return (
                                   <Card variant="subtle" padding="sm">
-                                    <Text style={styles.emptyText}>Aramayla eşleşen kişi yok.</Text>
+                                    <Text style={styles.emptyText}>{copy.noSearchMatches}</Text>
                                   </Card>
                                 );
                               }
@@ -460,17 +559,17 @@ export default function TeamsScreen() {
                                         </View>
                                         <View style={styles.memberInfo}>
                                           <Text style={styles.memberName}>{member.fullName}</Text>
-                                          <Text style={styles.memberMeta}>{member.email || getUserStatusLabel(member.status)}</Text>
+                                          <Text style={styles.memberMeta}>{member.email || copy.userStatusLabel(member.status)}</Text>
                                         </View>
                                         <AppButton
-                                          title="Mesaj"
+                                          title={copy.message}
                                           variant="secondary"
                                           onPress={() => openMessages(member.fullName)}
                                           style={styles.memberButton}
                                         />
                                         {userCanManageTeamRoster && !isProtectedMember ? (
                                           <AppButton
-                                            title={isUpdatingThisMember ? "..." : "Çıkar"}
+                                            title={isUpdatingThisMember ? copy.processing : copy.remove}
                                             variant="ghost"
                                             disabled={isUpdatingThisMember}
                                             onPress={() => setTeamMembership(team, member, false)}
@@ -497,7 +596,7 @@ export default function TeamsScreen() {
                               );
 
                               if (availableUsers.length === 0) {
-                                return <Text style={styles.emptyText}>Eklenebilecek başka aktif üye yok.</Text>;
+                                return <Text style={styles.emptyText}>{copy.noAvailableMembers}</Text>;
                               }
 
                               const filteredAvailableUsers = availableUsers.filter((user) =>
@@ -510,14 +609,14 @@ export default function TeamsScreen() {
                                     <SearchField
                                       value={addMemberSearchQuery}
                                       onChangeText={setAddMemberSearchQuery}
-                                      placeholder="Eklenecek kişi ara..."
-                                      accessibilityLabel="Eklenebilecek üyelerde ara"
+                                      placeholder={copy.searchToAddPlaceholder}
+                                      accessibilityLabel={copy.searchToAddA11y}
                                       style={styles.memberSearchField}
                                     />
                                   ) : null}
 
                                   {filteredAvailableUsers.length === 0 ? (
-                                    <Text style={styles.emptyText}>Aramayla eşleşen kişi yok.</Text>
+                                    <Text style={styles.emptyText}>{copy.noSearchMatches}</Text>
                                   ) : (
                                     filteredAvailableUsers.map((user) => {
                                       const isUpdatingThisUser = updatingMemberId === user.id;
@@ -526,10 +625,10 @@ export default function TeamsScreen() {
                                         <View key={user.id} style={styles.addMemberRow}>
                                           <View style={styles.memberInfo}>
                                             <Text style={styles.memberName}>{user.fullName}</Text>
-                                            <Text style={styles.memberMeta}>{user.email || getUserStatusLabel(user.status)}</Text>
+                                            <Text style={styles.memberMeta}>{user.email || copy.userStatusLabel(user.status)}</Text>
                                           </View>
                                           <AppButton
-                                            title={isUpdatingThisUser ? "..." : "Ekle"}
+                                            title={isUpdatingThisUser ? copy.processing : copy.add}
                                             disabled={isUpdatingThisUser}
                                             onPress={() => setTeamMembership(team, user, true)}
                                             style={styles.memberButton}
@@ -547,14 +646,14 @@ export default function TeamsScreen() {
 
                       {isPendingRemove ? (
                         <Card variant="danger" padding="sm">
-                          <Text style={styles.confirmTitle}>Bu takımı kaldırmak istediğine emin misin?</Text>
-                          <Text style={styles.confirmText}>Takım kartı listeden kalkacak ve kullanıcıların takım bağlantısı temizlenecek.</Text>
+                          <Text style={styles.confirmTitle}>{copy.removeConfirmTitle}</Text>
+                          <Text style={styles.confirmText}>{copy.removeConfirmText}</Text>
                         </Card>
                       ) : null}
 
                       <View style={styles.teamActionsRow}>
                         <AppButton
-                          title={isPendingRemove ? "Evet, kaldır" : "Takımı kaldır"}
+                          title={isPendingRemove ? copy.confirmRemove : copy.removeTeamButton}
                           variant="danger"
                           onPress={() => removeTeam(team)}
                           style={styles.actionButton}
@@ -562,11 +661,11 @@ export default function TeamsScreen() {
 
                         {isPendingRemove ? (
                           <AppButton
-                            title="Vazgeç"
+                            title={copy.cancel}
                             variant="ghost"
                             onPress={() => {
                               setPendingRemoveTeamId("");
-                              setStatusMessage("Takım kaldırma iptal edildi.");
+                              setStatusMessage(copy.removeTeamCancelled);
                             }}
                             style={styles.actionButton}
                           />

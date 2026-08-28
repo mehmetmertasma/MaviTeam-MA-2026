@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { StatusBadge } from "@/components/StatusBadge";
@@ -15,17 +16,36 @@ type EventListProps = {
   visibleMonthEvents: ScheduleEvent[];
   scheduleData: ScheduleWorkspaceData | null;
   onSelectEvent: (event: ScheduleEvent) => void;
+  language: "tr" | "en";
 };
 
-export function EventList({ visibleMonth, visibleMonthEvents, scheduleData, onSelectEvent }: EventListProps) {
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    titleSuffix: en ? "events" : "etkinlikleri",
+    subtitle: en
+      ? "Records for the selected month are listed from the central data."
+      : "Seçili aydaki kayıtlar merkezi data’dan listeleniyor.",
+    recordsCount: (count: number) => (en ? `${count} records` : `${count} kayıt`),
+    noNote: en ? "No additional note." : "Ek not yok.",
+    emptyTitle: en ? "No events this month" : "Bu ayda etkinlik yok",
+    emptyText: en
+      ? "Pick a day on the calendar to create a new schedule entry for this month."
+      : "Takvimden gün seçip bu aya yeni program kaydı oluşturabilirsin.",
+  };
+}
+
+export function EventList({ visibleMonth, visibleMonthEvents, scheduleData, onSelectEvent, language }: EventListProps) {
+  const copy = useMemo(() => getCopy(language), [language]);
+
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
         <View style={scheduleSharedStyles.sectionHeaderText}>
-          <Text style={scheduleSharedStyles.sectionTitle}>{formatMonthTitle(visibleMonth)} etkinlikleri</Text>
-          <Text style={scheduleSharedStyles.sectionSubtitle}>Seçili aydaki kayıtlar merkezi data’dan listeleniyor.</Text>
+          <Text style={scheduleSharedStyles.sectionTitle}>{formatMonthTitle(visibleMonth, language)} {copy.titleSuffix}</Text>
+          <Text style={scheduleSharedStyles.sectionSubtitle}>{copy.subtitle}</Text>
         </View>
-        <StatusBadge label={`${visibleMonthEvents.length} kayıt`} tone="info" />
+        <StatusBadge label={copy.recordsCount(visibleMonthEvents.length)} tone="info" />
       </View>
 
       <View style={styles.eventList}>
@@ -39,22 +59,22 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData, onSe
               >
                 <View style={styles.eventContent}>
                   <View style={styles.eventHeaderRow}>
-                    <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} />
+                    <StatusBadge label={getScheduleTypeLabel(event.type, language)} tone={getScheduleTypeTone(event.type)} />
                     <Text style={styles.eventTeam}>{getScheduleTeamLabel(event, scheduleData)}</Text>
                   </View>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventMeta}>
-                    {formatEventDate(event.startsAt)} · {formatEventTime(event.startsAt)} · {event.location}
+                    {formatEventDate(event.startsAt, language)} · {formatEventTime(event.startsAt, language)} · {event.location}
                   </Text>
-                  <Text style={styles.eventNote}>{event.note ?? "Ek not yok."}</Text>
+                  <Text style={styles.eventNote}>{event.note || copy.noNote}</Text>
                 </View>
               </Pressable>
             );
           })
         ) : (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Bu ayda etkinlik yok</Text>
-            <Text style={styles.emptyText}>Takvimden gün seçip bu aya yeni program kaydı oluşturabilirsin.</Text>
+            <Text style={styles.emptyTitle}>{copy.emptyTitle}</Text>
+            <Text style={styles.emptyText}>{copy.emptyText}</Text>
           </View>
         )}
       </View>

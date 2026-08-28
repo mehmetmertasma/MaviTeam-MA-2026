@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -5,7 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
 import type { ScheduleEventType } from "@/types/teamSync";
 
-import { SCHEDULE_TYPE_OPTIONS, getScheduleTypeStyles } from "../constants/schedule.constants";
+import { getScheduleTypeOptions, getScheduleTypeStyles } from "../constants/schedule.constants";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
 import type { TeamOption } from "../types/schedule.types";
 
@@ -28,7 +29,36 @@ type EventFormProps = {
   canCreate: boolean;
   onSave: () => void;
   onCancel: () => void;
+  language: "tr" | "en";
 };
+
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    editTitle: en ? "Edit event" : "Etkinliği düzenle",
+    addTitle: en ? "Add event" : "Etkinlik ekle",
+    selectedDatePrefix: en ? "Selected date:" : "Seçili tarih:",
+    selectedDateHint: en
+      ? "Choose a different day on the calendar to change it."
+      : "Değiştirmek için takvimden başka bir gün seç.",
+    editBadge: en ? "Edit" : "Düzenle",
+    newBadge: en ? "New" : "Yeni",
+    dateLabel: en ? "Date" : "Tarih",
+    titleLabel: en ? "Title" : "Başlık",
+    titlePlaceholder: en ? "E.g. U16 Boys practice" : "Örn: U16 Erkek antrenmanı",
+    typeLabel: en ? "Event type" : "Etkinlik türü",
+    teamLabel: en ? "Team" : "Takım",
+    timeLabel: en ? "Time" : "Saat",
+    timePlaceholder: en ? "E.g. 18:30" : "Örn: 18:30",
+    locationLabel: en ? "Location" : "Konum",
+    locationPlaceholder: en ? "E.g. Main Sports Hall" : "Örn: Ana Spor Salonu",
+    noteLabel: en ? "Note" : "Not",
+    notePlaceholder: en ? "Write an additional note..." : "Ek not yaz...",
+    saveEdit: en ? "Save changes" : "Değişiklikleri kaydet",
+    saveNew: en ? "Save event" : "Etkinliği kaydet",
+    cancel: en ? "Cancel" : "Vazgeç",
+  };
+}
 
 export function EventForm({
   isEditing,
@@ -49,37 +79,41 @@ export function EventForm({
   canCreate,
   onSave,
   onCancel,
+  language,
 }: EventFormProps) {
+  const copy = useMemo(() => getCopy(language), [language]);
+  const scheduleTypeOptions = useMemo(() => getScheduleTypeOptions(language), [language]);
+
   return (
     <View style={scheduleSharedStyles.section}>
       <View style={scheduleSharedStyles.sectionHeaderRow}>
         <View style={scheduleSharedStyles.sectionHeaderText}>
-          <Text style={scheduleSharedStyles.sectionTitle}>{isEditing ? "Etkinliği düzenle" : "Etkinlik ekle"}</Text>
+          <Text style={scheduleSharedStyles.sectionTitle}>{isEditing ? copy.editTitle : copy.addTitle}</Text>
           <Text style={scheduleSharedStyles.sectionSubtitle}>
-            Seçili tarih: {selectedDateLabel}. Değiştirmek için takvimden başka bir gün seç.
+            {copy.selectedDatePrefix} {selectedDateLabel}. {copy.selectedDateHint}
           </Text>
         </View>
 
-        <StatusBadge label={isEditing ? "Düzenle" : "Yeni"} tone={isEditing ? "warning" : "info"} />
+        <StatusBadge label={isEditing ? copy.editBadge : copy.newBadge} tone={isEditing ? "warning" : "info"} />
       </View>
 
       <View style={styles.selectedDateCard}>
-        <Text style={styles.selectedDateLabel}>Tarih</Text>
+        <Text style={styles.selectedDateLabel}>{copy.dateLabel}</Text>
         <Text style={styles.selectedDateText}>{selectedDateLabel}</Text>
       </View>
 
-      <Text style={styles.label}>Başlık</Text>
+      <Text style={styles.label}>{copy.titleLabel}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Örn: U16 Erkek antrenmanı"
+        placeholder={copy.titlePlaceholder}
         placeholderTextColor={theme.colors.text.muted}
         value={title}
         onChangeText={onChangeTitle}
       />
 
-      <Text style={styles.label}>Etkinlik türü</Text>
+      <Text style={styles.label}>{copy.typeLabel}</Text>
       <View style={styles.optionGrid}>
-        {SCHEDULE_TYPE_OPTIONS.map((type) => {
+        {scheduleTypeOptions.map((type) => {
           const isSelected = selectedType === type.value;
           const typeStyles = getScheduleTypeStyles(type.value);
 
@@ -111,7 +145,7 @@ export function EventForm({
         })}
       </View>
 
-      <Text style={styles.label}>Takım</Text>
+      <Text style={styles.label}>{copy.teamLabel}</Text>
       <View style={styles.optionGrid}>
         {teamOptions.map((team) => {
           const isSelected = selectedTeamId === team.id;
@@ -139,28 +173,28 @@ export function EventForm({
         })}
       </View>
 
-      <Text style={styles.label}>Saat</Text>
+      <Text style={styles.label}>{copy.timeLabel}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Örn: 18:30"
+        placeholder={copy.timePlaceholder}
         placeholderTextColor={theme.colors.text.muted}
         value={time}
         onChangeText={onChangeTime}
       />
 
-      <Text style={styles.label}>Konum</Text>
+      <Text style={styles.label}>{copy.locationLabel}</Text>
       <TextInput
         style={styles.input}
-        placeholder="Örn: Ana Spor Salonu"
+        placeholder={copy.locationPlaceholder}
         placeholderTextColor={theme.colors.text.muted}
         value={location}
         onChangeText={onChangeLocation}
       />
 
-      <Text style={styles.label}>Not</Text>
+      <Text style={styles.label}>{copy.noteLabel}</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
-        placeholder="Ek not yaz..."
+        placeholder={copy.notePlaceholder}
         placeholderTextColor={theme.colors.text.muted}
         value={note}
         onChangeText={onChangeNote}
@@ -169,13 +203,13 @@ export function EventForm({
 
       <View style={scheduleSharedStyles.actionRow}>
         <AppButton
-          title={isEditing ? "Değişiklikleri kaydet" : "Etkinliği kaydet"}
+          title={isEditing ? copy.saveEdit : copy.saveNew}
           onPress={onSave}
           disabled={!canCreate}
           style={scheduleSharedStyles.actionButton}
         />
         <AppButton
-          title="Vazgeç"
+          title={copy.cancel}
           variant="ghost"
           onPress={onCancel}
           style={scheduleSharedStyles.actionButton}

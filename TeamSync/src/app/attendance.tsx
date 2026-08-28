@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { AttendanceStatus, ScheduleEvent, Team, TeamSyncAppData, UserProfile } from "@/types/teamSync";
@@ -20,13 +21,6 @@ type AttendanceOption = {
   value: AttendanceStatus;
   label: string;
 };
-
-const attendanceOptions: AttendanceOption[] = [
-  { value: "present", label: "Katıldı" },
-  { value: "absent", label: "Katılmadı" },
-  { value: "late", label: "Geç kaldı" },
-  { value: "excused", label: "Mazeretli" },
-];
 
 const attendanceToneByStatus: Record<AttendanceStatus, StatusBadgeTone> = {
   present: "success",
@@ -39,43 +33,171 @@ const EMPTY_TEAMS: Team[] = [];
 const EMPTY_USERS: UserProfile[] = [];
 const EMPTY_EVENTS: ScheduleEvent[] = [];
 
-function formatEventDate(value: string) {
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  const attendanceOptions: AttendanceOption[] = [
+    { value: "present", label: en ? "Present" : "Katıldı" },
+    { value: "absent", label: en ? "Absent" : "Katılmadı" },
+    { value: "late", label: en ? "Late" : "Geç kaldı" },
+    { value: "excused", label: en ? "Excused" : "Mazeretli" },
+  ];
+
+  const eventTypeLabels: Record<ScheduleEvent["type"], string> = {
+    practice: en ? "Practice" : "Antrenman",
+    match: en ? "Match" : "Maç",
+    meeting: en ? "Meeting" : "Toplantı",
+  };
+
+  return {
+    attendanceOptions,
+    eventTypeLabels,
+    noDate: en ? "No date" : "Tarih yok",
+    noTime: en ? "No time" : "Saat yok",
+    notSavedYet: en ? "Not saved yet" : "Henüz kaydedilmedi",
+    initialStatus: en
+      ? "Choose a team and a session to take attendance."
+      : "Önce takım ve antrenman seçerek yoklama alabilirsin.",
+    teamSelected: (teamName: string) =>
+      en
+        ? `${teamName} selected. Now choose a practice or match session.`
+        : `${teamName} seçildi. Şimdi antrenman veya maç oturumu seç.`,
+    attendanceOpened: (eventTitle: string) =>
+      en ? `Attendance opened for ${eventTitle}.` : `${eventTitle} için yoklama açıldı.`,
+    confirmRemoveEvent: (eventTitle: string) =>
+      en
+        ? `${eventTitle} will be deleted. Tap Delete again to confirm.`
+        : `${eventTitle} silinecek. Eminsen tekrar Sil'e bas.`,
+    eventRemoved: (eventTitle: string) => (en ? `${eventTitle} deleted.` : `${eventTitle} silindi.`),
+    removeEventError: en ? "There was a problem deleting the session." : "Oturum silinirken bir sorun oluştu.",
+    createSessionNeedsTeam: en
+      ? "Choose a team above before creating a session."
+      : "Oturum oluşturmak için önce yukarıdan bir takım seçmelisin.",
+    createSessionNeedsTitle: en
+      ? "Enter a title for the session, e.g. U17 Practice."
+      : "Oturum için bir başlık yazmalısın. Örn. U17 Antrenmanı.",
+    locationUnspecified: en ? "Not specified" : "Belirtilmedi",
+    createSessionSuccess: (teamName: string, sessionTitle: string) =>
+      en
+        ? `${sessionTitle} session created for ${teamName}. You can take attendance now.`
+        : `${teamName} için ${sessionTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`,
+    createSessionError: en ? "There was a problem creating the session." : "Oturum oluşturulurken bir sorun oluştu.",
+    statusUpdated: en ? "Attendance updated. Don't forget to save." : "Yoklama güncellendi. Kaydetmeyi unutma.",
+    saveNeedsSelection: en
+      ? "Choose a team and a session before saving attendance."
+      : "Yoklama kaydetmek için önce takım ve antrenman seçmelisin.",
+    saveNoMembers: en
+      ? "There are no active members on this team to take attendance for."
+      : "Bu takımda yoklama alınacak aktif kişi yok.",
+    saveSuccess: en ? "Attendance saved for the selected session." : "Yoklama seçilen antrenman için kaydedildi.",
+    saveError: en ? "There was a problem saving attendance." : "Yoklama kaydedilirken bir sorun oluştu.",
+    resetSuccess: en ? "Changes for this session were reset." : "Bu oturumdaki değişiklikler sıfırlandı.",
+    eyebrow: en ? "Attendance flow" : "Yoklama akışı",
+    pageTitle: en ? "Attendance" : "Yoklama",
+    subtitleAdmin: en
+      ? "First choose a team, then pick which practice or match you're taking attendance for."
+      : "Önce takım seç, sonra hangi antrenman veya maç için yoklama aldığını seç.",
+    subtitleViewer: en
+      ? "Choose your team and the practice or match to see attendance status."
+      : "Takımını ve antrenman/maçı seç, katılım durumunu buradan görebilirsin.",
+    heroTitle: en ? "Attendance by team and session" : "Takım + oturum bazlı yoklama",
+    heroSubtitle: en
+      ? "Attendance is no longer a single athlete list — it's recorded against a specific practice or match on the selected team's schedule."
+      : "Yoklama artık tek bir sporcu listesi değil; seçilen takım ve programdaki belirli antrenman/maç üzerinden kaydedilir.",
+    step1Title: en ? "1. Choose a team" : "1. Takım seç",
+    step1SubtitleAdmin: en ? "Which team is this attendance for?" : "Yoklama hangi takım için alınacak?",
+    step1SubtitleViewer: en
+      ? "Choose the team whose attendance you want to see."
+      : "Yoklamasını görmek istediğin takımı seç.",
+    teamsCount: (count: number) => (en ? `${count} teams` : `${count} takım`),
+    noTeamsTitleAdmin: en ? "No teams yet" : "Henüz takım yok",
+    noTeamsDescAdmin: en
+      ? "Create a team from the Teams screen first."
+      : "Önce Takımlar ekranından takım oluşturmalısın.",
+    noTeamsTitleViewer: en ? "You're not part of a team yet" : "Henüz bir takıma bağlı değilsin",
+    noTeamsDescViewer: en
+      ? "Once you're added to a team, you'll be able to see attendance here."
+      : "Bir takıma eklendiğinde yoklama durumunu burada görebileceksin.",
+    teamLabel: en ? "Team" : "Takım",
+    chooseTeam: en ? "Choose a team" : "Takım seç",
+    memberCount: (count: number) => (en ? `${count} people` : `${count} kişi`),
+    step2Title: en ? "2. Choose a practice or match" : "2. Antrenman / maç seç",
+    step2Subtitle: en
+      ? "Which day and session is this attendance for?"
+      : "Yoklama hangi gün ve hangi program için alınacak?",
+    sessionsCount: (count: number) => (en ? `${count} sessions` : `${count} oturum`),
+    close: en ? "Close" : "Kapat",
+    newSession: en ? "Create new session" : "Yeni oturum oluştur",
+    newSessionFor: (teamName: string) => (en ? `New session for ${teamName}` : `${teamName} için yeni oturum`),
+    newSessionHint: en
+      ? "The session is created for right now (today's date and time). Use the Schedule screen to plan a different date."
+      : "Oturum şimdi (bugünün tarihi ve saati) için oluşturulur. Farklı bir tarih planlamak istersen Program ekranını kullan.",
+    sessionNameLabel: en ? "Session name" : "Oturum adı",
+    sessionNamePlaceholder: en ? "e.g. U17 Practice" : "Örn. U17 Antrenmanı",
+    sessionLocationLabel: en ? "Location (optional)" : "Konum (opsiyonel)",
+    sessionLocationPlaceholder: en ? "e.g. Club Gym" : "Örn. Kulüp Salonu",
+    creatingSession: en ? "Creating..." : "Oluşturuluyor...",
+    createSession: en ? "Create session" : "Oturumu oluştur",
+    noTeamSelectedTitle: en ? "No team selected" : "Takım seçilmedi",
+    noTeamSelectedDesc: en ? "Choose a team above first." : "Önce yukarıdan bir takım seçmelisin.",
+    noScheduleTitle: en ? "No schedule for this team" : "Bu takım için program yok",
+    noScheduleDescAdmin: en
+      ? 'Use the "Create new session" button above to open a practice or match session right away.'
+      : "Yukarıdaki 'Yeni oturum oluştur' butonuyla hemen bir antrenman/maç oturumu açabilirsin.",
+    noScheduleDescViewer: en
+      ? "Once a practice or match is added to this team from the Schedule screen, it will appear here."
+      : "Program ekranından bu takıma antrenman veya maç eklenince burada görünecek.",
+    confirmDelete: en ? "Sure?" : "Emin misin?",
+    delete: en ? "Delete" : "Sil",
+    step3TitleAdmin: en ? "3. Take attendance" : "3. Yoklama al",
+    step3TitleViewer: en ? "3. Attendance status" : "3. Yoklama durumu",
+    noTeamSelectedShort: en ? "No team selected" : "Takım seçilmedi",
+    noSessionSelectedShort: en ? "No session selected" : "Oturum seçilmedi",
+    lastSavedLabel: en ? "Last saved" : "Son kayıt",
+    attendanceRate: (rate: number) => (en ? `${rate}% attendance` : `%${rate} katılım`),
+    notReadyTitle: en ? "Attendance isn't ready yet" : "Yoklama hazır değil",
+    notReadyDesc: en
+      ? "Choose a team and a practice/match first to see the athlete list."
+      : "Sporcu listesi için önce takım ve antrenman/maç seç.",
+    noActiveMembersTitle: en ? "No active members on this team" : "Bu takımda aktif kişi yok",
+    noActiveMembersDesc: en
+      ? "Once members are added to the team, the attendance list will appear here."
+      : "Takıma üye eklenince yoklama listesi burada görünecek.",
+    searchPlaceholder: en ? "Search by name or email..." : "İsim veya e-posta ara...",
+    searchAccessibilityLabel: en ? "Search attendance list" : "Yoklama listesinde ara",
+    noSearchMatchTitle: en ? "No matches found" : "Aramayla eşleşen kişi yok",
+    noSearchMatchDesc: en ? "Try a different name or email." : "Farklı bir isim veya e-posta ile tekrar dene.",
+    notSaved: en ? "Not saved" : "Kaydedilmedi",
+    saveAttendance: en ? "Save attendance" : "Yoklamayı kaydet",
+    resetChanges: en ? "Reset changes" : "Değişiklikleri sıfırla",
+  };
+}
+
+function formatEventDate(value: string, locale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok";
+    return locale === "tr-TR" ? "Tarih yok" : "No date";
   }
 
-  return date.toLocaleDateString("tr-TR", {
+  return date.toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
     weekday: "short",
   });
 }
 
-function formatEventTime(value: string) {
+function formatEventTime(value: string, locale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Saat yok";
+    return locale === "tr-TR" ? "Saat yok" : "No time";
   }
 
-  return date.toLocaleTimeString("tr-TR", {
+  return date.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function getEventTypeLabel(type: ScheduleEvent["type"]) {
-  if (type === "practice") {
-    return "Antrenman";
-  }
-
-  if (type === "match") {
-    return "Maç";
-  }
-
-  return "Toplantı";
 }
 
 function getInitials(name: string) {
@@ -112,12 +234,16 @@ function getSavedStatus(appData: TeamSyncAppData | null, userId: string, teamId:
 }
 
 export default function AttendanceScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
+
   const { appData, setAppData } = useAppDataContext();
   const [selectedTeamIdState, setSelectedTeamId] = useState("");
   const [selectedEventIdState, setSelectedEventId] = useState("");
   const [attendanceDraft, setAttendanceDraft] = useState<Record<string, AttendanceStatus>>({});
-  const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
-  const [statusMessage, setStatusMessage] = useState("Önce takım ve antrenman seçerek yoklama alabilirsin.");
+  const [lastSavedAt, setLastSavedAt] = useState(copy.notSavedYet);
+  const [statusMessage, setStatusMessage] = useState(copy.initialStatus);
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [newSessionLocation, setNewSessionLocation] = useState("");
@@ -199,19 +325,19 @@ export default function AttendanceScreen() {
     setAttendanceDraft({});
     setShowCreateSession(false);
     setMemberSearchQuery("");
-    setStatusMessage(`${team.name} seçildi. Şimdi antrenman veya maç oturumu seç.`);
+    setStatusMessage(copy.teamSelected(team.name));
   }
 
   function selectEvent(event: ScheduleEvent) {
     setSelectedEventId(event.id);
     setAttendanceDraft({});
-    setStatusMessage(`${event.title} için yoklama açıldı.`);
+    setStatusMessage(copy.attendanceOpened(event.title));
   }
 
   async function handleRemoveEvent(event: ScheduleEvent) {
     if (pendingRemoveEventId !== event.id) {
       setPendingRemoveEventId(event.id);
-      setStatusMessage(`${event.title} silinecek. Eminsen tekrar Sil'e bas.`);
+      setStatusMessage(copy.confirmRemoveEvent(event.title));
       return;
     }
 
@@ -224,22 +350,22 @@ export default function AttendanceScreen() {
         setSelectedEventId("");
       }
 
-      setStatusMessage(`${event.title} silindi.`);
+      setStatusMessage(copy.eventRemoved(event.title));
     } catch {
-      setStatusMessage("Oturum silinirken bir sorun oluştu.");
+      setStatusMessage(copy.removeEventError);
     }
   }
 
   async function handleCreateSession() {
     if (appData === null || selectedTeam === undefined) {
-      setStatusMessage("Oturum oluşturmak için önce yukarıdan bir takım seçmelisin.");
+      setStatusMessage(copy.createSessionNeedsTeam);
       return;
     }
 
     const trimmedTitle = newSessionTitle.trim();
 
     if (trimmedTitle.length === 0) {
-      setStatusMessage("Oturum için bir başlık yazmalısın. Örn. U17 Antrenmanı.");
+      setStatusMessage(copy.createSessionNeedsTitle);
       return;
     }
 
@@ -252,7 +378,7 @@ export default function AttendanceScreen() {
         title: trimmedTitle,
         type: "practice",
         startsAt: new Date().toISOString(),
-        location: newSessionLocation.trim() || "Belirtilmedi",
+        location: newSessionLocation.trim() || copy.locationUnspecified,
         createdByUserId: appData.currentUser.id,
       });
 
@@ -269,9 +395,9 @@ export default function AttendanceScreen() {
       setNewSessionTitle("");
       setNewSessionLocation("");
       setShowCreateSession(false);
-      setStatusMessage(`${selectedTeam.name} için ${trimmedTitle} oturumu oluşturuldu. Şimdi yoklama alabilirsin.`);
+      setStatusMessage(copy.createSessionSuccess(selectedTeam.name, trimmedTitle));
     } catch {
-      setStatusMessage("Oturum oluşturulurken bir sorun oluştu.");
+      setStatusMessage(copy.createSessionError);
     } finally {
       setIsCreatingSession(false);
     }
@@ -283,17 +409,17 @@ export default function AttendanceScreen() {
       [userId]: newStatus,
     }));
 
-    setStatusMessage("Yoklama güncellendi. Kaydetmeyi unutma.");
+    setStatusMessage(copy.statusUpdated);
   }
 
   async function handleSaveAttendance() {
     if (appData === null || selectedTeam === undefined || selectedEvent === undefined) {
-      setStatusMessage("Yoklama kaydetmek için önce takım ve antrenman seçmelisin.");
+      setStatusMessage(copy.saveNeedsSelection);
       return;
     }
 
     if (teamMembers.length === 0) {
-      setStatusMessage("Bu takımda yoklama alınacak aktif kişi yok.");
+      setStatusMessage(copy.saveNoMembers);
       return;
     }
 
@@ -311,79 +437,73 @@ export default function AttendanceScreen() {
         records,
       });
 
-      const savedTime = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+      const savedTime = new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
       setAppData(nextAppData);
       setAttendanceDraft({});
       setLastSavedAt(`${selectedEvent.title} · ${savedTime}`);
-      setStatusMessage("Yoklama seçilen antrenman için kaydedildi.");
+      setStatusMessage(copy.saveSuccess);
     } catch {
-      setStatusMessage("Yoklama kaydedilirken bir sorun oluştu.");
+      setStatusMessage(copy.saveError);
     }
   }
 
   function resetCurrentAttendance() {
     setAttendanceDraft({});
-    setLastSavedAt("Henüz kaydedilmedi");
-    setStatusMessage("Bu oturumdaki değişiklikler sıfırlandı.");
+    setLastSavedAt(copy.notSavedYet);
+    setStatusMessage(copy.resetSuccess);
   }
 
   return (
     <AppScreenLayout variant="standard">
       <PageHeader
-        eyebrow="Yoklama akışı"
-        title="Yoklama"
-        subtitle={
-          canTakeAttendance
-            ? "Önce takım seç, sonra hangi antrenman veya maç için yoklama aldığını seç."
-            : "Takımını ve antrenman/maçı seç, katılım durumunu buradan görebilirsin."
-        }
+        eyebrow={copy.eyebrow}
+        title={copy.pageTitle}
+        subtitle={canTakeAttendance ? copy.subtitleAdmin : copy.subtitleViewer}
       />
 
       <Card style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Takım + oturum bazlı yoklama</Text>
-        <Text style={styles.heroSubtitle}>
-          Yoklama artık tek bir sporcu listesi değil; seçilen takım ve programdaki belirli antrenman/maç üzerinden kaydedilir.
-        </Text>
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <View style={styles.statsGrid}>
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{attendanceSummary.present}</Text>
-          <Text style={styles.statLabel}>Katıldı</Text>
+          <Text style={styles.statLabel}>{copy.attendanceOptions[0].label}</Text>
         </Card>
 
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{attendanceSummary.absent}</Text>
-          <Text style={styles.statLabel}>Katılmadı</Text>
+          <Text style={styles.statLabel}>{copy.attendanceOptions[1].label}</Text>
         </Card>
 
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{attendanceSummary.late}</Text>
-          <Text style={styles.statLabel}>Geç kaldı</Text>
+          <Text style={styles.statLabel}>{copy.attendanceOptions[2].label}</Text>
         </Card>
 
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{attendanceSummary.excused}</Text>
-          <Text style={styles.statLabel}>Mazeretli</Text>
+          <Text style={styles.statLabel}>{copy.attendanceOptions[3].label}</Text>
         </Card>
       </View>
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>1. Takım seç</Text>
+            <Text style={styles.sectionTitle}>{copy.step1Title}</Text>
             <Text style={styles.sectionSubtitle}>
-              {canTakeAttendance ? "Yoklama hangi takım için alınacak?" : "Yoklamasını görmek istediğin takımı seç."}
+              {canTakeAttendance ? copy.step1SubtitleAdmin : copy.step1SubtitleViewer}
             </Text>
           </View>
-          <Text style={styles.statusPill}>{teams.length} takım</Text>
+          <Text style={styles.statusPill}>{copy.teamsCount(teams.length)}</Text>
         </View>
 
         {teams.length === 0 ? (
           canTakeAttendance ? (
-            <EmptyState title="Henüz takım yok" description="Önce Takımlar ekranından takım oluşturmalısın." />
+            <EmptyState title={copy.noTeamsTitleAdmin} description={copy.noTeamsDescAdmin} />
           ) : (
-            <EmptyState title="Henüz bir takıma bağlı değilsin" description="Bir takıma eklendiğinde yoklama durumunu burada görebileceksin." />
+            <EmptyState title={copy.noTeamsTitleViewer} description={copy.noTeamsDescViewer} />
           )
         ) : (
           <View>
@@ -392,8 +512,8 @@ export default function AttendanceScreen() {
               style={({ pressed }) => [styles.teamDropdownButton, pressed ? styles.pressed : null]}
             >
               <View style={styles.teamDropdownTextArea}>
-                <Text style={styles.teamDropdownLabel}>Takım</Text>
-                <Text style={styles.teamDropdownValue}>{selectedTeam?.name ?? "Takım seç"}</Text>
+                <Text style={styles.teamDropdownLabel}>{copy.teamLabel}</Text>
+                <Text style={styles.teamDropdownValue}>{selectedTeam?.name ?? copy.chooseTeam}</Text>
               </View>
               <Text style={styles.teamDropdownChevron}>{showTeamPicker ? "▲" : "▼"}</Text>
             </Pressable>
@@ -424,7 +544,7 @@ export default function AttendanceScreen() {
                         <Text style={styles.teamDropdownRowMeta}>{team.ageGroup}</Text>
                       </View>
                       <Text style={[styles.teamDropdownRowCount, isSelected ? styles.teamDropdownRowTextSelected : null]}>
-                        {teamMemberCount} kişi
+                        {copy.memberCount(teamMemberCount)}
                       </Text>
                     </Pressable>
                   );
@@ -438,17 +558,17 @@ export default function AttendanceScreen() {
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>2. Antrenman / maç seç</Text>
+            <Text style={styles.sectionTitle}>{copy.step2Title}</Text>
             <Text style={styles.sectionSubtitle}>
-              Yoklama hangi gün ve hangi program için alınacak?
+              {copy.step2Subtitle}
             </Text>
           </View>
-          <Text style={styles.statusPill}>{availableEvents.length} oturum</Text>
+          <Text style={styles.statusPill}>{copy.sessionsCount(availableEvents.length)}</Text>
         </View>
 
         {canTakeAttendance && selectedTeam !== undefined ? (
           <AppButton
-            title={showCreateSession ? "Kapat" : "Yeni oturum oluştur"}
+            title={showCreateSession ? copy.close : copy.newSession}
             variant="secondary"
             onPress={() => setShowCreateSession((currentValue) => !currentValue)}
             style={styles.newSessionButton}
@@ -457,29 +577,29 @@ export default function AttendanceScreen() {
 
         {showCreateSession && selectedTeam !== undefined ? (
           <Card variant="subtle" style={styles.createSessionBox}>
-            <Text style={styles.createSessionTitle}>{selectedTeam.name} için yeni oturum</Text>
+            <Text style={styles.createSessionTitle}>{copy.newSessionFor(selectedTeam.name)}</Text>
             <Text style={styles.createSessionSubtitle}>
-              Oturum şimdi (bugünün tarihi ve saati) için oluşturulur. Farklı bir tarih planlamak istersen Program ekranını kullan.
+              {copy.newSessionHint}
             </Text>
 
             <TextField
-              label="Oturum adı"
+              label={copy.sessionNameLabel}
               value={newSessionTitle}
               onChangeText={setNewSessionTitle}
-              placeholder="Örn. U17 Antrenmanı"
+              placeholder={copy.sessionNamePlaceholder}
               containerStyle={styles.createSessionField}
             />
 
             <TextField
-              label="Konum (opsiyonel)"
+              label={copy.sessionLocationLabel}
               value={newSessionLocation}
               onChangeText={setNewSessionLocation}
-              placeholder="Örn. Kulüp Salonu"
+              placeholder={copy.sessionLocationPlaceholder}
               containerStyle={styles.createSessionField}
             />
 
             <AppButton
-              title={isCreatingSession ? "Oluşturuluyor..." : "Oturumu oluştur"}
+              title={isCreatingSession ? copy.creatingSession : copy.createSession}
               onPress={handleCreateSession}
               disabled={isCreatingSession}
               style={styles.createSessionButton}
@@ -488,15 +608,11 @@ export default function AttendanceScreen() {
         ) : null}
 
         {selectedTeam === undefined ? (
-          <EmptyState title="Takım seçilmedi" description="Önce yukarıdan bir takım seçmelisin." />
+          <EmptyState title={copy.noTeamSelectedTitle} description={copy.noTeamSelectedDesc} />
         ) : availableEvents.length === 0 ? (
           <EmptyState
-            title="Bu takım için program yok"
-            description={
-              canTakeAttendance
-                ? "Yukarıdaki 'Yeni oturum oluştur' butonuyla hemen bir antrenman/maç oturumu açabilirsin."
-                : "Program ekranından bu takıma antrenman veya maç eklenince burada görünecek."
-            }
+            title={copy.noScheduleTitle}
+            description={canTakeAttendance ? copy.noScheduleDescAdmin : copy.noScheduleDescViewer}
           />
         ) : (
           <View style={styles.eventList}>
@@ -510,12 +626,12 @@ export default function AttendanceScreen() {
                     style={({ pressed }) => [styles.eventMainArea, pressed ? styles.pressed : null]}
                   >
                     <View style={styles.eventDateBox}>
-                      <Text style={styles.eventDateText}>{formatEventDate(event.startsAt)}</Text>
-                      <Text style={styles.eventTimeText}>{formatEventTime(event.startsAt)}</Text>
+                      <Text style={styles.eventDateText}>{formatEventDate(event.startsAt, locale)}</Text>
+                      <Text style={styles.eventTimeText}>{formatEventTime(event.startsAt, locale)}</Text>
                     </View>
 
                     <View style={styles.eventInfo}>
-                      <Text style={styles.eventType}>{getEventTypeLabel(event.type)}</Text>
+                      <Text style={styles.eventType}>{copy.eventTypeLabels[event.type]}</Text>
                       <Text style={styles.eventTitle}>{event.title}</Text>
                       <Text style={styles.eventMeta}>{event.location}</Text>
                     </View>
@@ -527,7 +643,7 @@ export default function AttendanceScreen() {
                       style={({ pressed }) => [styles.eventDeleteButton, pressed ? styles.pressed : null]}
                     >
                       <Text style={styles.eventDeleteButtonText}>
-                        {pendingRemoveEventId === event.id ? "Emin misin?" : "Sil"}
+                        {pendingRemoveEventId === event.id ? copy.confirmDelete : copy.delete}
                       </Text>
                     </Pressable>
                   ) : null}
@@ -541,34 +657,34 @@ export default function AttendanceScreen() {
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>{canTakeAttendance ? "3. Yoklama al" : "3. Yoklama durumu"}</Text>
+            <Text style={styles.sectionTitle}>{canTakeAttendance ? copy.step3TitleAdmin : copy.step3TitleViewer}</Text>
             <Text style={styles.sectionSubtitle}>
               {canTakeAttendance
-                ? `${selectedTeam?.name ?? "Takım seçilmedi"} · ${selectedEvent?.title ?? "Oturum seçilmedi"} · Son kayıt: ${lastSavedAt}`
-                : `${selectedTeam?.name ?? "Takım seçilmedi"} · ${selectedEvent?.title ?? "Oturum seçilmedi"}`}
+                ? `${selectedTeam?.name ?? copy.noTeamSelectedShort} · ${selectedEvent?.title ?? copy.noSessionSelectedShort} · ${copy.lastSavedLabel}: ${lastSavedAt}`
+                : `${selectedTeam?.name ?? copy.noTeamSelectedShort} · ${selectedEvent?.title ?? copy.noSessionSelectedShort}`}
             </Text>
           </View>
-          <Text style={styles.statusPill}>%{attendanceSummary.attendanceRate} katılım</Text>
+          <Text style={styles.statusPill}>{copy.attendanceRate(attendanceSummary.attendanceRate)}</Text>
         </View>
 
         {selectedTeam === undefined || selectedEvent === undefined ? (
-          <EmptyState title="Yoklama hazır değil" description="Sporcu listesi için önce takım ve antrenman/maç seç." />
+          <EmptyState title={copy.notReadyTitle} description={copy.notReadyDesc} />
         ) : teamMembers.length === 0 ? (
-          <EmptyState title="Bu takımda aktif kişi yok" description="Takıma üye eklenince yoklama listesi burada görünecek." />
+          <EmptyState title={copy.noActiveMembersTitle} description={copy.noActiveMembersDesc} />
         ) : (
           <>
             {teamMembers.length > 5 ? (
               <SearchField
                 value={memberSearchQuery}
                 onChangeText={setMemberSearchQuery}
-                placeholder="İsim veya e-posta ara..."
-                accessibilityLabel="Yoklama listesinde ara"
+                placeholder={copy.searchPlaceholder}
+                accessibilityLabel={copy.searchAccessibilityLabel}
                 style={styles.memberSearchField}
               />
             ) : null}
 
             {filteredTeamMembers.length === 0 ? (
-              <EmptyState title="Aramayla eşleşen kişi yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+              <EmptyState title={copy.noSearchMatchTitle} description={copy.noSearchMatchDesc} />
             ) : (
               <View style={styles.attendanceList}>
                 {filteredTeamMembers.map((member) => {
@@ -589,14 +705,14 @@ export default function AttendanceScreen() {
                         </View>
 
                         <StatusBadge
-                          label={displayStatus === undefined ? "Kaydedilmedi" : attendanceOptions.find((option) => option.value === displayStatus)?.label ?? ""}
+                          label={displayStatus === undefined ? copy.notSaved : copy.attendanceOptions.find((option) => option.value === displayStatus)?.label ?? ""}
                           tone={displayStatus === undefined ? "neutral" : attendanceToneByStatus[displayStatus]}
                         />
                       </View>
 
                       {canTakeAttendance ? (
                         <View style={styles.statusGrid}>
-                          {attendanceOptions.map((option) => {
+                          {copy.attendanceOptions.map((option) => {
                             const isSelected = currentStatus === option.value;
 
                             return (
@@ -627,8 +743,8 @@ export default function AttendanceScreen() {
 
         {canTakeAttendance ? (
           <View style={styles.actionRow}>
-            <AppButton title="Yoklamayı kaydet" onPress={handleSaveAttendance} style={styles.actionButton} />
-            <AppButton title="Değişiklikleri sıfırla" variant="ghost" onPress={resetCurrentAttendance} style={styles.actionButton} />
+            <AppButton title={copy.saveAttendance} onPress={handleSaveAttendance} style={styles.actionButton} />
+            <AppButton title={copy.resetChanges} variant="ghost" onPress={resetCurrentAttendance} style={styles.actionButton} />
           </View>
         ) : null}
 

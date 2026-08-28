@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -18,7 +18,24 @@ type EventDetailsBubbleProps = {
   onEdit: (event: ScheduleEvent) => void;
   onDelete: (event: ScheduleEvent) => void;
   onClose: () => void;
+  language: "tr" | "en";
 };
+
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+  return {
+    closeAccessibilityLabel: en ? "Close event details" : "Etkinlik detayını kapat",
+    dateLabel: en ? "Date" : "Tarih",
+    timeLabel: en ? "Time" : "Saat",
+    teamLabel: en ? "Team" : "Takım",
+    locationLabel: en ? "Location" : "Konum",
+    noteLabel: en ? "Note" : "Not",
+    noNote: en ? "No additional note." : "Ek not yok.",
+    edit: en ? "Edit" : "Düzenle",
+    delete: en ? "Delete" : "Sil",
+    confirmDelete: en ? "Are you sure?" : "Emin misin?",
+  };
+}
 
 // A real Modal (not an inline View) -- this popup is triggered from deep
 // inside a scrollable screen (ScheduleScreen -> CalendarSection), so it
@@ -26,8 +43,9 @@ type EventDetailsBubbleProps = {
 // closing it must leave the page exactly where it was. Modal is the
 // component built for that; a hand-positioned absolute View only escapes
 // as far as its nearest scroll container, not the real viewport.
-export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onDelete, onClose }: EventDetailsBubbleProps) {
+export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onDelete, onClose, language }: EventDetailsBubbleProps) {
   const [pendingDelete, setPendingDelete] = useState(false);
+  const copy = useMemo(() => getCopy(language), [language]);
 
   function handleDeletePress() {
     if (!pendingDelete) {
@@ -40,19 +58,19 @@ export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onD
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Etkinlik detayını kapat">
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={copy.closeAccessibilityLabel}>
         {/* Swallows taps so pressing the card itself doesn't also close the modal via the backdrop underneath it. */}
         <Pressable style={styles.panel} onPress={(pressEvent) => pressEvent.stopPropagation()}>
           <View style={styles.header}>
             <View style={styles.titleArea}>
-              <StatusBadge label={getScheduleTypeLabel(event.type)} tone={getScheduleTypeTone(event.type)} style={styles.typeBadge} />
+              <StatusBadge label={getScheduleTypeLabel(event.type, language)} tone={getScheduleTypeTone(event.type)} style={styles.typeBadge} />
               <Text style={styles.title}>{event.title}</Text>
             </View>
 
             <Pressable
               onPress={onClose}
               style={({ pressed }) => [styles.closeButton, pressed ? styles.pressed : null]}
-              accessibilityLabel="Etkinlik detayını kapat"
+              accessibilityLabel={copy.closeAccessibilityLabel}
             >
               <Text style={styles.closeButtonText}>×</Text>
             </Pressable>
@@ -60,36 +78,36 @@ export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onD
 
           <View style={styles.metaGrid}>
             <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Tarih</Text>
-              <Text style={styles.metaValue}>{formatEventDate(event.startsAt)}</Text>
+              <Text style={styles.metaLabel}>{copy.dateLabel}</Text>
+              <Text style={styles.metaValue}>{formatEventDate(event.startsAt, language)}</Text>
             </View>
             <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Saat</Text>
-              <Text style={styles.metaValue}>{formatEventTime(event.startsAt)}</Text>
+              <Text style={styles.metaLabel}>{copy.timeLabel}</Text>
+              <Text style={styles.metaValue}>{formatEventTime(event.startsAt, language)}</Text>
             </View>
             <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Takım</Text>
+              <Text style={styles.metaLabel}>{copy.teamLabel}</Text>
               <Text style={styles.metaValue}>{getScheduleTeamLabel(event, scheduleData)}</Text>
             </View>
             <View style={styles.metaBox}>
-              <Text style={styles.metaLabel}>Konum</Text>
+              <Text style={styles.metaLabel}>{copy.locationLabel}</Text>
               <Text style={styles.metaValue}>{event.location}</Text>
             </View>
           </View>
 
-          <Text style={styles.noteLabel}>Not</Text>
-          <Text style={styles.noteText}>{event.note ?? "Ek not yok."}</Text>
+          <Text style={styles.noteLabel}>{copy.noteLabel}</Text>
+          <Text style={styles.noteText}>{event.note || copy.noNote}</Text>
 
           {canManage ? (
             <View style={styles.manageRow}>
               <AppButton
-                title="Düzenle"
+                title={copy.edit}
                 variant="secondary"
                 onPress={() => onEdit(event)}
                 style={styles.manageButton}
               />
               <AppButton
-                title={pendingDelete ? "Emin misin?" : "Sil"}
+                title={pendingDelete ? copy.confirmDelete : copy.delete}
                 variant="danger"
                 onPress={handleDeletePress}
                 style={styles.manageButton}

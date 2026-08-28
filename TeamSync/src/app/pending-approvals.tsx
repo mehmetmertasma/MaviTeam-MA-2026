@@ -1,38 +1,37 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { JoinRequest, UserProfile } from "@/types/teamSync";
-import { matchesSearchQuery } from "@/utils/search";
 
 type RequestRow = {
   request: JoinRequest;
   user?: UserProfile;
 };
 
-function getStatusText(status: JoinRequest["status"]) {
+function getStatusText(status: JoinRequest["status"], copy: ReturnType<typeof getCopy>) {
   if (status === "approved") {
-    return "Onaylandı";
+    return copy.statusApproved;
   }
 
   if (status === "rejected") {
-    return "Reddedildi";
+    return copy.statusRejected;
   }
 
-  return "Onay bekliyor";
+  return copy.statusPending;
 }
 
 const statusTones: Record<JoinRequest["status"], StatusBadgeTone> = {
@@ -41,14 +40,14 @@ const statusTones: Record<JoinRequest["status"], StatusBadgeTone> = {
   rejected: "danger",
 };
 
-function formatDate(value: string) {
+function formatDate(value: string, locale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok";
+    return locale === "tr-TR" ? "Tarih yok" : "No date";
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -56,14 +55,59 @@ function formatDate(value: string) {
   });
 }
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  return {
+    pageTitle: en ? "Pending members" : "Bekleyen üyeler",
+    pageSubtitle: en
+      ? "Approve or decline users who requested to join with a team code."
+      : "Takım kodu ile katılmak isteyen kullanıcıları onayla veya reddet.",
+    heroLabel: en ? "Member approval system" : "Üye onay sistemi",
+    heroTitle: en ? "Club entry control" : "Kulübe giriş kontrolü",
+    heroSubtitle: en
+      ? "Approve or decline join requests for your club."
+      : "Kulübüne katılma isteklerini onayla veya reddet.",
+    statCardPending: en ? "Pending" : "Bekleyen",
+    statCardApproved: en ? "Approved" : "Onaylanan",
+    statCardRejected: en ? "Rejected" : "Reddedilen",
+    memberRequests: en ? "Member requests" : "Üye istekleri",
+    recordCount: (count: number) => (en ? `${count} records` : `${count} kayıt`),
+    emptyTitle: en ? "No pending requests yet" : "Henüz bekleyen istek yok",
+    emptyDescription: en
+      ? "Requests submitted from the Join Club screen with a valid club code will appear here."
+      : "Join Club ekranından doğru kulüp kodu ile başvuru gönderildiğinde burada görünecek.",
+    userNotFound: en ? "User not found" : "Kullanıcı bulunamadı",
+    noEmail: en ? "No email" : "E-posta yok",
+    requestedAt: en ? "Requested" : "İstek zamanı",
+    approve: en ? "Approve" : "Onayla",
+    reject: en ? "Reject" : "Reddet",
+    approveAccessibilityLabel: (name: string) => (en ? `Approve ${name}` : `${name} kullanıcısını onayla`),
+    rejectAccessibilityLabel: (name: string) => (en ? `Decline ${name}` : `${name} kullanıcısını reddet`),
+    refresh: en ? "Refresh" : "Yenile",
+    refreshAccessibilityLabel: en ? "Reload pending requests" : "Bekleyen istekleri yeniden yükle",
+    statusApproved: en ? "Approved" : "Onaylandı",
+    statusRejected: en ? "Declined" : "Reddedildi",
+    statusPending: en ? "Awaiting review" : "Onay bekliyor",
+    statusIntro: en
+      ? "Manage users who want to join with a club code here."
+      : "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet.",
+    statusSignInToView: en ? "Sign in to view pending requests." : "Bekleyen istekleri görmek için giriş yapmalısın.",
+    statusUpdated: en ? "Pending requests updated." : "Bekleyen istekler güncellendi.",
+    statusSignInToApprove: en ? "Sign in to approve." : "Onaylamak için giriş yapmalısın.",
+    statusMemberApproved: en ? "Member approved." : "Üye onaylandı.",
+    statusSignInToReject: en ? "Sign in to decline." : "Reddetmek için giriş yapmalısın.",
+    statusMemberRemoved: en ? "Member removed." : "Üye çıkarıldı.",
+  };
+}
+
 export default function PendingApprovalsScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData, refresh, setAppData } = useAppDataContext();
   const [firestoreRows, setFirestoreRows] = useState<RequestRow[] | null>(null);
-  const [statusMessage, setStatusMessage] = useState(
-    "Kulüp kodu ile katılmak isteyen kullanıcıları buradan yönet."
-  );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showHistory, setShowHistory] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(copy.statusIntro);
 
   const loadApprovalData = useCallback(async () => {
     try {
@@ -72,23 +116,23 @@ export default function PendingApprovalsScreen() {
 
         if (firebaseUser === null) {
           setFirestoreRows([]);
-          setStatusMessage("Bekleyen istekleri görmek için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToView);
           return;
         }
 
         const rows = await firestoreTeamSyncService.listJoinRequestRowsForCurrentClub(firebaseUser);
         setFirestoreRows(rows);
-        setStatusMessage("Bekleyen istekler Firestore kulüp datasından yüklendi.");
+        setStatusMessage(copy.statusUpdated);
         return;
       }
 
       await refresh();
       setFirestoreRows(null);
-      setStatusMessage("Bekleyen istekler local TeamSync datasından yüklendi.");
+      setStatusMessage(copy.statusUpdated);
     } catch (approvalError) {
-      setStatusMessage(getAuthErrorMessage(approvalError));
+      setStatusMessage(getAuthErrorMessage(approvalError, language));
     }
-  }, [refresh]);
+  }, [refresh, copy, language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,34 +168,27 @@ export default function PendingApprovalsScreen() {
     };
   }, [requestRows]);
 
-  const filteredRows = useMemo(() => {
-    return requestRows.filter((row) => matchesSearchQuery(searchQuery, row.user?.fullName, row.user?.email));
-  }, [requestRows, searchQuery]);
-
-  const pendingRows = useMemo(() => filteredRows.filter((row) => row.request.status === "pending"), [filteredRows]);
-  const resolvedRows = useMemo(() => filteredRows.filter((row) => row.request.status !== "pending"), [filteredRows]);
-
   async function handleApprove(requestId: string) {
     try {
       if (authService.isConfigured()) {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setStatusMessage("Onaylamak için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToApprove);
           return;
         }
 
         await firestoreTeamSyncService.approveJoinRequest(firebaseUser, requestId);
         await loadApprovalData();
-        setStatusMessage("Üye Firestore içinde onaylandı ve active yapıldı.");
+        setStatusMessage(copy.statusMemberApproved);
         return;
       }
 
       const nextAppData = await teamSyncService.approveJoinRequest(requestId);
       setAppData(nextAppData);
-      setStatusMessage("Üye onaylandı ve kullanıcı active yapıldı.");
+      setStatusMessage(copy.statusMemberApproved);
     } catch (approvalError) {
-      setStatusMessage(getAuthErrorMessage(approvalError));
+      setStatusMessage(getAuthErrorMessage(approvalError, language));
     }
   }
 
@@ -161,149 +198,117 @@ export default function PendingApprovalsScreen() {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setStatusMessage("Reddetmek için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToReject);
           return;
         }
 
         await firestoreTeamSyncService.rejectJoinRequest(firebaseUser, requestId);
         await loadApprovalData();
-        setStatusMessage("Üye Firestore içinde reddedildi ve removed yapıldı.");
+        setStatusMessage(copy.statusMemberRemoved);
         return;
       }
 
       const nextAppData = await teamSyncService.rejectJoinRequest(requestId);
       setAppData(nextAppData);
-      setStatusMessage("Üye reddedildi ve kullanıcı removed yapıldı.");
+      setStatusMessage(copy.statusMemberRemoved);
     } catch (rejectError) {
-      setStatusMessage(getAuthErrorMessage(rejectError));
+      setStatusMessage(getAuthErrorMessage(rejectError, language));
     }
-  }
-
-  function renderRequestRow(row: RequestRow, dense: boolean) {
-    const { request, user } = row;
-    const isPending = request.status === "pending";
-    const displayName = user?.fullName ?? "Kullanıcı bulunamadı";
-    const displayEmail = user?.email ?? "E-posta yok";
-
-    return (
-      <Card key={request.id} variant="subtle" padding={dense ? "sm" : "md"} style={styles.memberCard}>
-        <View style={styles.memberTopRow}>
-          <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>{displayName}</Text>
-            <Text style={styles.memberMeta}>{displayEmail}</Text>
-            <Text style={styles.memberDate}>İstek zamanı: {formatDate(request.createdAt)}</Text>
-          </View>
-
-          <StatusBadge label={getStatusText(request.status)} tone={statusTones[request.status]} />
-        </View>
-
-        {isPending ? (
-          <View style={styles.actionRow}>
-            <AppButton
-              title="Onayla"
-              onPress={() => handleApprove(request.id)}
-              accessibilityLabel={`${displayName} kullanıcısını onayla`}
-              style={styles.actionButton}
-            />
-
-            <AppButton
-              title="Reddet"
-              variant="ghost"
-              onPress={() => handleReject(request.id)}
-              accessibilityLabel={`${displayName} kullanıcısını reddet`}
-              style={styles.actionButton}
-            />
-          </View>
-        ) : null}
-      </Card>
-    );
   }
 
   return (
     <AppScreenLayout>
-      <PageHeader title="Bekleyen üyeler" subtitle="Takım kodu ile katılmak isteyen kullanıcıları onayla veya reddet." />
+      <PageHeader title={copy.pageTitle} subtitle={copy.pageSubtitle} />
 
       <Card variant="elevated" style={styles.heroCard}>
-        <StatusBadge label="Üye onay sistemi" tone="info" style={styles.heroLabel} />
-        <Text style={styles.heroTitle}>Kulübe giriş kontrolü</Text>
-        <Text style={styles.heroSubtitle}>
-          Onaylanan kullanıcılar active olur. Reddedilen kullanıcılar removed durumuna alınır.
-        </Text>
+        <StatusBadge label={copy.heroLabel} tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <View style={styles.statsGrid}>
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{summary.pendingCount}</Text>
-          <Text style={styles.statLabel}>Bekleyen</Text>
+          <Text style={styles.statLabel}>{copy.statCardPending}</Text>
         </Card>
 
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{summary.approvedCount}</Text>
-          <Text style={styles.statLabel}>Onaylanan</Text>
+          <Text style={styles.statLabel}>{copy.statCardApproved}</Text>
         </Card>
 
         <Card style={styles.statCard}>
           <Text style={styles.statValue}>{summary.rejectedCount}</Text>
-          <Text style={styles.statLabel}>Reddedilen</Text>
+          <Text style={styles.statLabel}>{copy.statCardRejected}</Text>
         </Card>
       </View>
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>Üye istekleri</Text>
+            <Text style={styles.sectionTitle}>{copy.memberRequests}</Text>
             <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
           </View>
 
-          <StatusBadge label={`${summary.totalCount} kayıt`} tone="info" />
+          <StatusBadge label={copy.recordCount(summary.totalCount)} tone="info" />
         </View>
 
         {requestRows.length === 0 ? (
           <EmptyState
-            title="Henüz bekleyen istek yok"
-            description="Join Club ekranından doğru kulüp kodu ile başvuru gönderildiğinde burada görünecek."
+            title={copy.emptyTitle}
+            description={copy.emptyDescription}
           />
         ) : (
-          <>
-            {requestRows.length > 5 ? (
-              <SearchField
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="İsim veya e-posta ara..."
-                accessibilityLabel="İsteklerde ara"
-                style={styles.searchField}
-              />
-            ) : null}
+          <View style={styles.memberList}>
+            {requestRows.map((row) => {
+              const { request, user } = row;
+              const isPending = request.status === "pending";
+              const displayName = user?.fullName ?? copy.userNotFound;
+              const displayEmail = user?.email ?? copy.noEmail;
 
-            {pendingRows.length === 0 ? (
-              <EmptyState title="Bekleyen istek yok" description="Şu anda onay bekleyen kimse yok." />
-            ) : (
-              <View style={styles.memberList}>{pendingRows.map((row) => renderRequestRow(row, false))}</View>
-            )}
+              return (
+                <Card key={request.id} variant="subtle" style={styles.memberCard}>
+                  <View style={styles.memberTopRow}>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{displayName}</Text>
+                      <Text style={styles.memberMeta}>{displayEmail}</Text>
+                      <Text style={styles.memberDate}>
+                        {copy.requestedAt}: {formatDate(request.createdAt, locale)}
+                      </Text>
+                    </View>
 
-            {resolvedRows.length > 0 ? (
-              <View style={styles.historySection}>
-                <Pressable
-                  onPress={() => setShowHistory((currentValue) => !currentValue)}
-                  style={({ pressed }) => [styles.historyToggle, pressed ? styles.pressed : null]}
-                >
-                  <Text style={styles.historyToggleText}>Geçmiş ({resolvedRows.length})</Text>
-                  <Text style={styles.historyToggleChevron}>{showHistory ? "▲" : "▼"}</Text>
-                </Pressable>
+                    <StatusBadge label={getStatusText(request.status, copy)} tone={statusTones[request.status]} />
+                  </View>
 
-                {showHistory ? (
-                  <View style={styles.memberList}>{resolvedRows.map((row) => renderRequestRow(row, true))}</View>
-                ) : null}
-              </View>
-            ) : null}
-          </>
+                  {isPending ? (
+                    <View style={styles.actionRow}>
+                      <AppButton
+                        title={copy.approve}
+                        onPress={() => handleApprove(request.id)}
+                        accessibilityLabel={copy.approveAccessibilityLabel(displayName)}
+                        style={styles.actionButton}
+                      />
+
+                      <AppButton
+                        title={copy.reject}
+                        variant="ghost"
+                        onPress={() => handleReject(request.id)}
+                        accessibilityLabel={copy.rejectAccessibilityLabel(displayName)}
+                        style={styles.actionButton}
+                      />
+                    </View>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </View>
         )}
 
         <AppButton
-          title="Merkezi datayı yenile"
+          title={copy.refresh}
           variant="ghost"
           onPress={loadApprovalData}
-          accessibilityLabel="Bekleyen istekleri yeniden yükle"
+          accessibilityLabel={copy.refreshAccessibilityLabel}
           style={styles.resetButton}
         />
       </Card>
@@ -331,9 +336,8 @@ const styles = StyleSheet.create({
   sectionHeaderText: { flex: 1 },
   sectionTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes["2xl"], fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
   sectionSubtitle: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
-  searchField: { marginBottom: theme.spacing.md },
-  memberList: { gap: theme.spacing.sm },
-  memberCard: { padding: theme.spacing.md },
+  memberList: { gap: theme.spacing.md },
+  memberCard: { padding: theme.spacing.lg },
   memberTopRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: theme.spacing.lg, marginBottom: theme.spacing.md },
   memberInfo: { flex: 1 },
   memberName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold, marginBottom: theme.spacing.xs },
@@ -342,20 +346,4 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md, marginTop: theme.spacing.md },
   actionButton: { flexGrow: 1, minWidth: 130 },
   resetButton: { marginTop: theme.spacing["2xl"], alignSelf: "flex-start" },
-  historySection: { marginTop: theme.spacing.lg },
-  historyToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.border.default,
-    backgroundColor: theme.colors.background.subtle,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.sm,
-  },
-  historyToggleText: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
-  historyToggleChevron: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
-  pressed: { opacity: 0.86, transform: [{ scale: 0.99 }] },
 });

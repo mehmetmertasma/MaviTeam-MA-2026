@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import type { ScheduleEvent, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 import { matchesSearchQuery } from "@/utils/search";
@@ -30,26 +31,20 @@ function canViewTeamList(appData: TeamSyncAppData | null) {
   return appData?.currentUser.role === "superAdmin" || appData?.currentUser.role === "clubAdmin" || appData?.currentUser.role === "coach";
 }
 
-function getStatusLabel(status: AvailabilityStatus) {
-  if (status === "available") return "Uygun";
-  if (status === "notAvailable") return "Uygun değil";
-  return "Cevap yok";
-}
-
-function formatEventTime(value: string) {
+function formatEventTime(value: string, locale: string, noDateLabel: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || "Tarih yok";
-  return date.toLocaleString("tr-TR", { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" });
+  if (Number.isNaN(date.getTime())) return value || noDateLabel;
+  return date.toLocaleString(locale, { day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit" });
 }
 
-function getCurrentSaveLabel() {
-  const time = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-  return `Şimdi · ${time}`;
+function getCurrentSaveLabel(locale: string, nowLabel: string) {
+  const time = new Date().toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+  return `${nowLabel} · ${time}`;
 }
 
-function getEventTeamName(event: ScheduleEvent, appData: TeamSyncAppData | null) {
-  if (appData === null || event.teamId === undefined) return "Tüm Kulüp";
-  return appData.teams.find((team) => team.id === event.teamId)?.name ?? "Takım bulunamadı";
+function getEventTeamName(event: ScheduleEvent, appData: TeamSyncAppData | null, allClubLabel: string, teamNotFoundLabel: string) {
+  if (appData === null || event.teamId === undefined) return allClubLabel;
+  return appData.teams.find((team) => team.id === event.teamId)?.name ?? teamNotFoundLabel;
 }
 
 function getVisibleUsersForEvent(event: ScheduleEvent | undefined, users: UserProfile[], appData: TeamSyncAppData | null) {
@@ -62,14 +57,78 @@ function getVisibleUsersForEvent(event: ScheduleEvent | undefined, users: UserPr
   return activeUsers.filter((user) => user.teamIds.includes(event.teamId ?? ""));
 }
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  const statusLabels: Record<AvailabilityStatus, string> = {
+    available: en ? "Available" : "Uygun",
+    notAvailable: en ? "Not available" : "Uygun değil",
+    notAnswered: en ? "No response" : "Cevap yok",
+  };
+
+  return {
+    statusLabels,
+    noDate: en ? "No date" : "Tarih yok",
+    now: en ? "Now" : "Şimdi",
+    allClub: en ? "Whole Club" : "Tüm Kulüp",
+    teamNotFound: en ? "Team not found" : "Takım bulunamadı",
+    availabilityUpdated: en ? "Availability updated." : "Uygunluk bilgileri güncellendi.",
+    notSavedYet: en ? "Not saved yet" : "Henüz kaydedilmedi",
+    waitForUserLoad: en ? "Please wait for your account to finish loading." : "Hesap bilgilerinin yüklenmesini bekle.",
+    myStatusSaved: en ? "Your availability status was saved." : "Uygunluk durumun kaydedildi.",
+    noteSaved: en ? "Note saved." : "Not kaydedildi.",
+    eyebrow: en ? "Participation planning" : "Katılım planlama",
+    pageTitle: en ? "Availability" : "Uygunluk",
+    pageSubtitle: en ? "Let the team know if you can make it to an event." : "Etkinlik için gelip gelemeyeceğini bildir.",
+    heroTitle: en ? "Who's in, who's out?" : "Kim geliyor, kim gelemiyor?",
+    heroSubtitle: en
+      ? "Makes team planning easier ahead of matches and practices."
+      : "Maç ve antrenman öncesi takım planlamasını kolaylaştırır.",
+    selectEventTitle: en ? "Select an event" : "Etkinlik seç",
+    selectEventSubtitle: en ? "Pick one of the events on the calendar." : "Takvimdeki etkinliklerden birini seç.",
+    eventsCount: (count: number) => (en ? `${count} events` : `${count} etkinlik`),
+    noEventsTitle: en ? "No events yet" : "Henüz etkinlik yok",
+    noEventsDescription: en
+      ? "Add an event on the Schedule page first before setting your availability."
+      : "Uygunluk seçmek için önce Program sayfasından bir etkinlik ekle.",
+    myStatusTitle: en ? "My status" : "Benim durumum",
+    myStatusSubtitleForEvent: (eventTitle: string) => (en ? `Set your availability status for ${eventTitle}.` : `${eventTitle} için uygunluk durumunu seç.`),
+    userFallback: en ? "User" : "Kullanıcı",
+    lastSaved: (value: string) => (en ? `Last saved: ${value}` : `Son kayıt: ${value}`),
+    noteLabel: en ? "Note" : "Not",
+    notePlaceholder: en ? "E.g. I'm coming / I might be late / I can't make it" : "Örn: Geliyorum / Geç kalabilirim / Gelemiyorum",
+    imAvailable: en ? "I'm available" : "Uygunum",
+    imNotAvailable: en ? "I'm not available" : "Uygun değilim",
+    saveNote: en ? "Save note" : "Notu kaydet",
+    available: en ? "Available" : "Uygun",
+    notAvailable: en ? "Not available" : "Uygun değil",
+    noResponse: en ? "No response" : "Cevap yok",
+    responseRate: en ? "Response rate" : "Cevap oranı",
+    teamListTitle: en ? "Team availability list" : "Takım uygunluk listesi",
+    teamListSubtitle: en ? "See each user's status for the selected event." : "Seçilen etkinlik için kullanıcıların durumunu gör.",
+    peopleCount: (count: number) => (en ? `${count} people` : `${count} kişi`),
+    searchNameOrEmail: en ? "Search by name or email..." : "İsim veya e-posta ara...",
+    searchRosterLabel: en ? "Search availability list" : "Uygunluk listesinde ara",
+    noUsersInEventTitle: en ? "No users in this event" : "Bu etkinlikte kullanıcı yok",
+    noUsersInEventDescription: en ? "They'll appear here once team members are added." : "Takım üyeleri eklendiğinde burada görünecek.",
+    noMatchingPeopleTitle: en ? "No matching people" : "Aramayla eşleşen kişi yok",
+    noMatchingPeopleDescription: en ? "Try again with a different name or email." : "Farklı bir isim veya e-posta ile tekrar dene.",
+    noEmail: en ? "No email" : "E-posta yok",
+    noNoteWritten: en ? "No note written." : "Not yazılmadı.",
+  };
+}
+
 export default function AvailabilityScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData } = useAppDataContext();
   const [selectedEventIdState, setSelectedEventId] = useState("");
   const [statusByUserId, setStatusByUserId] = useState<Record<string, AvailabilityStatus>>({});
   const [noteByUserId, setNoteByUserId] = useState<Record<string, string>>({});
   const [myNoteState, setMyNote] = useState("");
-  const [statusMessage, setStatusMessage] = useState("Uygunluk bilgileri merkezi TeamSync datasından yüklendi.");
-  const [lastSavedAt, setLastSavedAt] = useState("Henüz kaydedilmedi");
+  const [statusMessage, setStatusMessage] = useState(copy.availabilityUpdated);
+  const [lastSavedAt, setLastSavedAt] = useState(copy.notSavedYet);
   const [rosterSearchQuery, setRosterSearchQuery] = useState("");
 
   const events = appData?.scheduleEvents ?? EMPTY_EVENTS;
@@ -98,47 +157,47 @@ export default function AvailabilityScreen() {
 
   function updateMyStatus(newStatus: AvailabilityStatus) {
     if (currentUserId.length === 0) {
-      setStatusMessage("Önce kullanıcı datası yüklenmeli.");
+      setStatusMessage(copy.waitForUserLoad);
       return;
     }
 
     setStatusByUserId((currentStatuses) => ({ ...currentStatuses, [currentUserId]: newStatus }));
     setNoteByUserId((currentNotes) => ({ ...currentNotes, [currentUserId]: myNote.trim() }));
-    setLastSavedAt(getCurrentSaveLabel());
-    setStatusMessage("Uygunluk durumun kaydedildi.");
+    setLastSavedAt(getCurrentSaveLabel(locale, copy.now));
+    setStatusMessage(copy.myStatusSaved);
   }
 
   function saveMyNote() {
     if (currentUserId.length === 0) {
-      setStatusMessage("Önce kullanıcı datası yüklenmeli.");
+      setStatusMessage(copy.waitForUserLoad);
       return;
     }
 
     setNoteByUserId((currentNotes) => ({ ...currentNotes, [currentUserId]: myNote.trim() }));
-    setLastSavedAt(getCurrentSaveLabel());
-    setStatusMessage("Not kaydedildi.");
+    setLastSavedAt(getCurrentSaveLabel(locale, copy.now));
+    setStatusMessage(copy.noteSaved);
   }
 
   return (
     <AppScreenLayout variant="standard">
       <PageHeader
-        eyebrow="Katılım planlama"
-        title="Uygunluk"
-        subtitle="Etkinlik için gelip gelemeyeceğini bildir."
+        eyebrow={copy.eyebrow}
+        title={copy.pageTitle}
+        subtitle={copy.pageSubtitle}
       />
 
       <Card style={styles.heroCard}>
-        <Text style={styles.heroTitle}>Kim geliyor, kim gelemiyor?</Text>
-        <Text style={styles.heroSubtitle}>Maç ve antrenman öncesi takım planlamasını kolaylaştırır.</Text>
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>Etkinlik seç</Text>
-            <Text style={styles.sectionSubtitle}>Takvimdeki etkinliklerden birini seç.</Text>
+            <Text style={styles.sectionTitle}>{copy.selectEventTitle}</Text>
+            <Text style={styles.sectionSubtitle}>{copy.selectEventSubtitle}</Text>
           </View>
-          <Text style={styles.statusPill}>{events.length} etkinlik</Text>
+          <Text style={styles.statusPill}>{copy.eventsCount(events.length)}</Text>
         </View>
 
         {events.length > 0 ? (
@@ -149,33 +208,33 @@ export default function AvailabilityScreen() {
               return (
                 <Pressable key={event.id} onPress={() => setSelectedEventId(event.id)} style={({ pressed }) => [styles.eventCard, isSelected ? styles.eventCardActive : null, pressed ? styles.pressed : null]}>
                   <Text style={[styles.eventTitle, isSelected ? styles.eventTitleActive : null]}>{event.title}</Text>
-                  <Text style={[styles.eventMeta, isSelected ? styles.eventMetaActive : null]}>{getEventTeamName(event, appData)} · {formatEventTime(event.startsAt)} · {event.location}</Text>
+                  <Text style={[styles.eventMeta, isSelected ? styles.eventMetaActive : null]}>{getEventTeamName(event, appData, copy.allClub, copy.teamNotFound)} · {formatEventTime(event.startsAt, locale, copy.noDate)} · {event.location}</Text>
                 </Pressable>
               );
             })}
           </View>
         ) : (
-          <EmptyState title="Henüz etkinlik yok" description="Uygunluk seçmek için önce Schedule sayfasından bir etkinlik ekle." />
+          <EmptyState title={copy.noEventsTitle} description={copy.noEventsDescription} />
         )}
       </Card>
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>Benim durumum</Text>
-            <Text style={styles.sectionSubtitle}>{selectedEvent ? `${selectedEvent.title} için uygunluk durumunu seç.` : statusMessage}</Text>
+            <Text style={styles.sectionTitle}>{copy.myStatusTitle}</Text>
+            <Text style={styles.sectionSubtitle}>{selectedEvent ? copy.myStatusSubtitleForEvent(selectedEvent.title) : statusMessage}</Text>
           </View>
-          <StatusBadge label={getStatusLabel(myAvailabilityStatus)} tone={availabilityToneByStatus[myAvailabilityStatus]} />
+          <StatusBadge label={copy.statusLabels[myAvailabilityStatus]} tone={availabilityToneByStatus[myAvailabilityStatus]} />
         </View>
 
         <View style={styles.myStatusCard}>
-          <Text style={styles.myName}>{appData?.currentUser.fullName || "Kullanıcı"}</Text>
-          <Text style={styles.myTeam}>Son kayıt: {lastSavedAt}</Text>
+          <Text style={styles.myName}>{appData?.currentUser.fullName || copy.userFallback}</Text>
+          <Text style={styles.myTeam}>{copy.lastSaved(lastSavedAt)}</Text>
         </View>
 
         <TextField
-          label="Not"
-          placeholder="Örn: Geliyorum / Geç kalabilirim / Gelemiyorum"
+          label={copy.noteLabel}
+          placeholder={copy.notePlaceholder}
           value={myNote}
           onChangeText={setMyNote}
           multiline
@@ -183,45 +242,45 @@ export default function AvailabilityScreen() {
         />
 
         <View style={styles.actionRow}>
-          <AppButton title="Uygunum" onPress={() => updateMyStatus("available")} style={styles.actionButton} />
-          <AppButton title="Uygun değilim" variant="secondary" onPress={() => updateMyStatus("notAvailable")} style={styles.actionButton} />
-          <AppButton title="Notu kaydet" variant="ghost" onPress={saveMyNote} style={styles.actionButton} />
+          <AppButton title={copy.imAvailable} onPress={() => updateMyStatus("available")} style={styles.actionButton} />
+          <AppButton title={copy.imNotAvailable} variant="secondary" onPress={() => updateMyStatus("notAvailable")} style={styles.actionButton} />
+          <AppButton title={copy.saveNote} variant="ghost" onPress={saveMyNote} style={styles.actionButton} />
         </View>
 
         <Text style={styles.statusText}>{statusMessage}</Text>
       </Card>
 
       <View style={styles.statsGrid}>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.availableCount}</Text><Text style={styles.statLabel}>Uygun</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.notAvailableCount}</Text><Text style={styles.statLabel}>Uygun değil</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.notAnsweredCount}</Text><Text style={styles.statLabel}>Cevap yok</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statValue}>%{availabilitySummary.responseRate}</Text><Text style={styles.statLabel}>Cevap oranı</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.availableCount}</Text><Text style={styles.statLabel}>{copy.available}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.notAvailableCount}</Text><Text style={styles.statLabel}>{copy.notAvailable}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{availabilitySummary.notAnsweredCount}</Text><Text style={styles.statLabel}>{copy.noResponse}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>%{availabilitySummary.responseRate}</Text><Text style={styles.statLabel}>{copy.responseRate}</Text></Card>
       </View>
 
       {userCanViewTeamList ? (
         <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Takım uygunluk listesi</Text>
-              <Text style={styles.sectionSubtitle}>Seçilen etkinlik için kullanıcıların durumunu gör.</Text>
+              <Text style={styles.sectionTitle}>{copy.teamListTitle}</Text>
+              <Text style={styles.sectionSubtitle}>{copy.teamListSubtitle}</Text>
             </View>
-            <Text style={styles.statusPill}>{availabilitySummary.totalCount} kişi</Text>
+            <Text style={styles.statusPill}>{copy.peopleCount(availabilitySummary.totalCount)}</Text>
           </View>
 
           {visibleUsers.length > 5 ? (
             <SearchField
               value={rosterSearchQuery}
               onChangeText={setRosterSearchQuery}
-              placeholder="İsim veya e-posta ara..."
-              accessibilityLabel="Uygunluk listesinde ara"
+              placeholder={copy.searchNameOrEmail}
+              accessibilityLabel={copy.searchRosterLabel}
               style={styles.searchField}
             />
           ) : null}
 
           {visibleUsers.length === 0 ? (
-            <EmptyState title="Bu etkinlikte kullanıcı yok" description="Takım üyeleri eklendiğinde burada görünecek." />
+            <EmptyState title={copy.noUsersInEventTitle} description={copy.noUsersInEventDescription} />
           ) : filteredVisibleUsers.length === 0 ? (
-            <EmptyState title="Aramayla eşleşen kişi yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+            <EmptyState title={copy.noMatchingPeopleTitle} description={copy.noMatchingPeopleDescription} />
           ) : (
             <View style={styles.athleteList}>
               {filteredVisibleUsers.map((user) => {
@@ -232,11 +291,11 @@ export default function AvailabilityScreen() {
                     <View style={styles.athleteTopRow}>
                       <View style={styles.athleteInfo}>
                         <Text style={styles.athleteName}>{user.fullName}</Text>
-                        <Text style={styles.parentName}>{user.email || "E-posta yok"}</Text>
+                        <Text style={styles.parentName}>{user.email || copy.noEmail}</Text>
                       </View>
-                      <StatusBadge label={getStatusLabel(status)} tone={availabilityToneByStatus[status]} />
+                      <StatusBadge label={copy.statusLabels[status]} tone={availabilityToneByStatus[status]} />
                     </View>
-                    <Text style={styles.noteText}>{noteByUserId[user.id] !== undefined && noteByUserId[user.id] !== "" ? noteByUserId[user.id] : "Not yazılmadı."}</Text>
+                    <Text style={styles.noteText}>{noteByUserId[user.id] !== undefined && noteByUserId[user.id] !== "" ? noteByUserId[user.id] : copy.noNoteWritten}</Text>
                   </View>
                 );
               })}

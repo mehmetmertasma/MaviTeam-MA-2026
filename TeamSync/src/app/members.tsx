@@ -10,6 +10,7 @@ import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 import { firestoreMemberManagementService } from "@/services/firestoreMemberManagementService";
@@ -20,33 +21,6 @@ type EditableRole = Exclude<UserRole, "superAdmin">;
 
 const EMPTY_USERS: UserProfile[] = [];
 const EMPTY_TEAMS: Team[] = [];
-
-const roleOptions: { label: string; value: EditableRole }[] = [
-  { label: "Admin", value: "clubAdmin" },
-  { label: "Coach", value: "coach" },
-  { label: "Parent", value: "parent" },
-  { label: "Athlete", value: "athlete" },
-];
-
-const statusOptions: { label: string; value: UserStatus }[] = [
-  { label: "Active", value: "active" },
-  { label: "Pending", value: "pending" },
-  { label: "Removed", value: "removed" },
-];
-
-const roleLabels: Record<UserRole, string> = {
-  superAdmin: "Platform Admin",
-  clubAdmin: "Admin",
-  coach: "Coach",
-  parent: "Parent",
-  athlete: "Athlete",
-};
-
-const statusLabels: Record<UserStatus, string> = {
-  active: "Active",
-  pending: "Pending",
-  removed: "Removed",
-};
 
 const statusTones: Record<UserStatus, StatusBadgeTone> = {
   active: "success",
@@ -79,24 +53,116 @@ function sortMembers(users: UserProfile[]) {
   });
 }
 
-function getTeamNames(user: UserProfile, teams: Team[]) {
-  const names = teams.filter((team) => user.teamIds.includes(team.id)).map((team) => team.name);
-  return names.length > 0 ? names.join(", ") : "Takım yok";
-}
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
 
-function getMemberErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
+  const roleOptions: { label: string; value: EditableRole }[] = [
+    { label: en ? "Admin" : "Yönetici", value: "clubAdmin" },
+    { label: en ? "Coach" : "Koç", value: "coach" },
+    { label: en ? "Parent" : "Veli", value: "parent" },
+    { label: en ? "Athlete" : "Sporcu", value: "athlete" },
+  ];
 
-  if (message === "MEMBER_SELF_EDIT_DENIED") return "Kendi rolünü buradan değiştiremezsin.";
-  if (message === "MEMBER_OWNER_EDIT_DENIED") return "Kulüp sahibinin rolü veya durumu buradan değiştirilemez.";
-  if (message === "MEMBER_PERMISSION_DENIED") return "Bu işlem için kulüp admin yetkisi gerekli.";
-  if (message === "MEMBER_TEAM_MISSING") return "Seçilen takımlardan biri artık mevcut değil.";
-  if (message === "MEMBER_MISSING") return "Kullanıcı bulunamadı.";
+  const statusOptions: { label: string; value: UserStatus }[] = [
+    { label: en ? "Active" : "Aktif", value: "active" },
+    { label: en ? "Pending" : "Beklemede", value: "pending" },
+    { label: en ? "Removed" : "Çıkarıldı", value: "removed" },
+  ];
 
-  return "Üye güncellenirken bir sorun oluştu.";
+  const roleLabels: Record<UserRole, string> = {
+    superAdmin: en ? "Platform Admin" : "Platform Yöneticisi",
+    clubAdmin: en ? "Admin" : "Yönetici",
+    coach: en ? "Coach" : "Koç",
+    parent: en ? "Parent" : "Veli",
+    athlete: en ? "Athlete" : "Sporcu",
+  };
+
+  const statusLabels: Record<UserStatus, string> = {
+    active: en ? "Active" : "Aktif",
+    pending: en ? "Pending" : "Beklemede",
+    removed: en ? "Removed" : "Çıkarıldı",
+  };
+
+  function getTeamNames(user: UserProfile, teams: Team[]) {
+    const names = teams.filter((team) => user.teamIds.includes(team.id)).map((team) => team.name);
+    return names.length > 0 ? names.join(", ") : en ? "No team" : "Takım yok";
+  }
+
+  function getMemberErrorMessage(error: unknown) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message === "MEMBER_SELF_EDIT_DENIED") return en ? "You can't change your own role here." : "Kendi rolünü buradan değiştiremezsin.";
+    if (message === "MEMBER_OWNER_EDIT_DENIED") return en ? "The club owner's role or status can't be changed here." : "Kulüp sahibinin rolü veya durumu buradan değiştirilemez.";
+    if (message === "MEMBER_PERMISSION_DENIED") return en ? "You need club admin access to do this." : "Bu işlem için kulüp admin yetkisi gerekli.";
+    if (message === "MEMBER_TEAM_MISSING") return en ? "One of the selected teams no longer exists." : "Seçilen takımlardan biri artık mevcut değil.";
+    if (message === "MEMBER_MISSING") return en ? "User not found." : "Kullanıcı bulunamadı.";
+
+    return en ? "Something went wrong while updating the member." : "Üye güncellenirken bir sorun oluştu.";
+  }
+
+  return {
+    pageTitle: en ? "Member Management" : "Üye Yönetimi",
+    pageSubtitle: en
+      ? "Browse members in a compact list, tap a person to expand their details, and edit role/team info as an admin."
+      : "Üyeleri kompakt listede gör, kişiye tıklayınca detayları aç ve admin olarak rol/takım bilgilerini düzenle.",
+    heroLabel: en ? "Club user controls" : "Kulüp kullanıcı kontrolü",
+    heroTitle: en ? "Roles, statuses, and team connections" : "Roller, durumlar ve takım bağlantıları",
+    heroSubtitle: en
+      ? "The screen stays simple while cards are collapsed. Only the person you select expands with details and edit options."
+      : "Kartlar kapalıyken ekran sade kalır. Sadece seçtiğin kişinin detayları ve edit seçenekleri açılır.",
+    statTotal: en ? "Total" : "Toplam",
+    statActive: en ? "Active" : "Aktif",
+    statCoaches: en ? "Coaches" : "Koç",
+    clubMembersTitle: en ? "Club members" : "Kulüp üyeleri",
+    refresh: en ? "Refresh" : "Yenile",
+    noMembersTitle: en ? "No members yet" : "Henüz üye yok",
+    noMembersDescription: en ? "Members will appear here as they join the club." : "Kullanıcılar kulübe katıldıkça burada görünecek.",
+    searchPlaceholder: en ? "Search name or email..." : "İsim veya e-posta ara...",
+    searchA11y: en ? "Search members" : "Üyelerde ara",
+    noSearchMatchesTitle: en ? "No members match your search" : "Aramayla eşleşen üye yok",
+    noSearchMatchesDescription: en ? "Try a different name or email." : "Farklı bir isim veya e-posta ile tekrar dene.",
+    noEmail: en ? "No email" : "E-posta yok",
+    teamsLabel: en ? "Teams" : "Takımlar",
+    userIdLabel: en ? "User ID" : "Kullanıcı ID",
+    roleLabel: en ? "Role" : "Rol",
+    statusLabel: en ? "Status" : "Durum",
+    teamsChipLabel: en ? "Teams" : "Takımlar",
+    noTeamsYet: en ? "No teams yet." : "Henüz takım yok.",
+    saving: en ? "Saving..." : "Kaydediliyor...",
+    save: en ? "Save" : "Kaydet",
+    cancel: en ? "Cancel" : "Vazgeç",
+    protected: en ? "Protected" : "Korumalı",
+    edit: en ? "Edit" : "Düzenle",
+    protectedHint: en
+      ? "Your own account, the owner, and platform admins are protected."
+      : "Kendi hesabın, owner veya platform admin korunur.",
+    editableHint: en ? "Edit role, status, and teams." : "Rol, durum ve takımları düzenle.",
+    // Status messages
+    membersUpdated: en ? "Members updated." : "Üyeler güncellendi.",
+    membersLoadFailed: en ? "Something went wrong while loading members." : "Üyeler yüklenirken bir sorun oluştu.",
+    memberDetailClosed: en ? "Member details closed." : "Üye detayı kapatıldı.",
+    memberDetailOpened: (name: string) => (en ? `${name} details opened.` : `${name} detayı açıldı.`),
+    mustBeAdminToEdit: en ? "You need to be a club admin to edit members." : "Üye düzenlemek için kulüp admin olmalısın.",
+    cannotEditOwnRole: en ? "You can't change your own role here." : "Kendi rolünü buradan değiştiremezsin.",
+    cannotEditOwnerRole: en ? "The club owner's role or status can't be changed here." : "Kulüp sahibinin rolü veya durumu buradan değiştirilemez.",
+    platformAdminNotEditable: en ? "The platform admin role can't be edited from this screen." : "Platform admin rolü bu ekrandan düzenlenemez.",
+    editModeOpened: en ? "Edit mode opened. Tap Save once you're done making changes." : "Düzenleme modu açıldı. Değişiklikleri yaptıktan sonra Kaydet'e bas.",
+    firebaseRequiredForMemberManagement: en
+      ? "Signing in is required to manage member roles and teams."
+      : "Üye rol/takım yönetimi için Firebase girişi gerekli.",
+    memberSaved: (name: string) => (en ? `${name}'s details were saved.` : `${name} bilgileri kaydedildi.`),
+    getMemberErrorMessage,
+    getTeamNames,
+    roleOptions,
+    statusOptions,
+    roleLabels,
+    statusLabels,
+  };
 }
 
 export default function MembersScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
   const { appData, refresh } = useAppDataContext();
   const [selectedUserId, setSelectedUserId] = useState("");
   const [editingUserId, setEditingUserId] = useState("");
@@ -104,15 +170,15 @@ export default function MembersScreen() {
   const [draftStatus, setDraftStatus] = useState<UserStatus>("active");
   const [draftTeamIds, setDraftTeamIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Üyeler MaviTeam kulüp datasından yüklendi.");
+  const [statusMessage, setStatusMessage] = useState(copy.membersUpdated);
   const [searchQuery, setSearchQuery] = useState("");
 
   async function refreshMembersData() {
     try {
       await refresh();
-      setStatusMessage("Üyeler MaviTeam kulüp datasından yüklendi.");
+      setStatusMessage(copy.membersUpdated);
     } catch {
-      setStatusMessage("Üyeler yüklenirken bir sorun oluştu.");
+      setStatusMessage(copy.membersLoadFailed);
     }
   }
 
@@ -138,27 +204,27 @@ export default function MembersScreen() {
     const nextSelectedId = selectedUserId === member.id ? "" : member.id;
     setSelectedUserId(nextSelectedId);
     setEditingUserId("");
-    setStatusMessage(nextSelectedId === "" ? "Üye detayı kapatıldı." : `${member.fullName} detayı açıldı.`);
+    setStatusMessage(nextSelectedId === "" ? copy.memberDetailClosed : copy.memberDetailOpened(member.fullName));
   }
 
   function startEdit(member: UserProfile) {
     if (!userCanManageMembers || currentUser === undefined) {
-      setStatusMessage("Üye düzenlemek için kulüp admin olmalısın.");
+      setStatusMessage(copy.mustBeAdminToEdit);
       return;
     }
 
     if (member.id === currentUser.id) {
-      setStatusMessage("Kendi rolünü buradan değiştiremezsin.");
+      setStatusMessage(copy.cannotEditOwnRole);
       return;
     }
 
     if (member.id === clubOwnerId) {
-      setStatusMessage("Kulüp sahibinin rolü veya durumu buradan değiştirilemez.");
+      setStatusMessage(copy.cannotEditOwnerRole);
       return;
     }
 
     if (!isEditableRole(member.role)) {
-      setStatusMessage("Platform admin rolü bu ekrandan düzenlenemez.");
+      setStatusMessage(copy.platformAdminNotEditable);
       return;
     }
 
@@ -166,7 +232,7 @@ export default function MembersScreen() {
     setDraftRole(member.role);
     setDraftStatus(member.status);
     setDraftTeamIds(member.teamIds);
-    setStatusMessage("Düzenleme modu açıldı. Değişiklikleri yaptıktan sonra Save'e bas.");
+    setStatusMessage(copy.editModeOpened);
   }
 
   function toggleDraftTeam(teamId: string) {
@@ -183,7 +249,7 @@ export default function MembersScreen() {
     const firebaseUser = authService.getCurrentUser();
 
     if (!authService.isConfigured() || firebaseUser === null) {
-      setStatusMessage("Üye rol/takım yönetimi için Firebase girişi gerekli.");
+      setStatusMessage(copy.firebaseRequiredForMemberManagement);
       return;
     }
 
@@ -198,9 +264,9 @@ export default function MembersScreen() {
 
       await refresh();
       setEditingUserId("");
-      setStatusMessage(`${member.fullName} bilgileri kaydedildi.`);
+      setStatusMessage(copy.memberSaved(member.fullName));
     } catch (memberError) {
-      setStatusMessage(getMemberErrorMessage(memberError));
+      setStatusMessage(copy.getMemberErrorMessage(memberError));
     } finally {
       setIsSaving(false);
     }
@@ -209,47 +275,47 @@ export default function MembersScreen() {
   return (
     <AppScreenLayout>
       <PageHeader
-        title="Üye Yönetimi"
-        subtitle="Üyeleri kompakt listede gör, kişiye tıklayınca detayları aç ve admin olarak rol/takım bilgilerini düzenle."
+        title={copy.pageTitle}
+        subtitle={copy.pageSubtitle}
       />
 
       <Card style={styles.heroCard} padding="lg">
-        <StatusBadge label="Kulüp kullanıcı kontrolü" tone="info" style={styles.heroLabel} />
-        <Text style={styles.heroTitle}>Roller, durumlar ve takım bağlantıları</Text>
-        <Text style={styles.heroSubtitle}>Kartlar kapalıyken ekran sade kalır. Sadece seçtiğin kişinin detayları ve edit seçenekleri açılır.</Text>
+        <StatusBadge label={copy.heroLabel} tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <View style={styles.statsGrid}>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{members.length}</Text><Text style={styles.statLabel}>Toplam</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{activeCount}</Text><Text style={styles.statLabel}>Aktif</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statValue}>{coachCount}</Text><Text style={styles.statLabel}>Coach</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{members.length}</Text><Text style={styles.statLabel}>{copy.statTotal}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{activeCount}</Text><Text style={styles.statLabel}>{copy.statActive}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statValue}>{coachCount}</Text><Text style={styles.statLabel}>{copy.statCoaches}</Text></Card>
       </View>
 
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>Kulüp üyeleri</Text>
+            <Text style={styles.sectionTitle}>{copy.clubMembersTitle}</Text>
             <Text style={styles.sectionSubtitle}>{statusMessage}</Text>
           </View>
-          <AppButton title="Yenile" variant="ghost" onPress={refreshMembersData} style={styles.refreshButton} />
+          <AppButton title={copy.refresh} variant="ghost" onPress={refreshMembersData} style={styles.refreshButton} />
         </View>
 
         {members.length === 0 ? (
-          <EmptyState title="Henüz üye yok" description="Kullanıcılar kulübe katıldıkça burada görünecek." />
+          <EmptyState title={copy.noMembersTitle} description={copy.noMembersDescription} />
         ) : (
           <>
             {members.length > 5 ? (
               <SearchField
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="İsim veya e-posta ara..."
-                accessibilityLabel="Üyelerde ara"
+                placeholder={copy.searchPlaceholder}
+                accessibilityLabel={copy.searchA11y}
                 style={styles.searchField}
               />
             ) : null}
 
             {filteredMembers.length === 0 ? (
-              <EmptyState title="Aramayla eşleşen üye yok" description="Farklı bir isim veya e-posta ile tekrar dene." />
+              <EmptyState title={copy.noSearchMatchesTitle} description={copy.noSearchMatchesDescription} />
             ) : (
           <View style={styles.memberList}>
             {filteredMembers.map((member) => {
@@ -263,47 +329,47 @@ export default function MembersScreen() {
                     <View style={styles.avatar}><Text style={styles.avatarText}>{getInitials(member.fullName)}</Text></View>
                     <View style={styles.memberInfo}>
                       <Text style={styles.memberName}>{member.fullName}</Text>
-                      <Text style={styles.memberMeta}>{member.email || "E-posta yok"}</Text>
+                      <Text style={styles.memberMeta}>{member.email || copy.noEmail}</Text>
                     </View>
                     <View style={styles.memberBadges}>
-                      <StatusBadge label={roleLabels[member.role]} tone="info" />
-                      <StatusBadge label={statusLabels[member.status]} tone={statusTones[member.status]} />
+                      <StatusBadge label={copy.roleLabels[member.role]} tone="info" />
+                      <StatusBadge label={copy.statusLabels[member.status]} tone={statusTones[member.status]} />
                     </View>
                   </Pressable>
 
                   {isSelected ? (
                     <View style={styles.expandedArea}>
                       <View style={styles.detailGrid}>
-                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>Takımlar</Text><Text style={styles.detailValue}>{getTeamNames(member, teams)}</Text></Card>
-                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>Kullanıcı ID</Text><Text style={styles.detailValue}>{member.id}</Text></Card>
+                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>{copy.teamsLabel}</Text><Text style={styles.detailValue}>{copy.getTeamNames(member, teams)}</Text></Card>
+                        <Card variant="subtle" padding="sm" style={styles.detailBox}><Text style={styles.detailLabel}>{copy.userIdLabel}</Text><Text style={styles.detailValue}>{member.id}</Text></Card>
                       </View>
 
                       {isEditing ? (
                         <View style={styles.editPanel}>
-                          <Text style={styles.editLabel}>Rol</Text>
-                          <View style={styles.chipRow}>{roleOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftRole(option.value)} style={({ pressed }) => [styles.chip, draftRole === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftRole === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
+                          <Text style={styles.editLabel}>{copy.roleLabel}</Text>
+                          <View style={styles.chipRow}>{copy.roleOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftRole(option.value)} style={({ pressed }) => [styles.chip, draftRole === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftRole === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
 
-                          <Text style={styles.editLabel}>Durum</Text>
-                          <View style={styles.chipRow}>{statusOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftStatus(option.value)} style={({ pressed }) => [styles.chip, draftStatus === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftStatus === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
+                          <Text style={styles.editLabel}>{copy.statusLabel}</Text>
+                          <View style={styles.chipRow}>{copy.statusOptions.map((option) => (<Pressable key={option.value} onPress={() => setDraftStatus(option.value)} style={({ pressed }) => [styles.chip, draftStatus === option.value ? styles.chipSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, draftStatus === option.value ? styles.chipTextSelected : null]}>{option.label}</Text></Pressable>))}</View>
 
-                          <Text style={styles.editLabel}>Takımlar</Text>
-                          <View style={styles.chipRow}>{teams.length === 0 ? <Text style={styles.emptyText}>Henüz takım yok.</Text> : teams.map((team) => { const isTeamSelected = draftTeamIds.includes(team.id); return (<Pressable key={team.id} onPress={() => toggleDraftTeam(team.id)} disabled={draftStatus === "removed"} style={({ pressed }) => [styles.chip, isTeamSelected ? styles.chipSelected : null, draftStatus === "removed" ? styles.chipDisabled : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, isTeamSelected ? styles.chipTextSelected : null]}>{team.name}</Text></Pressable>); })}</View>
+                          <Text style={styles.editLabel}>{copy.teamsChipLabel}</Text>
+                          <View style={styles.chipRow}>{teams.length === 0 ? <Text style={styles.emptyText}>{copy.noTeamsYet}</Text> : teams.map((team) => { const isTeamSelected = draftTeamIds.includes(team.id); return (<Pressable key={team.id} onPress={() => toggleDraftTeam(team.id)} disabled={draftStatus === "removed"} style={({ pressed }) => [styles.chip, isTeamSelected ? styles.chipSelected : null, draftStatus === "removed" ? styles.chipDisabled : null, pressed ? styles.pressed : null]}><Text style={[styles.chipText, isTeamSelected ? styles.chipTextSelected : null]}>{team.name}</Text></Pressable>); })}</View>
 
                           <View style={styles.actionRow}>
-                            <AppButton title={isSaving ? "Saving..." : "Save"} disabled={isSaving} onPress={() => saveMember(member)} style={styles.actionButton} />
-                            <AppButton title="Cancel" variant="ghost" disabled={isSaving} onPress={() => setEditingUserId("")} style={styles.actionButton} />
+                            <AppButton title={isSaving ? copy.saving : copy.save} disabled={isSaving} onPress={() => saveMember(member)} style={styles.actionButton} />
+                            <AppButton title={copy.cancel} variant="ghost" disabled={isSaving} onPress={() => setEditingUserId("")} style={styles.actionButton} />
                           </View>
                         </View>
                       ) : (
                         <View style={styles.actionRow}>
                           <AppButton
-                            title={isProtected ? "Protected" : "Edit"}
+                            title={isProtected ? copy.protected : copy.edit}
                             variant="secondary"
                             disabled={!userCanManageMembers || isProtected}
                             onPress={() => startEdit(member)}
                             style={styles.actionButton}
                           />
-                          <Text style={styles.inlineHint}>{isProtected ? "Kendi hesabın, owner veya platform admin korunur." : "Rol, durum ve takımları düzenle."}</Text>
+                          <Text style={styles.inlineHint}>{isProtected ? copy.protectedHint : copy.editableHint}</Text>
                         </View>
                       )}
                     </View>

@@ -7,20 +7,16 @@ import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
-import { SearchField } from "@/components/SearchField";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
+import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { Announcement, TeamSyncAppData, UserRole } from "@/types/teamSync";
-import { matchesSearchQuery } from "@/utils/search";
-
-const ANNOUNCEMENTS_PAGE_SIZE = 10;
-const EMPTY_ANNOUNCEMENTS: Announcement[] = [];
 
 type TargetOption = {
   id: string;
@@ -29,14 +25,14 @@ type TargetOption = {
   targetTeamId?: string;
 };
 
-function formatDate(value: string) {
+function formatDate(value: string, locale: string) {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Tarih yok";
+    return locale === "tr-TR" ? "Tarih yok" : "No date";
   }
 
-  return date.toLocaleString("tr-TR", {
+  return date.toLocaleString(locale, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -44,19 +40,93 @@ function formatDate(value: string) {
   });
 }
 
-function getAnnouncementTargetLabel(announcement: Announcement, appData: TeamSyncAppData) {
+function getAnnouncementTargetLabel(
+  announcement: Announcement,
+  appData: TeamSyncAppData,
+  copy: ReturnType<typeof getCopy>
+) {
   if (announcement.targetType === "allClub") {
-    return "Tüm Kulüp";
+    return copy.allClub;
   }
 
-  return appData.teams.find((team) => team.id === announcement.targetTeamId)?.name ?? "Takım bulunamadı";
+  return appData.teams.find((team) => team.id === announcement.targetTeamId)?.name ?? copy.teamNotFound;
 }
 
 function canPublishAnnouncements(role: UserRole) {
   return role === "clubAdmin" || role === "coach";
 }
 
+function getCopy(language: "tr" | "en") {
+  const en = language === "en";
+
+  return {
+    pageTitle: en ? "Announcements" : "Duyurular",
+    pageSubtitle: en
+      ? "Publish updates for your whole club or a specific team."
+      : "Kulüp veya takım üyelerine duyuru yayınla.",
+    heroLabel: en ? "Club communication hub" : "Kulüp iletişim merkezi",
+    heroTitle: en ? "Announcement management" : "Duyuru yönetimi",
+    heroSubtitle: en
+      ? "Share updates with your whole club or a specific team."
+      : "Kulübünle veya belirli bir takımla duyuru paylaş.",
+    createNew: en ? "Create announcement" : "Yeni duyuru oluştur",
+    formOpen: en ? "Form is open" : "Form açık",
+    refresh: en ? "Refresh" : "Yenile",
+    newAnnouncementTitle: en ? "Create announcement" : "Yeni duyuru oluştur",
+    newAnnouncementSubtitle: en
+      ? "Choose a title, message, and audience."
+      : "Başlığı, mesajı ve hedef kitleyi seç.",
+    newBadge: en ? "New" : "Yeni",
+    titleLabel: en ? "Announcement title" : "Duyuru başlığı",
+    titlePlaceholder: en ? "e.g. Match schedule announced" : "Örn: Maç programı açıklandı",
+    messageLabel: en ? "Announcement message" : "Duyuru mesajı",
+    messagePlaceholder: en ? "Write the announcement details..." : "Duyuru detaylarını yaz...",
+    audienceLabel: en ? "Who should receive this?" : "Kimlere gönderilecek?",
+    publishing: en ? "Publishing..." : "Yayınlanıyor...",
+    publish: en ? "Publish announcement" : "Duyuruyu yayınla",
+    cancel: en ? "Cancel" : "Vazgeç",
+    publishedSectionTitle: en ? "Published announcements" : "Yayınlanan duyurular",
+    publishedSectionSubtitle: en
+      ? "Keep track of everything you've shared here."
+      : "Paylaşılan duyuruları burada takip edebilirsin.",
+    activeCount: (count: number) => (en ? `${count} active` : `${count} aktif`),
+    sharedOn: en ? "Shared" : "Paylaşıldı",
+    deleteLabel: en ? "Delete" : "Sil",
+    emptyTitle: en ? "No announcements yet" : "Henüz duyuru yok",
+    emptyDescription: en
+      ? "Tap Create announcement to add your first one."
+      : "Yeni duyuru oluştur butonuna basarak ilk duyurunu ekleyebilirsin.",
+    allClub: en ? "Entire Club" : "Tüm Kulüp",
+    teamNotFound: en ? "Team not found" : "Takım bulunamadı",
+    statusUpdated: en ? "Announcements updated." : "Duyurular güncellendi.",
+    statusSignInToView: en ? "Sign in to view announcements." : "Duyuruları görmek için giriş yapmalısın.",
+    statusNeedsData: en
+      ? "Please wait for the page to finish loading."
+      : "Sayfanın yüklenmesini bekle.",
+    statusNoPublishPermission: en
+      ? "This account doesn't have permission to publish announcements."
+      : "Bu hesap duyuru yayınlama yetkisine sahip değil.",
+    statusFieldsRequired: en
+      ? "Title and message cannot be empty."
+      : "Başlık ve mesaj alanı boş bırakılamaz.",
+    statusSignInToPublish: en ? "Sign in to publish an announcement." : "Duyuru yayınlamak için giriş yapmalısın.",
+    statusPublished: en ? "Announcement published." : "Duyuru yayınlandı.",
+    statusFillForm: en
+      ? "Fill in the new announcement details."
+      : "Yeni duyuru bilgilerini doldurabilirsin.",
+    statusCreateCancelled: en ? "Announcement creation cancelled." : "Duyuru oluşturma iptal edildi.",
+    statusOnlyAdminDelete: en
+      ? "Only a club admin can delete announcements."
+      : "Sadece kulüp yöneticisi duyuru silebilir.",
+    statusSignInToDelete: en ? "Sign in to delete an announcement." : "Duyuru silmek için giriş yapmalısın.",
+    statusDeleted: en ? "Announcement deleted." : "Duyuru silindi.",
+  };
+}
+
 export default function AnnouncementsScreen() {
+  const { language } = useTranslation();
+  const copy = useMemo(() => getCopy(language), [language]);
+  const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData: contextAppData, setAppData: setContextAppData } = useAppDataContext();
   const [firestoreAnnouncements, setFirestoreAnnouncements] = useState<Announcement[] | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -64,9 +134,7 @@ export default function AnnouncementsScreen() {
   const [message, setMessage] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("Duyurular merkezi TeamSync datasından yüklendi.");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showAllAnnouncements, setShowAllAnnouncements] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(copy.statusUpdated);
 
   // Overlays a dedicated, targeted Firestore fetch on top of the shared
   // appData instead of pulling announcements from it directly, so this
@@ -84,21 +152,21 @@ export default function AnnouncementsScreen() {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setStatusMessage("Duyuruları görmek için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToView);
           return;
         }
 
         const fetchedAnnouncements = await firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser);
         setFirestoreAnnouncements(fetchedAnnouncements);
-        setStatusMessage("Duyurular Firestore kulüp datasından yüklendi.");
+        setStatusMessage(copy.statusUpdated);
         return;
       }
 
-      setStatusMessage("Duyurular local TeamSync datasından yüklendi.");
+      setStatusMessage(copy.statusUpdated);
     } catch (loadError) {
-      setStatusMessage(getAuthErrorMessage(loadError));
+      setStatusMessage(getAuthErrorMessage(loadError, language));
     }
-  }, []);
+  }, [copy, language]);
 
   useFocusEffect(
     useCallback(() => {
@@ -109,7 +177,7 @@ export default function AnnouncementsScreen() {
   const targetOptions = useMemo<TargetOption[]>(() => {
     const allClubOption: TargetOption = {
       id: "all-club",
-      label: "Tüm Kulüp",
+      label: copy.allClub,
       targetType: "allClub",
     };
 
@@ -126,18 +194,9 @@ export default function AnnouncementsScreen() {
         targetTeamId: team.id,
       })),
     ];
-  }, [appData]);
+  }, [appData, copy]);
 
-  const announcements = appData?.announcements ?? EMPTY_ANNOUNCEMENTS;
-
-  const filteredAnnouncements = useMemo(() => {
-    return announcements.filter((announcement) => matchesSearchQuery(searchQuery, announcement.title, announcement.message));
-  }, [announcements, searchQuery]);
-
-  const visibleAnnouncements = showAllAnnouncements
-    ? filteredAnnouncements
-    : filteredAnnouncements.slice(0, ANNOUNCEMENTS_PAGE_SIZE);
-
+  const announcements = appData?.announcements ?? [];
   const userCanPublish = appData !== null && canPublishAnnouncements(appData.currentUser.role);
   const userCanDelete = appData?.currentUser.role === "clubAdmin";
   const canPublish = title.trim().length > 0 && message.trim().length > 0 && userCanPublish && !isSubmitting;
@@ -150,17 +209,17 @@ export default function AnnouncementsScreen() {
 
   async function publishAnnouncement() {
     if (appData === null) {
-      setStatusMessage("Önce merkezi data yüklenmeli.");
+      setStatusMessage(copy.statusNeedsData);
       return;
     }
 
     if (!userCanPublish) {
-      setStatusMessage("Bu hesap duyuru yayınlama yetkisine sahip değil.");
+      setStatusMessage(copy.statusNoPublishPermission);
       return;
     }
 
     if (!canPublish) {
-      setStatusMessage("Başlık ve mesaj alanı boş bırakılamaz.");
+      setStatusMessage(copy.statusFieldsRequired);
       return;
     }
 
@@ -174,7 +233,7 @@ export default function AnnouncementsScreen() {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setStatusMessage("Duyuru yayınlamak için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToPublish);
           return;
         }
 
@@ -188,7 +247,7 @@ export default function AnnouncementsScreen() {
         await loadAnnouncementsData();
         clearForm();
         setShowCreateForm(false);
-        setStatusMessage("Duyuru Firestore kulüp datasına yayınlandı.");
+        setStatusMessage(copy.statusPublished);
         return;
       }
 
@@ -204,9 +263,9 @@ export default function AnnouncementsScreen() {
       setContextAppData(nextAppData);
       clearForm();
       setShowCreateForm(false);
-      setStatusMessage("Duyuru local data service içine yayınlandı.");
+      setStatusMessage(copy.statusPublished);
     } catch (publishError) {
-      setStatusMessage(getAuthErrorMessage(publishError));
+      setStatusMessage(getAuthErrorMessage(publishError, language));
     } finally {
       setIsSubmitting(false);
     }
@@ -214,7 +273,7 @@ export default function AnnouncementsScreen() {
 
   async function deleteAnnouncement(announcementId: string) {
     if (!userCanDelete) {
-      setStatusMessage("Sadece kulüp yöneticisi duyuru silebilir.");
+      setStatusMessage(copy.statusOnlyAdminDelete);
       return;
     }
 
@@ -223,85 +282,86 @@ export default function AnnouncementsScreen() {
         const firebaseUser = authService.getCurrentUser();
 
         if (firebaseUser === null) {
-          setStatusMessage("Duyuru silmek için giriş yapmalısın.");
+          setStatusMessage(copy.statusSignInToDelete);
           return;
         }
 
         await firestoreTeamSyncService.removeAnnouncement(firebaseUser, announcementId);
         await loadAnnouncementsData();
-        setStatusMessage("Duyuru Firestore kulüp datasından silindi.");
+        setStatusMessage(copy.statusDeleted);
         return;
       }
 
       const nextAppData = await teamSyncService.removeAnnouncement(announcementId);
       setContextAppData(nextAppData);
-      setStatusMessage("Duyuru local datadan silindi.");
+      setStatusMessage(copy.statusDeleted);
     } catch (deleteError) {
-      setStatusMessage(getAuthErrorMessage(deleteError));
+      setStatusMessage(getAuthErrorMessage(deleteError, language));
     }
   }
 
   return (
     <AppScreenLayout>
-      <PageHeader title="Duyurular" subtitle="Kulüp veya takım üyelerine merkezi data üzerinden duyuru yayınla." />
+      <PageHeader title={copy.pageTitle} subtitle={copy.pageSubtitle} />
 
       <Card variant="elevated" style={styles.heroCard}>
-        <StatusBadge label="Kulüp iletişim merkezi" tone="info" style={styles.heroLabel} />
-        <Text style={styles.heroTitle}>Duyuru yönetimi</Text>
-        <Text style={styles.heroSubtitle}>
-          Duyurular artık Firebase varsa Firestore kulüp datasından gelir. Her kullanıcı sadece kendi kulübünün duyurularını görür.
-        </Text>
+        <StatusBadge label={copy.heroLabel} tone="info" style={styles.heroLabel} />
+        <Text style={styles.heroTitle}>{copy.heroTitle}</Text>
+        <Text style={styles.heroSubtitle}>{copy.heroSubtitle}</Text>
       </Card>
 
       <View style={styles.actionRowTop}>
-        {userCanPublish ? (
-          <AppButton
-            title={showCreateForm ? "Form açık" : "Yeni duyuru oluştur"}
-            onPress={() => {
-              setShowCreateForm(true);
-              setStatusMessage("Yeni duyuru bilgilerini doldurabilirsin.");
-            }}
-            disabled={showCreateForm}
-            style={styles.actionButton}
-          />
-        ) : null}
+        <AppButton
+          title={showCreateForm ? copy.formOpen : copy.createNew}
+          onPress={() => {
+            if (!userCanPublish) {
+              setStatusMessage(copy.statusNoPublishPermission);
+              return;
+            }
+
+            setShowCreateForm(true);
+            setStatusMessage(copy.statusFillForm);
+          }}
+          disabled={showCreateForm || !userCanPublish}
+          style={styles.actionButton}
+        />
 
         <AppButton
-          title="Merkezi datayı yenile"
+          title={copy.refresh}
           variant="ghost"
           onPress={loadAnnouncementsData}
           style={styles.actionButton}
         />
       </View>
 
-      {showCreateForm && userCanPublish ? (
+      {showCreateForm ? (
         <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.sectionHeaderText}>
-              <Text style={styles.sectionTitle}>Yeni duyuru oluştur</Text>
-              <Text style={styles.sectionSubtitle}>Başlığı, mesajı ve hedef kitleyi seç.</Text>
+              <Text style={styles.sectionTitle}>{copy.newAnnouncementTitle}</Text>
+              <Text style={styles.sectionSubtitle}>{copy.newAnnouncementSubtitle}</Text>
             </View>
-            <StatusBadge label="Yeni" tone="info" />
+            <StatusBadge label={copy.newBadge} tone="info" />
           </View>
 
           <TextField
-            label="Duyuru başlığı"
+            label={copy.titleLabel}
             value={title}
             onChangeText={setTitle}
-            placeholder="Örn: Maç programı açıklandı"
+            placeholder={copy.titlePlaceholder}
             containerStyle={styles.field}
           />
 
           <TextField
-            label="Duyuru mesajı"
+            label={copy.messageLabel}
             value={message}
             onChangeText={setMessage}
-            placeholder="Duyuru detaylarını yaz..."
+            placeholder={copy.messagePlaceholder}
             multiline
             containerStyle={styles.field}
           />
 
-          <Text style={styles.label}>Kimlere gönderilecek?</Text>
+          <Text style={styles.label}>{copy.audienceLabel}</Text>
           <View style={styles.targetGrid}>
             {targetOptions.map((target) => {
               const isSelected = selectedTargetId === target.id;
@@ -326,18 +386,18 @@ export default function AnnouncementsScreen() {
 
           <View style={styles.publishRow}>
             <AppButton
-              title={isSubmitting ? "Yayınlanıyor..." : "Duyuruyu yayınla"}
+              title={isSubmitting ? copy.publishing : copy.publish}
               onPress={publishAnnouncement}
               disabled={!canPublish}
               style={styles.actionButton}
             />
             <AppButton
-              title="Vazgeç"
+              title={copy.cancel}
               variant="ghost"
               onPress={() => {
                 clearForm();
                 setShowCreateForm(false);
-                setStatusMessage("Duyuru oluşturma iptal edildi.");
+                setStatusMessage(copy.statusCreateCancelled);
               }}
               style={styles.actionButton}
             />
@@ -348,38 +408,30 @@ export default function AnnouncementsScreen() {
       <Card style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>Yayınlanan duyurular</Text>
-            <Text style={styles.sectionSubtitle}>Paylaşılan duyuruları burada takip edebilirsin.</Text>
+            <Text style={styles.sectionTitle}>{copy.publishedSectionTitle}</Text>
+            <Text style={styles.sectionSubtitle}>{copy.publishedSectionSubtitle}</Text>
           </View>
-          <StatusBadge label={`${announcements.length} aktif`} tone="info" />
+          <StatusBadge label={copy.activeCount(announcements.length)} tone="info" />
         </View>
 
-        {announcements.length > 5 ? (
-          <SearchField
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Başlık veya mesaj ara..."
-            accessibilityLabel="Duyurularda ara"
-            style={styles.searchField}
-          />
-        ) : null}
-
         <View style={styles.announcementList}>
-          {appData !== null && visibleAnnouncements.length > 0 ? (
-            visibleAnnouncements.map((announcement) => (
+          {appData !== null && announcements.length > 0 ? (
+            announcements.map((announcement) => (
               <Card key={announcement.id} variant="subtle" style={styles.announcementCard}>
                 <View style={styles.announcementHeaderRow}>
                   <View style={styles.announcementTextArea}>
                     <Text style={styles.announcementTarget}>
-                      {getAnnouncementTargetLabel(announcement, appData)}
+                      {getAnnouncementTargetLabel(announcement, appData, copy)}
                     </Text>
                     <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                    <Text style={styles.announcementDate}>Paylaşıldı: {formatDate(announcement.createdAt)}</Text>
+                    <Text style={styles.announcementDate}>
+                      {copy.sharedOn}: {formatDate(announcement.createdAt, locale)}
+                    </Text>
                   </View>
 
                   {userCanDelete ? (
                     <AppButton
-                      title="Sil"
+                      title={copy.deleteLabel}
                       variant="ghost"
                       onPress={() => deleteAnnouncement(announcement.id)}
                       style={styles.deleteButton}
@@ -390,21 +442,10 @@ export default function AnnouncementsScreen() {
                 <Text style={styles.announcementMessage}>{announcement.message}</Text>
               </Card>
             ))
-          ) : announcements.length > 0 ? (
-            <EmptyState title="Aramayla eşleşen duyuru yok" description="Farklı bir başlık veya kelime ile tekrar dene." />
           ) : (
-            <EmptyState title="Henüz duyuru yok" description="Yeni duyuru oluştur butonuna basarak ilk duyurunu ekleyebilirsin." />
+            <EmptyState title={copy.emptyTitle} description={copy.emptyDescription} />
           )}
         </View>
-
-        {!showAllAnnouncements && filteredAnnouncements.length > visibleAnnouncements.length ? (
-          <AppButton
-            title={`Daha fazla göster (${filteredAnnouncements.length - visibleAnnouncements.length})`}
-            variant="ghost"
-            onPress={() => setShowAllAnnouncements(true)}
-            style={styles.showMoreButton}
-          />
-        ) : null}
 
         <Text style={styles.statusText}>{statusMessage}</Text>
       </Card>
@@ -470,7 +511,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xl,
   },
   targetButton: {
-    borderRadius: theme.radius.md,
+    borderRadius: theme.radius.full,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
     paddingVertical: theme.spacing.sm,
@@ -488,10 +529,8 @@ const styles = StyleSheet.create({
   },
   targetButtonTextSelected: { color: theme.colors.text.inverse },
   publishRow: { flexDirection: "row", flexWrap: "wrap", gap: theme.spacing.md },
-  searchField: { marginBottom: theme.spacing.lg },
-  showMoreButton: { alignSelf: "flex-start", marginTop: theme.spacing.md },
-  announcementList: { gap: theme.spacing.sm },
-  announcementCard: { padding: theme.spacing.md },
+  announcementList: { gap: theme.spacing.md },
+  announcementCard: { padding: theme.spacing.lg },
   announcementHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",

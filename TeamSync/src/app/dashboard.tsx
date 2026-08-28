@@ -268,7 +268,7 @@ export default function DashboardScreen() {
       </View>
 
       <View style={[styles.mainGrid, isDesktop ? null : styles.mainGridStacked]}>
-        <Card style={styles.panel}>
+        <Card style={[styles.panel, isDesktop ? styles.mainGridPanel : null]}>
           <Text style={styles.panelTitle}>{copy.quickActions}</Text>
           <View style={styles.actionGrid}>
             {quickActions.map((action) => (
@@ -283,7 +283,7 @@ export default function DashboardScreen() {
           </View>
         </Card>
 
-        <Card style={styles.panel}>
+        <Card style={[styles.panel, isDesktop ? styles.mainGridPanel : null]}>
           <Text style={styles.panelTitle}>{copy.upcomingEvents}</Text>
           {upcomingEvents.length === 0 ? (
             <Text style={styles.emptyText}>{copy.noEvents}</Text>
@@ -355,7 +355,8 @@ const styles = StyleSheet.create({
 
   mainGrid: { flexDirection: "row", gap: theme.spacing.xl, marginBottom: theme.spacing.xl },
   mainGridStacked: { flexDirection: "column" },
-  panel: { flex: 1, gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
+  mainGridPanel: { flex: 1 },
+  panel: { gap: theme.spacing.lg, marginBottom: theme.spacing.xl },
   panelHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   panelTitle: { color: theme.colors.text.primary, fontSize: theme.fontSizes.xl, fontWeight: theme.fontWeights.semibold },
   viewAllText: { color: theme.colors.brand.primary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },

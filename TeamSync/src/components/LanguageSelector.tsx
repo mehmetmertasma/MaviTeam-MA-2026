@@ -7,13 +7,13 @@ type LanguageSelectorProps = {
   compact?: boolean;
 };
 
+// A plain two-segment control instead of a "current -> next" toggle: you see
+// both options and tap the one you want, rather than reading an arrow to
+// figure out what tapping does. Flag emoji were dropped entirely -- on
+// Windows they don't render as flags at all, just as literal "TR"/"US" text,
+// which was the actual clutter in the old design, not just the shape/color.
 export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
   const { language, setLanguage, t } = useTranslation();
-  const currentLanguage = supportedLanguages.find((item) => item.code === language) ?? supportedLanguages[0];
-  const nextLanguage = supportedLanguages.find((item) => item.code !== language) ?? currentLanguage;
-  const switchLabel = compact
-    ? `${currentLanguage.shortLabel} → ${nextLanguage.shortLabel}`
-    : `${currentLanguage.nativeLabel} → ${nextLanguage.nativeLabel}`;
 
   return (
     <View style={[styles.container, compact ? styles.compactContainer : null]}>
@@ -24,28 +24,38 @@ export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
         </View>
       ) : null}
 
-      <Pressable
-        onPress={() => setLanguage(nextLanguage.code)}
-        accessibilityRole="button"
-        accessibilityLabel={`Switch language to ${nextLanguage.nativeLabel}`}
-        style={({ pressed }) => [
-          styles.toggle,
-          compact ? styles.compactToggle : null,
-          pressed ? styles.pressed : null,
-        ]}
-      >
-        <View style={styles.currentSide}>
-          <Text style={styles.flag}>{currentLanguage.flag}</Text>
-          <View style={styles.languageTextArea}>
-            {!compact ? <Text style={styles.metaLabel}>{t.language.title}</Text> : null}
-            <Text style={[styles.toggleText, compact ? styles.compactToggleText : null]}>{switchLabel}</Text>
-          </View>
-        </View>
+      <View style={[styles.segmentGroup, compact ? styles.compactSegmentGroup : null]}>
+        {supportedLanguages.map((option) => {
+          const isActive = option.code === language;
+          const label = compact ? option.shortLabel : option.nativeLabel;
 
-        <View style={styles.nextPill}>
-          <Text style={styles.nextPillText}>{nextLanguage.shortLabel}</Text>
-        </View>
-      </Pressable>
+          return (
+            <Pressable
+              key={option.code}
+              onPress={() => setLanguage(option.code)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`${t.language.title}: ${option.nativeLabel}`}
+              style={({ pressed }) => [
+                styles.segment,
+                compact ? styles.compactSegment : null,
+                isActive ? styles.segmentActive : null,
+                pressed && !isActive ? styles.pressed : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  compact ? styles.compactSegmentText : null,
+                  isActive ? styles.segmentTextActive : null,
+                ]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -71,66 +81,48 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
     lineHeight: theme.lineHeights.md,
   },
-  toggle: {
-    minHeight: 56,
-    borderRadius: theme.radius.xl,
+  segmentGroup: {
+    flexDirection: "row",
+    borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
-    backgroundColor: theme.colors.background.surface,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.spacing.lg,
+    backgroundColor: theme.colors.background.subtle,
+    padding: 3,
+    gap: 3,
   },
-  compactToggle: {
-    minHeight: 38,
+  compactSegmentGroup: {
     borderRadius: theme.radius.md,
-    paddingVertical: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    gap: theme.spacing.sm,
+    padding: 2,
+    gap: 2,
   },
-  currentSide: {
+  segment: {
     flex: 1,
-    flexDirection: "row",
+    minHeight: 44,
     alignItems: "center",
-    gap: theme.spacing.sm,
+    justifyContent: "center",
+    borderRadius: theme.radius.md,
+    paddingHorizontal: theme.spacing.md,
   },
-  flag: {
-    fontSize: theme.fontSizes.lg,
+  compactSegment: {
+    minHeight: 30,
+    borderRadius: theme.radius.sm,
+    paddingHorizontal: theme.spacing.sm,
   },
-  languageTextArea: {
-    flex: 1,
+  segmentActive: {
+    backgroundColor: theme.colors.brand.primary,
   },
-  metaLabel: {
-    color: theme.colors.text.muted,
-    fontSize: theme.fontSizes.xs,
-    fontWeight: theme.fontWeights.medium,
-    textTransform: "uppercase",
-    marginBottom: 2,
-  },
-  toggleText: {
-    color: theme.colors.text.primary,
+  segmentText: {
+    color: theme.colors.text.secondary,
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
   },
-  compactToggleText: {
+  compactSegmentText: {
     fontSize: theme.fontSizes.sm,
   },
-  nextPill: {
-    backgroundColor: theme.colors.brand.primarySoft,
-    borderRadius: theme.radius.sm,
-    paddingVertical: theme.spacing.xs,
-    paddingHorizontal: theme.spacing.sm,
-  },
-  nextPillText: {
-    color: theme.colors.text.brand,
-    fontSize: theme.fontSizes.sm,
-    fontWeight: theme.fontWeights.semibold,
+  segmentTextActive: {
+    color: theme.colors.text.inverse,
   },
   pressed: {
-    opacity: 0.84,
-    transform: [{ scale: 0.98 }],
+    opacity: 0.7,
   },
 });

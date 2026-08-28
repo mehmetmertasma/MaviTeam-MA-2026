@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -42,11 +42,12 @@ export default function RegisterScreen() {
         creatingAccount: "Hesap oluşturuluyor...",
         preparingProfile: "Hesap profili hazırlanıyor...",
         readyForNextStep: "Hesap oluşturuldu. Sonraki adıma geçiliyor...",
-        legalConsentPrefix: "Hesap oluşturarak ",
+        legalConsentPrefix: "",
         legalPrivacyLabel: "Gizlilik Politikası'nı",
         legalAnd: " ve ",
         legalTermsLabel: "Kullanım Koşulları'nı",
-        legalConsentSuffix: " kabul etmiş olursunuz.",
+        legalConsentSuffix: " okudum ve kabul ediyorum.",
+        legalConsentRequired: "Devam etmek için Gizlilik Politikası ve Kullanım Koşulları'nı kabul etmelisiniz.",
       }
     : {
         accountSetupTitle: "Secure account setup",
@@ -54,17 +55,19 @@ export default function RegisterScreen() {
         creatingAccount: "Creating account...",
         preparingProfile: "Preparing account profile...",
         readyForNextStep: "Account created. Moving to the next step...",
-        legalConsentPrefix: "By creating an account, you agree to our ",
+        legalConsentPrefix: "I have read and agree to the ",
         legalPrivacyLabel: "Privacy Policy",
         legalAnd: " and ",
         legalTermsLabel: "Terms of Service",
         legalConsentSuffix: ".",
+        legalConsentRequired: "Please accept the Privacy Policy and Terms of Service to continue.",
       };
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState(
     firebaseIsReady ? t.auth.firebaseReadyRegister : t.auth.firebaseMissingRegister
@@ -104,6 +107,11 @@ export default function RegisterScreen() {
 
     if (cleanPassword !== confirmPassword.trim()) {
       setStatusMessage(t.auth.validation.passwordMismatch);
+      return;
+    }
+
+    if (!acceptedTerms) {
+      setStatusMessage(registerCopy.legalConsentRequired);
       return;
     }
 
@@ -237,17 +245,41 @@ export default function RegisterScreen() {
           <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
         </View>
 
-        <Text style={styles.legalConsentText}>
-          {registerCopy.legalConsentPrefix}
-          <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
-            {registerCopy.legalPrivacyLabel}
+        <Pressable
+          style={styles.consentRow}
+          onPress={() => setAcceptedTerms((currentValue) => !currentValue)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: acceptedTerms }}
+          accessibilityLabel={`${registerCopy.legalConsentPrefix}${registerCopy.legalPrivacyLabel}${registerCopy.legalAnd}${registerCopy.legalTermsLabel}${registerCopy.legalConsentSuffix}`}
+        >
+          <View style={[styles.checkbox, acceptedTerms ? styles.checkboxChecked : null]}>
+            {acceptedTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+          </View>
+
+          <Text style={styles.legalConsentText}>
+            {registerCopy.legalConsentPrefix}
+            <Text
+              style={styles.legalLink}
+              onPress={(pressEvent) => {
+                pressEvent.stopPropagation();
+                router.push("/privacy-policy" as never);
+              }}
+            >
+              {registerCopy.legalPrivacyLabel}
+            </Text>
+            {registerCopy.legalAnd}
+            <Text
+              style={styles.legalLink}
+              onPress={(pressEvent) => {
+                pressEvent.stopPropagation();
+                router.push("/terms-of-service" as never);
+              }}
+            >
+              {registerCopy.legalTermsLabel}
+            </Text>
+            {registerCopy.legalConsentSuffix}
           </Text>
-          {registerCopy.legalAnd}
-          <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
-            {registerCopy.legalTermsLabel}
-          </Text>
-          {registerCopy.legalConsentSuffix}
-        </Text>
+        </Pressable>
 
         <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
 
@@ -255,7 +287,7 @@ export default function RegisterScreen() {
           <AppButton
             title={isSubmitting ? t.auth.registerSubmitting : t.auth.registerButton}
             onPress={handleContinue}
-            disabled={isSubmitting || !firebaseIsReady}
+            disabled={isSubmitting || !firebaseIsReady || !acceptedTerms}
             accessibilityLabel={t.auth.accessibility.register}
             style={styles.button}
           />
@@ -324,11 +356,37 @@ const styles = StyleSheet.create({
     ...Typography.supporting,
     color: theme.colors.text.secondary,
   },
+  consentRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing["2xl"],
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border.strong,
+    backgroundColor: theme.colors.background.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  checkboxMark: {
+    color: theme.colors.text.inverse,
+    fontSize: 14,
+    fontWeight: theme.fontWeights.bold,
+    lineHeight: 16,
+  },
   legalConsentText: {
     ...Typography.caption,
     color: theme.colors.text.muted,
-    textAlign: "center",
-    marginTop: theme.spacing["2xl"],
+    flex: 1,
   },
   legalLink: {
     color: theme.colors.text.brand,

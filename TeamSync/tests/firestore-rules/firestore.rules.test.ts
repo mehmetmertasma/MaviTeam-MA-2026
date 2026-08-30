@@ -399,6 +399,36 @@ describe("chatGroups", () => {
     const db = authedFirestore(PARENT_A1);
     await assertFails(deleteDoc(doc(db, "chatGroups", "chatgroup-a1-team")));
   });
+
+  // Regression coverage for a real production bug: the rule worked fine for
+  // a single get() but denied the WHOLE list query when its allow-read
+  // condition mixed a get()-dependent branch (admin/team) with a plain
+  // resource.data array-membership check (visibleUserIds) in one boolean --
+  // see the split allow-read statements on the chatGroups match block.
+  it("a member can list (not just get) chat groups where their uid is in visibleUserIds", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(
+      getDocs(query(collection(db, "chatGroups"), where("clubId", "==", CLUB_A), where("visibleUserIds", "array-contains", ATHLETE_A1)))
+    );
+  });
+
+  it("a member's visibleUserIds list query only returns groups they're actually in", async () => {
+    const db = authedFirestore(PARENT_A2);
+    const results = await getDocs(
+      query(collection(db, "chatGroups"), where("clubId", "==", CLUB_A), where("visibleUserIds", "array-contains", PARENT_A2))
+    );
+    // PARENT_A2 is only listed in the club-wide group's visibleUserIds, not
+    // the team-scoped one -- confirms per-document filtering still works
+    // correctly with the split rule, not just that the request succeeds.
+    if (results.docs.length !== 1 || results.docs[0].id !== "chatgroup-a-clubwide") {
+      throw new Error(`Expected exactly chatgroup-a-clubwide, got: ${results.docs.map((d) => d.id).join(", ")}`);
+    }
+  });
+
+  it("clubAdmin can list every chat group in their club (no visibleUserIds filter)", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDocs(query(collection(db, "chatGroups"), where("clubId", "==", CLUB_A))));
+  });
 });
 
 describe("replays", () => {
@@ -420,6 +450,82 @@ describe("replays", () => {
   it("athlete cannot delete a replay", async () => {
     const db = authedFirestore(ATHLETE_A1);
     await assertFails(deleteDoc(doc(db, "replays", "replay-a1-team")));
+  });
+
+  // Same regression class as the chatGroups list-query tests above.
+  it("a member can list (not just get) replays where their uid is in visibleUserIds", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(
+      getDocs(query(collection(db, "replays"), where("clubId", "==", CLUB_A), where("visibleUserIds", "array-contains", ATHLETE_A1)))
+    );
+  });
+
+  it("clubAdmin can list every replay in their club (no visibleUserIds filter)", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDocs(query(collection(db, "replays"), where("clubId", "==", CLUB_A))));
+  });
+});
+
+describe("chatMessages", () => {
+  const GROUP_MESSAGE_FIXTURE = {
+    clubId: CLUB_A,
+    groupId: "chatgroup-a1-team",
+    senderUserId: COACH_A,
+    text: "Practice moved to 6pm",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    visibleUserIds: [COACH_A, PARENT_A1, ATHLETE_A1],
+  };
+
+  const DIRECT_MESSAGE_FIXTURE = {
+    clubId: CLUB_A,
+    senderUserId: PARENT_A1,
+    text: "Hi coach",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    directUserIds: [PARENT_A1, COACH_A],
+  };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "chatMessages", "message-group"), GROUP_MESSAGE_FIXTURE);
+      await setDoc(doc(db, "chatMessages", "message-direct"), DIRECT_MESSAGE_FIXTURE);
+    });
+  });
+
+  // Regression coverage: this exact query shape (clubId + visibleUserIds
+  // array-contains) is what firestoreMaviTeamDataService.
+  // listVisibleChatMessagesForCurrentUser now uses instead of a
+  // groupId-based lookup, specifically because a get() into a different
+  // document (the chatGroups doc) keyed off a field of the message being
+  // evaluated could never be proven safe for a list query.
+  it("a group member can list messages via visibleUserIds", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(
+      getDocs(query(collection(db, "chatMessages"), where("clubId", "==", CLUB_A), where("visibleUserIds", "array-contains", ATHLETE_A1)))
+    );
+  });
+
+  it("a non-member's visibleUserIds list query returns nothing for that group", async () => {
+    const db = authedFirestore(PARENT_A2);
+    const results = await getDocs(
+      query(collection(db, "chatMessages"), where("clubId", "==", CLUB_A), where("visibleUserIds", "array-contains", PARENT_A2))
+    );
+
+    if (results.docs.length !== 0) {
+      throw new Error(`Expected no visible messages for PARENT_A2, got: ${results.docs.map((d) => d.id).join(", ")}`);
+    }
+  });
+
+  it("a participant can list their direct messages", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertSucceeds(
+      getDocs(query(collection(db, "chatMessages"), where("clubId", "==", CLUB_A), where("directUserIds", "array-contains", PARENT_A1)))
+    );
+  });
+
+  it("clubAdmin can list every message in their club (no filter beyond clubId)", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDocs(query(collection(db, "chatMessages"), where("clubId", "==", CLUB_A))));
   });
 });
 

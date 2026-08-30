@@ -174,19 +174,9 @@ service cloud.firestore {
 
     // Group-message visibility is read from data.visibleUserIds directly rather
     // than looking up the chatGroups doc (see canCreateChatMessage, which is the
-    // only place that trusts that field): a list query can't statically prove a
-    // get() keyed off a field on the very documents it's evaluating is safe, so
-    // Firestore denies the whole query rather than filtering per-document.
-    function canReadChatMessage(data) {
-      return belongsToCurrentUsersClub(data.clubId)
-        && (
-          currentUserIsClubAdmin()
-          || data.senderUserId == request.auth.uid
-          || (('directUserIds' in data) && data.directUserIds is list && request.auth.uid in data.directUserIds)
-          || (('visibleUserIds' in data) && data.visibleUserIds is list && request.auth.uid in data.visibleUserIds)
-        );
-    }
-
+    // only place that trusts that field) -- see the chatMessages match block
+    // below for why read authorization is split into separate allow statements
+    // instead of one function here.
     function canCreateChatMessage(data) {
       return currentUserHasProfile()
         && currentUserIsActive()
@@ -198,16 +188,6 @@ service cloud.firestore {
             ('groupId' in data) && chatGroupExists(data.groupId) && canReadChatGroupData(chatGroupData(data.groupId))
             && data.visibleUserIds == chatGroupData(data.groupId).visibleUserIds
           )
-        );
-    }
-
-    function canReadReplay(data) {
-      return belongsToCurrentUsersClub(data.clubId)
-        && (
-          currentUserIsClubAdmin()
-          || data.createdByUserId == request.auth.uid
-          || (('visibleUserIds' in data) && data.visibleUserIds is list && request.auth.uid in data.visibleUserIds)
-          || isCurrentUsersTeamData(data)
         );
     }
 
@@ -443,7 +423,16 @@ service cloud.firestore {
     }
 
     match /chatGroups/{chatGroupId} {
-      allow read: if canReadChatGroupData(resource.data);
+      // Split into separate allow-read statements (instead of one canReadChatGroupData(resource.data)
+      // OR'd boolean) because Firestore's list-query rule validator can't statically prove a compound
+      // expression that mixes a get()-dependent branch (admin/team) with a plain resource.data array
+      // membership check (visibleUserIds) -- it denies the whole `list` request outright even when every
+      // returned document would individually satisfy the rule. Each statement below is validated
+      // independently, and Firestore ORs the results, which list queries can prove document-by-document.
+      allow read: if currentUserIsClubAdmin() && belongsToCurrentUsersClub(resource.data.clubId);
+      allow read: if isCurrentUsersTeamData(resource.data) && belongsToCurrentUsersClub(resource.data.clubId);
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
+        && ('visibleUserIds' in resource.data) && request.auth.uid in resource.data.visibleUserIds;
       allow create, update: if canCreateOrUpdateChatGroupData(request.resource.data);
       allow delete: if (currentUserIsClubAdmin()
           && resource.data.clubId == currentUserClubId())
@@ -451,13 +440,26 @@ service cloud.firestore {
     }
 
     match /chatMessages/{chatMessageId} {
-      allow read: if canReadChatMessage(resource.data);
+      // Split for the same reason as chatGroups above -- a list query can't
+      // be validated when a get()-dependent branch (admin) is OR'd together
+      // with a plain resource.data array-membership check in one expression.
+      allow read: if currentUserIsClubAdmin() && belongsToCurrentUsersClub(resource.data.clubId);
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId) && resource.data.senderUserId == request.auth.uid;
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
+        && ('directUserIds' in resource.data) && request.auth.uid in resource.data.directUserIds;
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
+        && ('visibleUserIds' in resource.data) && request.auth.uid in resource.data.visibleUserIds;
       allow create: if canCreateChatMessage(request.resource.data);
       allow update, delete: if false;
     }
 
     match /replays/{replayId} {
-      allow read: if canReadReplay(resource.data);
+      // Split for the same reason as chatGroups above.
+      allow read: if currentUserIsClubAdmin() && belongsToCurrentUsersClub(resource.data.clubId);
+      allow read: if isCurrentUsersTeamData(resource.data) && belongsToCurrentUsersClub(resource.data.clubId);
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId) && resource.data.createdByUserId == request.auth.uid;
+      allow read: if belongsToCurrentUsersClub(resource.data.clubId)
+        && ('visibleUserIds' in resource.data) && request.auth.uid in resource.data.visibleUserIds;
       allow create, update: if canCreateOrUpdateReplay(request.resource.data);
       allow delete: if (currentUserIsClubAdmin()
           && resource.data.clubId == currentUserClubId())

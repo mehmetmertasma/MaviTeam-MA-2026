@@ -70,7 +70,7 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "clubId", "order": "ASCENDING" },
-        { "fieldPath": "groupId", "order": "ASCENDING" }
+        { "fieldPath": "visibleUserIds", "arrayConfig": "CONTAINS" }
       ]
     },
     {

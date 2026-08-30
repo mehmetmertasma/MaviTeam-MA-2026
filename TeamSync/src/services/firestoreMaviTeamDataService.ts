@@ -550,7 +550,15 @@ export const firestoreMaviTeamDataService = {
     return sortNewestFirst(groups);
   },
 
-  async listVisibleChatMessagesForCurrentUser(firebaseUser: User, groupIds: string[] = [], maxResults = 250): Promise<ChatMessage[]> {
+  // groupId-based lookup used to require the caller's already-fetched
+  // chatGroups IDs (where("groupId", "in", groupIds)) -- besides the extra
+  // dependency, that shape is unauthorizable for a list query, since
+  // firestore.rules can only authorize a group message via its own
+  // denormalized visibleUserIds field (see the chatMessages match block),
+  // which the query itself needs to filter on for Firestore to prove the
+  // rule holds. Querying visibleUserIds directly, like the direct-message
+  // query already does with directUserIds, fixes both at once.
+  async listVisibleChatMessagesForCurrentUser(firebaseUser: User, maxResults = 250): Promise<ChatMessage[]> {
     const { db } = requireFirebaseServices();
     const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
@@ -558,18 +566,20 @@ export const firestoreMaviTeamDataService = {
       return [];
     }
 
+    if (workspace.currentUser.role === "clubAdmin") {
+      const adminQuery = query(collection(db, "chatMessages"), where("clubId", "==", workspace.club.id), firestoreLimit(maxResults));
+      const adminSnapshots = await getDocs(adminQuery);
+      return adminSnapshots.docs.map(getChatMessageFromFirestore).sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+    }
+
     const messages: ChatMessage[] = [];
     const directQuery = query(collection(db, "chatMessages"), where("clubId", "==", workspace.club.id), where("directUserIds", "array-contains", firebaseUser.uid), firestoreLimit(maxResults));
     const directSnapshots = await getDocs(directQuery);
     messages.push(...directSnapshots.docs.map(getChatMessageFromFirestore));
 
-    const limitedGroupIds = groupIds.filter(Boolean).slice(0, 10);
-
-    if (limitedGroupIds.length > 0) {
-      const groupQuery = query(collection(db, "chatMessages"), where("clubId", "==", workspace.club.id), where("groupId", "in", limitedGroupIds), firestoreLimit(maxResults));
-      const groupSnapshots = await getDocs(groupQuery);
-      messages.push(...groupSnapshots.docs.map(getChatMessageFromFirestore));
-    }
+    const groupVisibleQuery = query(collection(db, "chatMessages"), where("clubId", "==", workspace.club.id), where("visibleUserIds", "array-contains", firebaseUser.uid), firestoreLimit(maxResults));
+    const groupVisibleSnapshots = await getDocs(groupVisibleQuery);
+    messages.push(...groupVisibleSnapshots.docs.map(getChatMessageFromFirestore));
 
     return uniqueById(messages).sort((first, second) => first.createdAt.localeCompare(second.createdAt));
   },

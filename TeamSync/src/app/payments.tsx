@@ -1,8 +1,11 @@
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { openBrowserAsync } from "expo-web-browser";
+import { useCallback, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { AppScreenLayout } from "@/components/AppScreenLayout";
+import { BillingDetailsModal } from "@/components/BillingDetailsModal";
 import { Card } from "@/components/Card";
 import { EmptyState } from "@/components/EmptyState";
 import { PageHeader } from "@/components/PageHeader";
@@ -13,8 +16,9 @@ import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
+import { paymentGatewayService } from "@/services/paymentGatewayService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { Payment, PaymentStatus, TeamSyncAppData, UserProfile } from "@/types/teamSync";
+import type { BillingDetails, Payment, PaymentStatus, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 import { matchesSearchQuery } from "@/utils/search";
 
 const EMPTY_PAYMENTS: Payment[] = [];
@@ -30,8 +34,26 @@ function canManagePayments(appData: TeamSyncAppData | null) {
   return appData?.currentUser.role === "superAdmin" || appData?.currentUser.role === "clubAdmin";
 }
 
-function formatAmount(amountCents: number, locale: string) {
-  return new Intl.NumberFormat(locale, { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(amountCents / 100);
+function formatAmount(amountCents: number, locale: string, currency: string) {
+  return new Intl.NumberFormat(locale, { style: "currency", currency, maximumFractionDigits: 0 }).format(amountCents / 100);
+}
+
+// Payments the monthly dues generator creates (functions/index.js's
+// generateMonthlyDues) carry a billingPeriodKey ("2026-09") instead of a
+// meaningful free-text title -- label those by month/year instead of
+// showing the generic placeholder title stored on the doc.
+function formatPaymentTitle(payment: Payment, locale: string) {
+  if (payment.billingPeriodKey === undefined) {
+    return payment.title;
+  }
+
+  const [year, month] = payment.billingPeriodKey.split("-").map(Number);
+  if (year === undefined || month === undefined) {
+    return payment.title;
+  }
+
+  const monthLabel = new Date(year, month - 1, 1).toLocaleDateString(locale, { month: "long", year: "numeric" });
+  return locale === "tr-TR" ? `${monthLabel} aidatı` : `${monthLabel} dues`;
 }
 
 function formatDate(value: string, locale: string, noDateLabel: string) {
@@ -56,6 +78,19 @@ function buildDueAt(dateText: string) {
   if (cleanDateText.length === 0) return new Date().toISOString();
   const parsedDate = new Date(cleanDateText);
   return Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+}
+
+// Prefix search, not substring: typing "e" should surface names starting
+// with "e" (Emre), not every name that merely contains an "e" somewhere
+// (Mehmet, Ahmet, ...). Checked per word so a surname prefix ("yil" for
+// "Emre Yılmaz") also matches, the way contact pickers usually behave.
+function matchesRecipientQuery(query: string, fullName: string, email: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (normalizedQuery === "") return true;
+
+  const matchesName = fullName.toLowerCase().split(/\s+/).some((word) => word.startsWith(normalizedQuery));
+  const matchesEmail = email.toLowerCase().startsWith(normalizedQuery);
+  return matchesName || matchesEmail;
 }
 
 function parseAmountToCents(amountText: string) {
@@ -115,6 +150,13 @@ function getCopy(language: "tr" | "en") {
     newPaymentSubtitle: en ? "Add a dues or payment record for a member." : "Bir üyeye aidat veya ödeme kaydı ekle.",
     newBadge: en ? "New" : "Yeni",
     userLabel: en ? "User" : "Kullanıcı",
+    selectedUserLabel: en ? "Selected" : "Seçili",
+    clearSelectedUser: en ? "Clear selected member" : "Seçili üyeyi kaldır",
+    searchMembersPlaceholder: en ? "Type a name or email to search..." : "İsim veya e-posta yazarak ara...",
+    searchMembersLabel: en ? "Search members" : "Üyelerde ara",
+    searchMembersHint: en ? "Start typing to find a member." : "Aramaya başlamak için yazmaya başla.",
+    noMatchingMembersTitle: en ? "No matching members" : "Aramayla eşleşen üye yok",
+    noMatchingMembersDescription: en ? "Try a different name or email." : "Farklı bir isim veya e-posta ile tekrar dene.",
     titleLabel: en ? "Title" : "Başlık",
     titlePlaceholder: en ? "E.g. July dues" : "Örn: Temmuz aidatı",
     amountLabel: en ? "Amount" : "Tutar",
@@ -141,6 +183,9 @@ function getCopy(language: "tr" | "en") {
     noPaymentsYetDescription: en
       ? "Use the New payment button to add the first payment record."
       : "Yeni ödeme oluştur butonuyla ilk ödeme kaydını ekleyebilirsin.",
+    payNow: en ? "Pay now" : "Şimdi öde",
+    payingNow: en ? "Opening checkout..." : "Ödeme açılıyor...",
+    payNowError: en ? "Could not start the payment. Please try again." : "Ödeme başlatılamadı. Lütfen tekrar dene.",
   };
 }
 
@@ -149,6 +194,7 @@ export default function PaymentsScreen() {
   const copy = useMemo(() => getCopy(language), [language]);
   const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData, refresh, setAppData } = useAppDataContext();
+  const { checkout: checkoutReturnParam } = useLocalSearchParams<{ checkout?: string }>();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedUserIdState, setSelectedUserId] = useState("");
   const [paymentTitle, setPaymentTitle] = useState("");
@@ -156,11 +202,12 @@ export default function PaymentsScreen() {
   const [dueDateText, setDueDateText] = useState("");
   const [statusMessage, setStatusMessage] = useState(copy.paymentsUpdated);
   const [searchQuery, setSearchQuery] = useState("");
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const [payingPaymentId, setPayingPaymentId] = useState<string | null>(null);
+  const [pendingCheckoutPaymentId, setPendingCheckoutPaymentId] = useState<string | null>(null);
 
   const users = appData?.users ?? EMPTY_USERS;
-  const selectedUserId = users.some((user) => user.id === selectedUserIdState && user.status !== "removed")
-    ? selectedUserIdState
-    : users.find((user) => user.status !== "removed")?.id ?? "";
+  const selectedUserId = users.find((user) => user.id === selectedUserIdState && user.status !== "removed")?.id ?? "";
 
   async function refreshPaymentsData() {
     try {
@@ -171,8 +218,78 @@ export default function PaymentsScreen() {
     }
   }
 
+  // Stripe/iyzico's hosted checkout returns the browser here with
+  // ?checkout=return once the payer finishes (or abandons) paying --
+  // refresh so a payment the webhook already marked "paid" shows up without
+  // a manual pull-to-refresh.
+  useFocusEffect(
+    useCallback(() => {
+      if (checkoutReturnParam === "return") {
+        refresh()
+          .then(() => setStatusMessage(copy.paymentsUpdated))
+          .catch(() => setStatusMessage(copy.loadError));
+      }
+    }, [checkoutReturnParam, refresh, copy.paymentsUpdated, copy.loadError])
+  );
+
+  async function startCheckout(paymentId: string) {
+    try {
+      setPayingPaymentId(paymentId);
+      const { url } = await paymentGatewayService.createCheckoutSession(paymentId);
+      await openBrowserAsync(url);
+    } catch {
+      setStatusMessage(copy.payNowError);
+    } finally {
+      setPayingPaymentId(null);
+    }
+  }
+
+  async function handlePayNow(payment: Payment) {
+    if (appData === null || payingPaymentId !== null) {
+      return;
+    }
+
+    // iyzico needs the payer's national ID/phone/address on every checkout
+    // -- collect it once via BillingDetailsModal before the very first
+    // online payment instead of asking every time.
+    if (appData.club.country !== "US" && appData.currentUser.billingDetails === undefined) {
+      setPendingCheckoutPaymentId(payment.id);
+      return;
+    }
+
+    await startCheckout(payment.id);
+  }
+
+  async function handleSaveBillingDetails(billingDetails: BillingDetails) {
+    if (appData === null) {
+      return;
+    }
+
+    try {
+      setPayingPaymentId(pendingCheckoutPaymentId);
+      const nextAppData = await teamSyncService.updateCurrentUser({ billingDetails });
+      setAppData(nextAppData);
+
+      const paymentId = pendingCheckoutPaymentId;
+      setPendingCheckoutPaymentId(null);
+
+      if (paymentId !== null) {
+        await startCheckout(paymentId);
+      }
+    } catch {
+      setStatusMessage(copy.payNowError);
+      setPayingPaymentId(null);
+    }
+  }
+
+  const currency = appData?.club.currency ?? "TRY";
   const payments = appData?.payments ?? EMPTY_PAYMENTS;
   const activeUsers = users.filter((user) => user.status !== "removed");
+  const selectedUser = activeUsers.find((user) => user.id === selectedUserId);
+
+  const filteredRecipients = useMemo(() => {
+    return activeUsers.filter((user) => matchesRecipientQuery(recipientQuery, user.fullName, user.email));
+  }, [activeUsers, recipientQuery]);
   const userCanManagePayments = canManagePayments(appData);
   const visiblePayments = userCanManagePayments || appData === null ? payments : payments.filter((payment) => payment.userId === appData.currentUser.id);
 
@@ -264,7 +381,49 @@ export default function PaymentsScreen() {
         <Card style={styles.section}>
           <View style={styles.sectionHeaderRow}><View style={styles.sectionHeaderText}><Text style={styles.sectionTitle}>{copy.newPaymentTitle}</Text><Text style={styles.sectionSubtitle}>{copy.newPaymentSubtitle}</Text></View><Text style={styles.statusPill}>{copy.newBadge}</Text></View>
           <Text style={styles.label}>{copy.userLabel}</Text>
-          <View style={styles.optionGrid}>{activeUsers.map((user) => { const isSelected = selectedUserId === user.id; return (<Pressable key={user.id} onPress={() => setSelectedUserId(user.id)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{user.fullName}</Text></Pressable>); })}</View>
+          {selectedUser ? (
+            <View style={styles.selectedRecipientBanner}>
+              <View style={styles.selectedRecipientText}>
+                <Text style={styles.selectedRecipientLabel}>{copy.selectedUserLabel}</Text>
+                <Text style={styles.selectedRecipientName}>{selectedUser.fullName}</Text>
+              </View>
+              <Pressable
+                onPress={() => { setSelectedUserId(""); setRecipientQuery(""); }}
+                accessibilityLabel={copy.clearSelectedUser}
+                style={({ pressed }) => [styles.clearRecipientButton, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.clearRecipientButtonText}>×</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <SearchField
+                value={recipientQuery}
+                onChangeText={setRecipientQuery}
+                placeholder={copy.searchMembersPlaceholder}
+                accessibilityLabel={copy.searchMembersLabel}
+                style={styles.field}
+              />
+              {recipientQuery.trim().length === 0 ? (
+                <Text style={styles.searchHint}>{copy.searchMembersHint}</Text>
+              ) : filteredRecipients.length === 0 ? (
+                <EmptyState title={copy.noMatchingMembersTitle} description={copy.noMatchingMembersDescription} />
+              ) : (
+                <ScrollView style={styles.recipientList} nestedScrollEnabled>
+                  {filteredRecipients.map((user) => (
+                    <Pressable
+                      key={user.id}
+                      onPress={() => { setSelectedUserId(user.id); setRecipientQuery(""); }}
+                      style={({ pressed }) => [styles.recipientRow, pressed ? styles.pressed : null]}
+                    >
+                      <Text style={styles.recipientName}>{user.fullName}</Text>
+                      <Text style={styles.recipientMeta}>{user.email}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </>
+          )}
           <TextField label={copy.titleLabel} value={paymentTitle} onChangeText={setPaymentTitle} placeholder={copy.titlePlaceholder} containerStyle={styles.field} />
           <View style={styles.formGrid}>
             <TextField label={copy.amountLabel} value={amountText} onChangeText={setAmountText} placeholder={copy.amountPlaceholder} keyboardType="numeric" containerStyle={styles.formField} />
@@ -298,17 +457,17 @@ export default function PaymentsScreen() {
                   <View style={styles.cardTopRow}>
                     <View style={styles.cardTitleGroup}>
                       <Text style={styles.athleteName}>{getUserName(payment.userId, users, copy.userNotFound)}</Text>
-                      <Text style={styles.parentName}>{payment.title}</Text>
+                      <Text style={styles.parentName}>{formatPaymentTitle(payment, locale)}</Text>
                     </View>
                     <StatusBadge label={copy.statusLabels[payment.status]} tone={paymentToneByStatus[payment.status]} />
                   </View>
                   <View style={styles.infoGrid}>
                     <View style={styles.infoBox}><Text style={styles.infoLabel}>{copy.team}</Text><Text style={styles.infoValue}>{getPrimaryTeamName(payment.userId, appData, copy.noTeamSelected, copy.teamNotFound)}</Text></View>
-                    <View style={styles.infoBox}><Text style={styles.infoLabel}>{copy.amount}</Text><Text style={styles.infoValue}>{formatAmount(payment.amountCents, locale)}</Text></View>
+                    <View style={styles.infoBox}><Text style={styles.infoLabel}>{copy.amount}</Text><Text style={styles.infoValue}>{formatAmount(payment.amountCents, locale, currency)}</Text></View>
                     <View style={styles.infoBox}><Text style={styles.infoLabel}>{copy.dueDate}</Text><Text style={styles.infoValue}>{formatDate(payment.dueAt, locale, copy.noDate)}</Text></View>
                     <View style={styles.infoBox}><Text style={styles.infoLabel}>{copy.paidOn}</Text><Text style={styles.infoValue}>{payment.paidAt ? formatDate(payment.paidAt, locale, copy.noDate) : copy.pending}</Text></View>
                   </View>
-                  {userCanManagePayments ? (
+                  {userCanManagePayments && payment.paymentMethod !== "online" ? (
                     <View style={styles.statusActions}>
                       {copy.paymentStatusOptions.map((option) => {
                         const isSelected = payment.status === option.status;
@@ -320,6 +479,14 @@ export default function PaymentsScreen() {
                       })}
                     </View>
                   ) : null}
+                  {payment.paymentMethod === "online" && payment.userId === appData.currentUser.id && payment.status !== "paid" ? (
+                    <AppButton
+                      title={payingPaymentId === payment.id ? copy.payingNow : copy.payNow}
+                      disabled={payingPaymentId !== null}
+                      onPress={() => handlePayNow(payment)}
+                      style={styles.payNowButton}
+                    />
+                  ) : null}
                 </View>
               );
             })}
@@ -330,6 +497,16 @@ export default function PaymentsScreen() {
           <EmptyState title={copy.noPaymentsYetTitle} description={copy.noPaymentsYetDescription} />
         )}
       </Card>
+
+      {pendingCheckoutPaymentId !== null ? (
+        <BillingDetailsModal
+          initialValues={appData?.currentUser.billingDetails}
+          isSaving={payingPaymentId !== null}
+          onSave={handleSaveBillingDetails}
+          onClose={() => setPendingCheckoutPaymentId(null)}
+          language={language}
+        />
+      ) : null}
     </AppScreenLayout>
   );
 }
@@ -359,6 +536,17 @@ const styles = StyleSheet.create({
   optionButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   optionButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   optionButtonTextSelected: { color: theme.colors.text.inverse },
+  selectedRecipientBanner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.sm, backgroundColor: theme.colors.brand.primarySoft, borderRadius: theme.radius.md, paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, marginBottom: theme.spacing.lg },
+  selectedRecipientText: { flex: 1 },
+  selectedRecipientLabel: { color: theme.colors.text.brand, fontSize: theme.fontSizes.xs, fontWeight: theme.fontWeights.semibold, textTransform: "uppercase" },
+  selectedRecipientName: { color: theme.colors.text.brand, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  clearRecipientButton: { width: 28, height: 28, borderRadius: theme.radius.full, alignItems: "center", justifyContent: "center", backgroundColor: theme.colors.background.surface },
+  clearRecipientButtonText: { color: theme.colors.text.brand, fontSize: theme.fontSizes.lg, fontWeight: theme.fontWeights.semibold, lineHeight: theme.fontSizes.lg },
+  searchHint: { color: theme.colors.text.muted, fontSize: theme.fontSizes.sm, marginBottom: theme.spacing.lg },
+  recipientList: { maxHeight: 220, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border.default, marginBottom: theme.spacing.xl },
+  recipientRow: { paddingVertical: theme.spacing.sm, paddingHorizontal: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: theme.colors.border.default, backgroundColor: theme.colors.background.subtle },
+  recipientName: { color: theme.colors.text.primary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.semibold },
+  recipientMeta: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm },
   searchField: { marginBottom: theme.spacing.lg },
   paymentList: { gap: theme.spacing.md },
   paymentCard: { backgroundColor: theme.colors.background.subtle, borderRadius: theme.radius.xl, padding: theme.spacing.lg, borderWidth: 1, borderColor: theme.colors.border.default },
@@ -375,5 +563,6 @@ const styles = StyleSheet.create({
   statusButtonSelected: { backgroundColor: theme.colors.brand.primary, borderColor: theme.colors.brand.primary },
   statusButtonText: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.sm, fontWeight: theme.fontWeights.semibold },
   statusButtonTextSelected: { color: theme.colors.text.inverse },
+  payNowButton: { marginTop: theme.spacing.sm },
   pressed: { opacity: 0.84, transform: [{ scale: 0.99 }] },
 });

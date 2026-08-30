@@ -20,6 +20,21 @@ export type TimestampString = string;
 
 export type ClubStatus = "active" | "suspended";
 
+export type ClubCountry = "TR" | "US";
+
+export type ClubCurrency = "TRY" | "USD";
+
+export type PaymentProvider = "iyzico" | "stripe";
+
+export type ClubPaymentAccountStatus = "not_connected" | "pending" | "connected";
+
+export type ClubPaymentAccount = {
+  provider: PaymentProvider;
+  status: ClubPaymentAccountStatus;
+  externalAccountId?: string;
+  connectedAt?: TimestampString;
+};
+
 export type Club = {
   id: string;
   name: string;
@@ -34,6 +49,22 @@ export type Club = {
   // writes it, via the Admin SDK, so every existing club document written
   // before this field existed keeps working without a backfill.
   status?: ClubStatus;
+  // Missing/undefined is treated as "TR" everywhere that reads this --
+  // every real club predates this field and is actually Turkish, so no
+  // backfill is needed. Drives which online-payment provider a club uses
+  // once it connects a payment account (see ClubPaymentAccount below).
+  country?: ClubCountry;
+  // Derived from country (TR -> TRY, US -> USD) at write time, stored
+  // redundantly so screens can format amounts without re-deriving it.
+  currency?: ClubCurrency;
+  // Day of the month the monthly-dues generator creates new payments on
+  // for this club. Missing/undefined is treated as 1. One setting per
+  // club (not per athlete) -- keeps the generator simple.
+  duesBillingDayOfMonth?: number;
+  // Present only once a club has started connecting a real payment
+  // account. Missing entirely = the club has never touched online
+  // payments and behaves exactly as it does today (manual ledger only).
+  paymentAccount?: ClubPaymentAccount;
   createdAt: TimestampString;
   updatedAt: TimestampString;
 };
@@ -52,8 +83,25 @@ export type UserProfile = {
   // older one still in use elsewhere. Written only by the signed-in user
   // themselves (see firestoreTeamSyncService.registerPushToken).
   expoPushTokens?: string[];
+  // Unset/0 = no recurring due for this person -- most parents/coaches/
+  // admins never have this set, only athletes with an active monthly fee
+  // do. Set by a clubAdmin via the members screen; read by the monthly
+  // dues generator (functions/index.js's generateMonthlyDues).
+  monthlyDuesAmountCents?: number;
+  // Only ever set for a TR-club user paying online -- iyzico's checkout API
+  // requires the payer's national ID, phone, and address on every
+  // transaction, so this is collected once (see BillingDetailsModal) and
+  // reused for every subsequent online payment instead of asking again.
+  billingDetails?: BillingDetails;
   createdAt: TimestampString;
   updatedAt: TimestampString;
+};
+
+export type BillingDetails = {
+  nationalId: string;
+  phone: string;
+  address: string;
+  city: string;
 };
 
 export type Team = {
@@ -150,6 +198,8 @@ export type ChatMessage = {
   createdAt: TimestampString;
 };
 
+export type PaymentMethod = "manual" | "online";
+
 export type Payment = {
   id: string;
   clubId: string;
@@ -160,6 +210,23 @@ export type Payment = {
   dueAt: TimestampString;
   paidAt?: TimestampString;
   updatedAt: TimestampString;
+  // Missing/undefined is treated as "manual" -- every existing payment
+  // predates online collection and was tracked by hand. "online" rows are
+  // only ever created server-side (the monthly generator or the checkout
+  // function), never directly by a client -- see firestore.rules.
+  paymentMethod?: PaymentMethod;
+  provider?: PaymentProvider;
+  // The gateway's own id for this specific payment/checkout session --
+  // used by the webhook to find the matching document idempotently.
+  providerPaymentId?: string;
+  // MaviTeam's commission on this specific payment, if any. Informational
+  // only (the actual split happens at the gateway); kept for reporting.
+  platformFeeCents?: number;
+  // Present only on payments created by the monthly dues generator, e.g.
+  // "2026-09". Used both to label the row ("September dues") and by the
+  // generator itself to avoid creating a second due for the same person
+  // in the same month.
+  billingPeriodKey?: string;
 };
 
 export type Replay = {

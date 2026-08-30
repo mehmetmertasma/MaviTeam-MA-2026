@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -12,6 +12,7 @@ import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 import { teamSyncService } from "@/services/teamSyncService";
+import type { ClubCountry } from "@/types/teamSync";
 
 function getParamValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -42,8 +43,14 @@ export default function CreateClubScreen() {
   const [clubName, setClubName] = useState("");
   const [sport, setSport] = useState("");
   const [city, setCity] = useState("");
+  const [country, setCountry] = useState<ClubCountry>("TR");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const countryOptions: { label: string; value: ClubCountry }[] = [
+    { label: t.createClub.countryTurkey, value: "TR" },
+    { label: t.createClub.countryUnitedStates, value: "US" },
+  ];
 
   const previewCode = generatePreviewCode(clubName, t.createClub.defaultCodePrefix);
 
@@ -89,6 +96,7 @@ export default function CreateClubScreen() {
         clubName: trimmedClubName,
         sport: trimmedSport,
         city: trimmedCity,
+        country,
       });
 
       if (authService.isConfigured() && firebaseUser !== null) {
@@ -99,6 +107,7 @@ export default function CreateClubScreen() {
           sport: nextData.club.sport,
           city: nextData.club.city,
           clubCode: nextData.club.code,
+          country,
         });
       }
 
@@ -153,6 +162,34 @@ export default function CreateClubScreen() {
             onChangeText={setCity}
             accessibilityLabel={t.createClub.accessibility.city}
           />
+
+          <View>
+            <Text style={styles.countryLabel}>{t.createClub.countryLabel}</Text>
+            <View style={styles.countryRow}>
+              {countryOptions.map((option) => {
+                const isSelected = option.value === country;
+
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setCountry(option.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    style={({ pressed }) => [
+                      styles.countryOption,
+                      isSelected ? styles.countryOptionSelected : null,
+                      pressed && !isSelected ? styles.pressed : null,
+                    ]}
+                  >
+                    <Text style={[styles.countryOptionText, isSelected ? styles.countryOptionTextSelected : null]}>
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={styles.countryHint}>{t.createClub.countryHint}</Text>
+          </View>
         </View>
 
         <View style={styles.codePreviewBox}>
@@ -242,6 +279,38 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
   },
   form: { width: "100%", gap: theme.spacing.lg },
+  countryLabel: {
+    ...Typography.label,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+  },
+  countryRow: { flexDirection: "row", gap: theme.spacing.sm },
+  countryOption: {
+    flex: 1,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+    backgroundColor: theme.colors.background.subtle,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    alignItems: "center",
+  },
+  countryOptionSelected: {
+    backgroundColor: theme.colors.brand.primary,
+    borderColor: theme.colors.brand.primary,
+  },
+  countryOptionText: {
+    color: theme.colors.text.secondary,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: theme.fontWeights.semibold,
+  },
+  countryOptionTextSelected: { color: theme.colors.text.inverse },
+  countryHint: {
+    ...Typography.caption,
+    color: theme.colors.text.muted,
+    marginTop: theme.spacing.xs,
+  },
+  pressed: { opacity: 0.84 },
   codePreviewBox: {
     width: "100%",
     backgroundColor: theme.colors.state.infoSoft,

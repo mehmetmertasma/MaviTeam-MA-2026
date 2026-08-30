@@ -19,7 +19,11 @@ import type { QueryDocumentSnapshot } from "firebase/firestore";
 import { requireFirebaseServices } from "@/lib/firebase";
 import type {
   Announcement,
+  BillingDetails,
   Club,
+  ClubCountry,
+  ClubCurrency,
+  ClubPaymentAccount,
   JoinRequest,
   ScheduleEvent,
   ScheduleEventType,
@@ -43,11 +47,17 @@ type CreateClubWorkspaceInput = {
   sport: string;
   city: string;
   clubCode: string;
+  country: ClubCountry;
 };
+
+function getCurrencyForCountry(country: ClubCountry): ClubCurrency {
+  return country === "US" ? "USD" : "TRY";
+}
 
 type UpdateCurrentUserProfileInput = {
   firebaseUser: User;
   fullName: string;
+  billingDetails?: BillingDetails;
 };
 
 type UpdateCurrentClubSettingsInput = {
@@ -187,6 +197,60 @@ function readJoinRequestStatus(value: unknown): JoinRequest["status"] {
   return "pending";
 }
 
+function readNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readClubCountry(value: unknown): ClubCountry | undefined {
+  return value === "TR" || value === "US" ? value : undefined;
+}
+
+function readClubCurrency(value: unknown): ClubCurrency | undefined {
+  return value === "TRY" || value === "USD" ? value : undefined;
+}
+
+function readBillingDetails(value: unknown): BillingDetails | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const data = value as Record<string, unknown>;
+  const nationalId = readOptionalString(data.nationalId);
+  const phone = readOptionalString(data.phone);
+  const address = readOptionalString(data.address);
+  const city = readOptionalString(data.city);
+
+  if (nationalId === undefined || phone === undefined || address === undefined || city === undefined) {
+    return undefined;
+  }
+
+  return { nationalId, phone, address, city };
+}
+
+function readClubPaymentAccount(value: unknown): ClubPaymentAccount | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const data = value as Record<string, unknown>;
+  const provider = data.provider === "iyzico" || data.provider === "stripe" ? data.provider : undefined;
+  const status =
+    data.status === "not_connected" || data.status === "pending" || data.status === "connected"
+      ? data.status
+      : undefined;
+
+  if (provider === undefined || status === undefined) {
+    return undefined;
+  }
+
+  return {
+    provider,
+    status,
+    externalAccountId: readOptionalString(data.externalAccountId),
+    connectedAt: readOptionalString(data.connectedAt),
+  };
+}
+
 function getUserProfileFromFirestore(userId: string, data: Record<string, unknown>): UserProfile {
   return {
     id: userId,
@@ -196,6 +260,8 @@ function getUserProfileFromFirestore(userId: string, data: Record<string, unknow
     status: readUserStatus(data.status),
     clubId: readString(data.clubId),
     teamIds: readStringArray(data.teamIds),
+    monthlyDuesAmountCents: readNumber(data.monthlyDuesAmountCents, 0) || undefined,
+    billingDetails: readBillingDetails(data.billingDetails),
     createdAt: readTimestampString(data.createdAt),
     updatedAt: readTimestampString(data.updatedAt),
   };
@@ -211,6 +277,10 @@ function getClubFromFirestore(clubId: string, data: Record<string, unknown>): Cl
     ownerId: readString(data.ownerId),
     logoUrl: readString(data.logoUrl),
     primaryColor: readString(data.primaryColor, "#2563eb"),
+    country: readClubCountry(data.country),
+    currency: readClubCurrency(data.currency),
+    duesBillingDayOfMonth: readNumber(data.duesBillingDayOfMonth, 0) || undefined,
+    paymentAccount: readClubPaymentAccount(data.paymentAccount),
     createdAt: readTimestampString(data.createdAt),
     updatedAt: readTimestampString(data.updatedAt),
   };
@@ -462,6 +532,8 @@ export const firestoreTeamSyncService = {
       ownerId: input.firebaseUser.uid,
       primaryColor: "#2563eb",
       logoUrl: "",
+      country: input.country,
+      currency: getCurrencyForCountry(input.country),
       createdAt: now,
       updatedAt: now,
     });
@@ -990,6 +1062,7 @@ export const firestoreTeamSyncService = {
         email: input.firebaseUser.email ?? "",
         emailVerified: input.firebaseUser.emailVerified,
         updatedAt: serverTimestamp(),
+        ...(input.billingDetails !== undefined ? { billingDetails: input.billingDetails } : {}),
       },
       { merge: true }
     );

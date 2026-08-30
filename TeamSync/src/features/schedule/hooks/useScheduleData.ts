@@ -8,19 +8,33 @@ const INITIAL_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklenecek
 const SUCCESS_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklendi.";
 const ERROR_STATUS_MESSAGE = "Program yüklenirken bir sorun oluştu.";
 
+// Lets the status line at the bottom of CalendarSection look like a
+// confirmation (green), a problem (red), or a neutral instruction (gray)
+// instead of always rendering as the same plain gray sentence -- otherwise
+// "Event updated." and "Pick a day and fill in the details." are visually
+// indistinguishable, and a completed save doesn't look like anything happened.
+export type ScheduleStatusTone = "neutral" | "success" | "danger";
+
 type UseScheduleDataResult = {
   scheduleData: ScheduleWorkspaceData | null;
   isLoading: boolean;
   statusMessage: string;
+  statusTone: ScheduleStatusTone;
   loadScheduleData: () => Promise<void>;
   setScheduleData: React.Dispatch<React.SetStateAction<ScheduleWorkspaceData | null>>;
-  setStatusMessage: React.Dispatch<React.SetStateAction<string>>;
+  setStatus: (message: string, tone?: ScheduleStatusTone) => void;
 };
 
 export function useScheduleData(): UseScheduleDataResult {
   const [scheduleData, setScheduleData] = useState<ScheduleWorkspaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState(INITIAL_STATUS_MESSAGE);
+  const [statusTone, setStatusTone] = useState<ScheduleStatusTone>("neutral");
+
+  const setStatus = useCallback((message: string, tone: ScheduleStatusTone = "neutral") => {
+    setStatusMessage(message);
+    setStatusTone(tone);
+  }, []);
 
   const loadScheduleData = useCallback(async () => {
     setIsLoading(true);
@@ -28,13 +42,13 @@ export function useScheduleData(): UseScheduleDataResult {
     try {
       const loadedScheduleData = await scheduleRepository.getScheduleData();
       setScheduleData(loadedScheduleData);
-      setStatusMessage(SUCCESS_STATUS_MESSAGE);
+      setStatus(SUCCESS_STATUS_MESSAGE, "success");
     } catch {
-      setStatusMessage(ERROR_STATUS_MESSAGE);
+      setStatus(ERROR_STATUS_MESSAGE, "danger");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -46,8 +60,9 @@ export function useScheduleData(): UseScheduleDataResult {
     scheduleData,
     isLoading,
     statusMessage,
+    statusTone,
     loadScheduleData,
     setScheduleData,
-    setStatusMessage,
+    setStatus,
   };
 }

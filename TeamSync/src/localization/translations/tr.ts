@@ -148,6 +148,10 @@ export const tr = {
     sportPlaceholder: "Örn. Voleybol",
     cityLabel: "Şehir",
     cityPlaceholder: "Örn. İstanbul",
+    countryLabel: "Ülke",
+    countryHint: "Kulübün ileride online ödeme almak isteyip istemeyeceğine göre önemli -- doğru ülkeyi seç.",
+    countryTurkey: "Türkiye",
+    countryUnitedStates: "Amerika Birleşik Devletleri",
     invitationCodePreview: "Oluşacak örnek kulüp kodu",
     invitationCodeHint:
       "Bu kod kulübünüze katılacak oyuncu, veli ve koçların üyelik isteği göndermesi için kullanılacak.",

@@ -7,6 +7,8 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
 const { Webhook } = require("svix");
+const Stripe = require("stripe");
+const Iyzipay = require("iyzipay");
 
 admin.initializeApp();
 setGlobalOptions({ region: "us-central1" });
@@ -35,6 +37,21 @@ const RESEND_API_URL = "https://api.resend.com/emails";
 const FROM_EMAIL = "MaviTeam <no-reply@maviteam.com>";
 const resendApiKey = defineSecret("RESEND_API_KEY");
 const resendWebhookSecret = defineSecret("RESEND_WEBHOOK_SECRET");
+
+// Online dues payments: iyzico (sub-merchant marketplace API) for TR clubs,
+// Stripe Connect for US clubs -- see the "connectPaymentAccount"/
+// "createCheckoutSession" functions below for how each is actually used.
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+const iyzicoApiKey = defineSecret("IYZICO_API_KEY");
+const iyzicoSecretKey = defineSecret("IYZICO_SECRET_KEY");
+// MaviTeam's cut of every online dues payment; the rest goes to the club via
+// Stripe's application_fee_amount / iyzico's subMerchantPrice split.
+const PLATFORM_FEE_RATE = 0.02;
+
+function getPlatformFeeCents(amountCents) {
+  return Math.round(amountCents * PLATFORM_FEE_RATE);
+}
 
 const ATTENDANCE_RETENTION_DAYS = 14;
 const ATTENDANCE_CLEANUP_BATCH_SIZE = 300;
@@ -528,6 +545,538 @@ exports.cleanupOldAttendance = onSchedule("every 24 hours", async () => {
   const db = admin.firestore();
   const result = await runAttendanceCleanup(db);
   console.log("Attendance cleanup finished", result);
+});
+
+function getBillingPeriodKey(date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+// Recurring dues: a club admin sets monthlyDuesAmountCents on an athlete's
+// profile once (see members.tsx / firestoreMemberManagementService), and
+// from then on this creates one new "unpaid" payment per billing cycle --
+// no further admin action needed. Runs daily but only actually acts on a
+// club on its own duesBillingDayOfMonth (default day 1), same "runs often,
+// mostly no-ops" shape as runAttendanceCleanup. Idempotent via a
+// deterministic doc id (dues_{userId}_{billingPeriodKey}) instead of a
+// query-then-create race, since this only ever runs on a schedule, never
+// concurrently with itself.
+async function runMonthlyDuesGeneration(db) {
+  const today = new Date();
+  const billingPeriodKey = getBillingPeriodKey(today);
+  const todayOfMonth = today.getDate();
+
+  const clubsSnapshot = await db.collection("clubs").get();
+  let createdCount = 0;
+  let consideredClubCount = 0;
+
+  for (const clubSnapshot of clubsSnapshot.docs) {
+    const club = clubSnapshot.data();
+
+    if (club.status === "suspended") {
+      continue;
+    }
+
+    const billingDay = typeof club.duesBillingDayOfMonth === "number" && club.duesBillingDayOfMonth > 0 ? club.duesBillingDayOfMonth : 1;
+
+    if (todayOfMonth !== billingDay) {
+      continue;
+    }
+
+    consideredClubCount += 1;
+
+    const usersSnapshot = await db
+      .collection("users")
+      .where("clubId", "==", clubSnapshot.id)
+      .where("status", "==", "active")
+      .get();
+
+    const dueUsers = usersSnapshot.docs.filter((userSnapshot) => {
+      const amount = userSnapshot.data().monthlyDuesAmountCents;
+      return typeof amount === "number" && amount > 0;
+    });
+
+    if (dueUsers.length === 0) {
+      continue;
+    }
+
+    const paymentMethod = club.paymentAccount && club.paymentAccount.status === "connected" ? "online" : "manual";
+    const batch = db.batch();
+    let batchHasWrites = false;
+
+    for (const userSnapshot of dueUsers) {
+      const paymentRef = db.doc(`payments/dues_${userSnapshot.id}_${billingPeriodKey}`);
+      // eslint-disable-next-line no-await-in-loop -- sequential existence
+      // checks are fine here: club rosters are small, and this only runs
+      // once a day on each club's own billing day.
+      const existingPayment = await paymentRef.get();
+
+      if (existingPayment.exists) {
+        continue;
+      }
+
+      batch.set(paymentRef, {
+        clubId: clubSnapshot.id,
+        userId: userSnapshot.id,
+        title: "Aylık aidat",
+        amountCents: userSnapshot.data().monthlyDuesAmountCents,
+        status: "unpaid",
+        dueAt: today.toISOString(),
+        paymentMethod,
+        billingPeriodKey,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      batchHasWrites = true;
+      createdCount += 1;
+    }
+
+    if (batchHasWrites) {
+      await batch.commit();
+    }
+  }
+
+  return { consideredClubCount, createdCount, billingPeriodKey };
+}
+
+exports.runMonthlyDuesGeneration = runMonthlyDuesGeneration;
+
+exports.generateMonthlyDues = onSchedule("every 24 hours", async () => {
+  const db = admin.firestore();
+  const result = await runMonthlyDuesGeneration(db);
+  console.log("Monthly dues generation finished", result);
+});
+
+// Online dues payments: iyzico (TR) / Stripe (US). Every write to
+// clubs/{id}.paymentAccount below uses the Admin SDK specifically because
+// firestore.rules blocks clients from ever moving that field themselves
+// (see the "clubs.paymentAccount" rules tests).
+
+// TODO before going live: switch this to iyzico's production base URI --
+// sandbox-api.iyzipay.com only works with sandbox merchant credentials.
+const IYZICO_BASE_URL = "https://sandbox-api.iyzipay.com";
+
+function getIyzicoClient() {
+  return new Iyzipay({
+    apiKey: iyzicoApiKey.value(),
+    secretKey: iyzicoSecretKey.value(),
+    uri: IYZICO_BASE_URL,
+  });
+}
+
+// iyzico's SDK is callback-based, not Promise-based.
+function iyzicoRequest(resource, method, params) {
+  return new Promise((resolve, reject) => {
+    resource[method](params, (error, result) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(result);
+    });
+  });
+}
+
+async function requireClubAdminOfClub(request, clubId) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const db = admin.firestore();
+  const userSnapshot = await db.doc(`users/${request.auth.uid}`).get();
+  const userData = userSnapshot.exists ? userSnapshot.data() : null;
+
+  if (!userData || userData.role !== "clubAdmin" || userData.status !== "active" || userData.clubId !== clubId) {
+    throw new HttpsError("permission-denied", "Only that club's admin can manage its payment account.");
+  }
+}
+
+// Connects a club's payment account. US clubs get Stripe's hosted Connect
+// Express onboarding (a redirect link, nothing else to build); TR clubs get
+// iyzico, which has no equivalent hosted onboarding page -- their
+// sub-merchant is created directly from business details collected in-app
+// (see profile.tsx's iyzico connect form). PERSONAL sub-merchant type only
+// for now (an individual admin signing up, not a registered company) --
+// company sub-merchant types are a clean fast-follow if a club needs one.
+exports.connectPaymentAccount = onCall(
+  { secrets: [stripeSecretKey, iyzicoApiKey, iyzicoSecretKey] },
+  async (request) => {
+    const clubId = String(request.data?.clubId || "").trim();
+
+    if (clubId === "") {
+      throw new HttpsError("invalid-argument", "clubId is required.");
+    }
+
+    await requireClubAdminOfClub(request, clubId);
+
+    const db = admin.firestore();
+    const clubRef = db.doc(`clubs/${clubId}`);
+    const clubSnapshot = await clubRef.get();
+
+    if (!clubSnapshot.exists) {
+      throw new HttpsError("not-found", "Club not found.");
+    }
+
+    const club = clubSnapshot.data();
+
+    if (club.country === "US") {
+      const stripe = new Stripe(stripeSecretKey.value());
+      let externalAccountId = club.paymentAccount?.externalAccountId;
+
+      if (!externalAccountId) {
+        const account = await stripe.accounts.create({
+          type: "express",
+          country: "US",
+          email: request.auth.token.email,
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true },
+          },
+        });
+        externalAccountId = account.id;
+      }
+
+      const accountLink = await stripe.accountLinks.create({
+        account: externalAccountId,
+        refresh_url: "https://maviteam.com/connect-refresh",
+        return_url: "maviteam://profile?connect=return",
+        type: "account_onboarding",
+      });
+
+      await clubRef.set(
+        {
+          paymentAccount: {
+            provider: "stripe",
+            status: "pending",
+            externalAccountId,
+            connectedAt: null,
+          },
+        },
+        { merge: true }
+      );
+
+      return { url: accountLink.url };
+    }
+
+    const subMerchant = request.data?.iyzicoSubMerchant || {};
+    const requiredFields = ["name", "contactName", "contactSurname", "email", "gsmNumber", "address", "iban", "identityNumber"];
+    const missingField = requiredFields.find((field) => String(subMerchant[field] || "").trim() === "");
+
+    if (missingField) {
+      throw new HttpsError("invalid-argument", `Missing sub-merchant field: ${missingField}`);
+    }
+
+    const iyzipay = getIyzicoClient();
+    const result = await iyzicoRequest(iyzipay.subMerchant, "create", {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: `submerchant-${clubId}-${Date.now()}`,
+      subMerchantExternalId: clubId,
+      subMerchantType: Iyzipay.SUB_MERCHANT_TYPE.PERSONAL,
+      address: subMerchant.address,
+      contactName: subMerchant.contactName,
+      contactSurname: subMerchant.contactSurname,
+      email: subMerchant.email,
+      gsmNumber: subMerchant.gsmNumber,
+      name: subMerchant.name,
+      iban: subMerchant.iban,
+      identityNumber: subMerchant.identityNumber,
+      currency: club.currency === "USD" ? Iyzipay.CURRENCY.USD : Iyzipay.CURRENCY.TRY,
+    });
+
+    if (result.status !== "success") {
+      throw new HttpsError("internal", result.errorMessage || "iyzico sub-merchant creation failed.");
+    }
+
+    // Unlike Stripe (which only becomes "connected" once its webhook
+    // confirms charges_enabled), iyzico's sub-merchant creation is a single
+    // synchronous API call with no separate approval step -- it's
+    // "connected" the moment this call succeeds.
+    await clubRef.set(
+      {
+        paymentAccount: {
+          provider: "iyzico",
+          status: "connected",
+          externalAccountId: result.subMerchantKey,
+          connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      },
+      { merge: true }
+    );
+
+    return { url: null };
+  }
+);
+
+// Starts an online payment for one specific unpaid dues Payment doc. Only
+// the person who owes the money can pay it (canReadPayment in
+// firestore.rules already scopes a payment's visibility the same way --
+// clubAdmin or the payment's own userId -- but only the actual payer should
+// ever trigger a real charge).
+exports.createCheckoutSession = onCall(
+  { secrets: [stripeSecretKey, iyzicoApiKey, iyzicoSecretKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be signed in.");
+    }
+
+    const paymentId = String(request.data?.paymentId || "").trim();
+
+    if (paymentId === "") {
+      throw new HttpsError("invalid-argument", "paymentId is required.");
+    }
+
+    const db = admin.firestore();
+    const paymentRef = db.doc(`payments/${paymentId}`);
+    const paymentSnapshot = await paymentRef.get();
+
+    if (!paymentSnapshot.exists) {
+      throw new HttpsError("not-found", "Payment not found.");
+    }
+
+    const payment = paymentSnapshot.data();
+
+    if (payment.userId !== request.auth.uid) {
+      throw new HttpsError("permission-denied", "You can only pay your own dues.");
+    }
+
+    if (payment.status === "paid") {
+      throw new HttpsError("failed-precondition", "This payment is already settled.");
+    }
+
+    if (payment.paymentMethod !== "online") {
+      throw new HttpsError("failed-precondition", "This payment is not set up for online collection.");
+    }
+
+    const clubSnapshot = await db.doc(`clubs/${payment.clubId}`).get();
+    const club = clubSnapshot.exists ? clubSnapshot.data() : null;
+    const paymentAccount = club?.paymentAccount;
+
+    if (!paymentAccount || paymentAccount.status !== "connected") {
+      throw new HttpsError("failed-precondition", "This club has not connected a payment account yet.");
+    }
+
+    const platformFeeCents = getPlatformFeeCents(payment.amountCents);
+
+    if (paymentAccount.provider === "stripe") {
+      const stripe = new Stripe(stripeSecretKey.value());
+      const currency = (club.currency || "USD").toLowerCase();
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items: [
+          {
+            price_data: {
+              currency,
+              unit_amount: payment.amountCents,
+              product_data: { name: payment.title || "Club dues" },
+            },
+            quantity: 1,
+          },
+        ],
+        payment_intent_data: {
+          application_fee_amount: platformFeeCents,
+          transfer_data: { destination: paymentAccount.externalAccountId },
+        },
+        success_url: "maviteam://payments?checkout=return",
+        cancel_url: "maviteam://payments?checkout=return",
+        metadata: { paymentId },
+      });
+
+      return { url: session.url };
+    }
+
+    // iyzico requires the payer's national ID/phone/address on every
+    // checkout -- collected once via BillingDetailsModal and reused here
+    // rather than asked for on every payment.
+    const userSnapshot = await db.doc(`users/${request.auth.uid}`).get();
+    const billingDetails = userSnapshot.exists ? userSnapshot.data().billingDetails : null;
+
+    if (!billingDetails?.nationalId || !billingDetails?.phone || !billingDetails?.address || !billingDetails?.city) {
+      throw new HttpsError("failed-precondition", "BILLING_DETAILS_REQUIRED");
+    }
+
+    const priceMajorUnits = (payment.amountCents / 100).toFixed(2);
+    const subMerchantPriceMajorUnits = ((payment.amountCents - platformFeeCents) / 100).toFixed(2);
+    const displayName = String(request.auth.token.name || "MaviTeam User").trim();
+    const [firstName, ...restOfName] = displayName.split(/\s+/);
+    const lastName = restOfName.join(" ") || firstName;
+    const buyerIp = request.rawRequest?.ip || "85.34.78.112";
+
+    const iyzipay = getIyzicoClient();
+    const result = await iyzicoRequest(iyzipay.checkoutFormInitialize, "create", {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: paymentId,
+      price: priceMajorUnits,
+      paidPrice: priceMajorUnits,
+      currency: Iyzipay.CURRENCY.TRY,
+      basketId: paymentId,
+      paymentGroup: Iyzipay.PAYMENT_GROUP.SUBSCRIPTION,
+      callbackUrl: `https://us-central1-${process.env.GCLOUD_PROJECT}.cloudfunctions.net/iyzicoCallback`,
+      buyer: {
+        id: request.auth.uid,
+        name: firstName,
+        surname: lastName,
+        gsmNumber: billingDetails.phone,
+        email: request.auth.token.email || "no-reply@maviteam.com",
+        identityNumber: billingDetails.nationalId,
+        registrationAddress: billingDetails.address,
+        ip: buyerIp,
+        city: billingDetails.city,
+        country: "Turkey",
+      },
+      shippingAddress: {
+        contactName: displayName,
+        city: billingDetails.city,
+        country: "Turkey",
+        address: billingDetails.address,
+      },
+      billingAddress: {
+        contactName: displayName,
+        city: billingDetails.city,
+        country: "Turkey",
+        address: billingDetails.address,
+      },
+      basketItems: [
+        {
+          id: paymentId,
+          name: payment.title || "Aidat",
+          category1: "Dues",
+          itemType: Iyzipay.BASKET_ITEM_TYPE.VIRTUAL,
+          price: priceMajorUnits,
+          subMerchantKey: paymentAccount.externalAccountId,
+          subMerchantPrice: subMerchantPriceMajorUnits,
+        },
+      ],
+    });
+
+    if (result.status !== "success") {
+      throw new HttpsError("internal", result.errorMessage || "iyzico checkout initialize failed.");
+    }
+
+    return { url: result.paymentPageUrl };
+  }
+);
+
+exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
+  if (req.method !== "POST") {
+    res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value());
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, req.headers["stripe-signature"], stripeWebhookSecret.value());
+  } catch (error) {
+    console.error("Stripe webhook signature verification failed", error);
+    res.status(400).send("Invalid signature");
+    return;
+  }
+
+  const db = admin.firestore();
+
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object;
+    const paymentId = session.metadata?.paymentId;
+
+    if (paymentId) {
+      await db.doc(`payments/${paymentId}`).set(
+        {
+          status: "paid",
+          paidAt: admin.firestore.FieldValue.serverTimestamp(),
+          providerPaymentId: session.payment_intent,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  // A club isn't actually "connected" until Stripe confirms the account can
+  // accept charges -- connectPaymentAccount only ever sets "pending".
+  if (event.type === "account.updated") {
+    const account = event.data.object;
+
+    if (account.charges_enabled) {
+      const clubsSnapshot = await db
+        .collection("clubs")
+        .where("paymentAccount.externalAccountId", "==", account.id)
+        .limit(1)
+        .get();
+
+      if (!clubsSnapshot.empty) {
+        await clubsSnapshot.docs[0].ref.set(
+          {
+            paymentAccount: {
+              provider: "stripe",
+              status: "connected",
+              externalAccountId: account.id,
+              connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+          },
+          { merge: true }
+        );
+      }
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  res.status(200).send("Ignored");
+});
+
+// iyzico's Checkout Form has no signature-verified webhook like Stripe's --
+// instead, the hosted payment page redirects the browser back here with a
+// one-time token, and this calls iyzico's own "retrieve" API (authenticated
+// with our API/secret key) to authoritatively confirm the result
+// server-side before trusting it, then bounces the browser back into the
+// app. Register this function's URL as the callback for every
+// checkoutFormInitialize call above.
+exports.iyzicoCallback = onRequest({ secrets: [iyzicoApiKey, iyzicoSecretKey] }, async (req, res) => {
+  const token = req.body?.token || req.query?.token;
+  const returnUrl = "maviteam://payments?checkout=return";
+
+  if (!token) {
+    res.redirect(302, returnUrl);
+    return;
+  }
+
+  try {
+    const iyzipay = getIyzicoClient();
+    const result = await iyzicoRequest(iyzipay.checkoutForm, "retrieve", {
+      locale: Iyzipay.LOCALE.TR,
+      conversationId: `callback-${Date.now()}`,
+      token,
+    });
+
+    if (result.status === "success" && result.paymentStatus === "SUCCESS" && result.conversationId) {
+      await admin
+        .firestore()
+        .doc(`payments/${result.conversationId}`)
+        .set(
+          {
+            status: "paid",
+            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+            providerPaymentId: result.paymentId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+    } else {
+      console.warn("iyzico checkout did not complete successfully", result);
+    }
+  } catch (error) {
+    console.error("iyzico checkout form retrieve failed", error);
+  }
+
+  res.redirect(302, returnUrl);
 });
 
 // Platform admin (superadmin) panel -- gated by a hardcoded UID allowlist,

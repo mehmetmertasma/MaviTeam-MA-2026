@@ -1,22 +1,27 @@
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { openBrowserAsync } from "expo-web-browser";
 import { useCallback, useState } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
 import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
+import { IyzicoSubMerchantModal } from "@/components/IyzicoSubMerchantModal";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import { LoadingState } from "@/components/LoadingState";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
+import type { StatusBadgeTone } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
 import { accountDeletionService } from "@/services/accountDeletionService";
 import { authService, getAuthErrorMessage } from "@/services/authService";
+import { paymentGatewayService } from "@/services/paymentGatewayService";
+import type { IyzicoSubMerchantInput } from "@/services/paymentGatewayService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData } from "@/types/teamSync";
+import type { ClubPaymentAccountStatus, TeamSyncAppData } from "@/types/teamSync";
 
 type ProfileFormData = {
   fullName: string;
@@ -25,6 +30,12 @@ type ProfileFormData = {
   clubSport: string;
   clubCity: string;
   clubCode: string;
+};
+
+const paymentAccountStatusTone: Record<ClubPaymentAccountStatus, StatusBadgeTone> = {
+  not_connected: "neutral",
+  pending: "warning",
+  connected: "success",
 };
 
 const emptyFormData: ProfileFormData = {
@@ -101,6 +112,18 @@ function getProfileCopy(language: "tr" | "en") {
       defaultClub: "MaviTeam Club",
       defaultCity: "No city",
       city: "City",
+      paymentAccountTitle: "Payment account",
+      paymentAccountSubtitle: "Connect a payment account so parents can pay dues online.",
+      paymentStatusLabels: {
+        not_connected: "Not connected",
+        pending: "Setup in progress",
+        connected: "Connected",
+      },
+      paymentProviderLabels: { stripe: "Stripe", iyzico: "iyzico" },
+      connectAccountButton: "Connect account",
+      connectingAccount: "Connecting...",
+      connectAccountError: "Could not connect a payment account. Please try again.",
+      connectAccountSuccess: "Payment account connected.",
     };
   }
 
@@ -143,13 +166,26 @@ function getProfileCopy(language: "tr" | "en") {
     defaultClub: "MaviTeam Kulübü",
     defaultCity: "Şehir yok",
     city: "Şehir",
+    paymentAccountTitle: "Ödeme hesabı",
+    paymentAccountSubtitle: "Velilerin aidatlarını online ödeyebilmesi için bir ödeme hesabı bağla.",
+    paymentStatusLabels: {
+      not_connected: "Bağlı değil",
+      pending: "Kurulum devam ediyor",
+      connected: "Bağlandı",
+    },
+    paymentProviderLabels: { stripe: "Stripe", iyzico: "iyzico" },
+    connectAccountButton: "Hesabı bağla",
+    connectingAccount: "Bağlanıyor...",
+    connectAccountError: "Ödeme hesabı bağlanamadı. Lütfen tekrar dene.",
+    connectAccountSuccess: "Ödeme hesabı bağlandı.",
   };
 }
 
 export default function ProfileScreen() {
   const { t, language } = useTranslation();
   const copy = getProfileCopy(language === "tr" ? "tr" : "en");
-  const { appData, error: appDataError, setAppData } = useAppDataContext();
+  const { appData, error: appDataError, setAppData, refresh } = useAppDataContext();
+  const { connect: connectReturnParam } = useLocalSearchParams<{ connect?: string }>();
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -159,6 +195,9 @@ export default function ProfileScreen() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isConnectingPaymentAccount, setIsConnectingPaymentAccount] = useState(false);
+  const [showIyzicoConnectModal, setShowIyzicoConnectModal] = useState(false);
+  const [iyzicoConnectError, setIyzicoConnectError] = useState("");
 
   useFocusEffect(
     useCallback(() => {
@@ -169,6 +208,18 @@ export default function ProfileScreen() {
         setStatusMessage(t.profile.messages.failedToLoad);
       }
     }, [appData, appDataError, t.profile.messages.failedToLoad, t.profile.messages.loaded])
+  );
+
+  // Stripe's hosted onboarding returns the browser here with ?connect=return
+  // once the club admin finishes (or abandons) the flow -- refresh so an
+  // updated paymentAccount.status (set by the stripeWebhook once Stripe
+  // confirms the account can accept charges) shows up without a manual pull.
+  useFocusEffect(
+    useCallback(() => {
+      if (connectReturnParam === "return") {
+        refresh().then(setAppData).catch(() => undefined);
+      }
+    }, [connectReturnParam, refresh, setAppData])
   );
 
   function startEditing() {
@@ -271,6 +322,56 @@ export default function ProfileScreen() {
       const errorCode = deleteError instanceof Error && "code" in deleteError ? String((deleteError as { code?: unknown }).code) : "";
       setStatusMessage(errorCode === "functions/failed-precondition" ? copy.deleteFailedOwner : copy.deleteFailedGeneric);
       setIsDeletingAccount(false);
+    }
+  }
+
+  async function handleConnectPaymentAccount() {
+    if (appData === null || isConnectingPaymentAccount) {
+      return;
+    }
+
+    // US clubs get Stripe's hosted onboarding (a redirect, nothing else to
+    // collect here); TR clubs go through iyzico, which has no hosted
+    // onboarding page, so a business-details form is needed first.
+    if (appData.club.country === "US") {
+      try {
+        setIsConnectingPaymentAccount(true);
+        setStatusMessage(copy.connectingAccount);
+        const { url } = await paymentGatewayService.connectPaymentAccount(appData.club.id);
+
+        if (url) {
+          await openBrowserAsync(url);
+        }
+      } catch {
+        setStatusMessage(copy.connectAccountError);
+      } finally {
+        setIsConnectingPaymentAccount(false);
+      }
+
+      return;
+    }
+
+    setIyzicoConnectError("");
+    setShowIyzicoConnectModal(true);
+  }
+
+  async function handleSaveIyzicoSubMerchant(iyzicoSubMerchant: IyzicoSubMerchantInput) {
+    if (appData === null) {
+      return;
+    }
+
+    try {
+      setIsConnectingPaymentAccount(true);
+      setIyzicoConnectError("");
+      await paymentGatewayService.connectPaymentAccount(appData.club.id, iyzicoSubMerchant);
+      const nextAppData = await refresh();
+      setAppData(nextAppData);
+      setShowIyzicoConnectModal(false);
+      setStatusMessage(copy.connectAccountSuccess);
+    } catch {
+      setIyzicoConnectError(copy.connectAccountError);
+    } finally {
+      setIsConnectingPaymentAccount(false);
     }
   }
 
@@ -454,6 +555,34 @@ export default function ProfileScreen() {
         )}
       </Card>
 
+      {currentUser.role === "clubAdmin" ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>{copy.paymentAccountTitle}</Text>
+          <Text style={styles.sectionSubtitle}>{copy.paymentAccountSubtitle}</Text>
+
+          <View style={styles.paymentAccountRow}>
+            <View style={styles.paymentAccountTextArea}>
+              <Text style={styles.infoLabel}>{copy.paymentProviderLabels[currentClub.country === "US" ? "stripe" : "iyzico"]}</Text>
+              <StatusBadge
+                label={copy.paymentStatusLabels[currentClub.paymentAccount?.status ?? "not_connected"]}
+                tone={paymentAccountStatusTone[currentClub.paymentAccount?.status ?? "not_connected"]}
+                style={styles.paymentAccountBadge}
+              />
+            </View>
+
+            {currentClub.paymentAccount?.status !== "connected" ? (
+              <AppButton
+                title={isConnectingPaymentAccount ? copy.connectingAccount : copy.connectAccountButton}
+                variant="secondary"
+                disabled={isConnectingPaymentAccount}
+                onPress={handleConnectPaymentAccount}
+                style={styles.paymentAccountButton}
+              />
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
+
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>{t.profile.languageSettings}</Text>
         <Text style={styles.sectionSubtitle}>{t.language.subtitle}</Text>
@@ -573,6 +702,16 @@ export default function ProfileScreen() {
           <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.editBottomButton} />
         ) : null}
       </Card>
+
+      {showIyzicoConnectModal ? (
+        <IyzicoSubMerchantModal
+          isSaving={isConnectingPaymentAccount}
+          errorMessage={iyzicoConnectError}
+          onSave={handleSaveIyzicoSubMerchant}
+          onClose={() => setShowIyzicoConnectModal(false)}
+          language={language === "tr" ? "tr" : "en"}
+        />
+      ) : null}
     </AppScreenLayout>
   );
 }
@@ -626,4 +765,8 @@ const styles = StyleSheet.create({
   deleteConfirmField: { marginTop: theme.spacing.xs },
   deleteConfirmButton: { alignSelf: "flex-start", minWidth: 220 },
   editBottomButton: { marginTop: theme.spacing.lg, alignSelf: "flex-start", minWidth: 180 },
+  paymentAccountRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg, marginTop: theme.spacing.xl },
+  paymentAccountTextArea: { gap: theme.spacing.sm },
+  paymentAccountBadge: { alignSelf: "flex-start" },
+  paymentAccountButton: { minWidth: 170 },
 });

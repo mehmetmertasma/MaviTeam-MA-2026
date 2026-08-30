@@ -88,6 +88,35 @@ Before launch, confirm:
 - A new user can receive and verify the 6-digit code
 - The verified Firebase Auth token refreshes before the user creates or joins a club
 
+## Online Dues Payments (Stripe + iyzico)
+
+Club admins can connect a payment account (Stripe for US clubs, iyzico for
+TR clubs) so members can pay dues online instead of only by manual ledger.
+The code is written against each provider's standard test/sandbox setup —
+none of this works until real credentials are set. Before launch:
+
+- Create a Stripe account, enable Connect, and get a **test-mode** secret
+  key. After first deploying `stripeWebhook`, register its URL as a webhook
+  endpoint in the Stripe dashboard (subscribed to `checkout.session.completed`
+  and `account.updated`) to get its signing secret.
+- Create an iyzico **sandbox** merchant account to get sandbox API/secret
+  keys. iyzico has no hosted onboarding page for sub-merchants, so a TR
+  club admin's business details (name, IBAN, national ID, etc.) are
+  collected directly in-app and sent straight to iyzico's sub-merchant API
+  — personal ("PERSONAL") sub-merchants only for now, not registered
+  companies.
+- Set all four secrets: `firebase functions:secrets:set STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`, `IYZICO_API_KEY`, `IYZICO_SECRET_KEY`.
+- Switch `IYZICO_BASE_URL` in `functions/index.js` from iyzico's sandbox
+  host to their production host once using real (non-sandbox) iyzico
+  credentials.
+- Confirm end-to-end with each provider's test cards/sandbox flow: connect
+  a club, pay a due, and see the webhook mark it `paid`. This can't be
+  verified without real sandbox credentials, so it hasn't been tested yet.
+- MaviTeam currently takes a 2% platform fee on every online payment
+  (`platformFeeCents`, hardcoded in `functions/index.js`) — revisit if the
+  business decides on a different rate.
+
 ## Manual Launch QA
 
 Use the production Firebase project and a clean browser/device:
@@ -105,8 +134,9 @@ Use the production Firebase project and a clean browser/device:
 
 ## Not Yet Implemented
 
-- Push notifications
-- Real payment processing
+- Real payment processing end-to-end verification (code is written against
+  Stripe/iyzico's sandbox shape -- see "Online Dues Payments" above, but
+  untested without real sandbox credentials)
+- iyzico company (non-personal) sub-merchant onboarding
 - Native crash reporting
-- Automated Firestore rules tests
 - App Store and Play Store listing assets

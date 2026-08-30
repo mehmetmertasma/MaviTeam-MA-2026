@@ -12,6 +12,7 @@ import type {
   ChatGroup,
   ChatMessage,
   Club,
+  ClubCountry,
   JoinRequest,
   Payment,
   PaymentStatus,
@@ -32,6 +33,7 @@ type CreateClubWorkspaceInput = {
   clubName: string;
   sport: string;
   city: string;
+  country: ClubCountry;
 };
 
 type CreateJoinRequestInput = {
@@ -319,6 +321,7 @@ async function syncCurrentUserToFirestore(data: TeamSyncAppData) {
   await firestoreTeamSyncService.updateCurrentUserProfile({
     firebaseUser,
     fullName: data.currentUser.fullName,
+    billingDetails: data.currentUser.billingDetails,
   });
 }
 
@@ -390,6 +393,8 @@ export const teamSyncService = {
       code: generateClubCode(input.clubName),
       ownerId,
       primaryColor: "#2563eb",
+      country: input.country,
+      currency: input.country === "US" ? "USD" : "TRY",
       createdAt,
       updatedAt: createdAt,
     };
@@ -526,7 +531,7 @@ export const teamSyncService = {
     return saveAppData({ ...data, users, joinRequests });
   },
 
-  async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds">>) {
+  async updateCurrentUser(updates: Partial<Pick<UserProfile, "fullName" | "email" | "role" | "status" | "teamIds" | "billingDetails">>) {
     const data = await loadAppData();
     const nextCurrentUser: UserProfile = { ...data.currentUser, ...updates, updatedAt: nowIso() };
     const nextAppData = await saveAppData({

@@ -150,6 +150,10 @@ export const en = {
     sportPlaceholder: "E.g. Volleyball",
     cityLabel: "City",
     cityPlaceholder: "E.g. Istanbul",
+    countryLabel: "Country",
+    countryHint: "Matters for whether your club can accept online payments later -- pick the right one.",
+    countryTurkey: "Turkey",
+    countryUnitedStates: "United States",
     invitationCodePreview: "Preview club code",
     invitationCodeHint:
       "This code will be used by athletes, parents, and coaches to send a membership request to your club.",

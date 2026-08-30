@@ -423,6 +423,177 @@ describe("replays", () => {
   });
 });
 
+describe("payments", () => {
+  const MANUAL_PAYMENT_FIXTURE = {
+    clubId: CLUB_A,
+    userId: ATHLETE_A1,
+    title: "Aylık aidat",
+    amountCents: 30000,
+    status: "unpaid",
+    dueAt: "2026-09-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  };
+
+  const ONLINE_PAYMENT_FIXTURE = {
+    ...MANUAL_PAYMENT_FIXTURE,
+    paymentMethod: "online",
+  };
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await setDoc(doc(db, "payments", "payment-manual"), MANUAL_PAYMENT_FIXTURE);
+      await setDoc(doc(db, "payments", "payment-online"), ONLINE_PAYMENT_FIXTURE);
+    });
+  });
+
+  it("clubAdmin can create a valid manual payment", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(
+      setDoc(doc(db, "payments", "payment-new"), {
+        clubId: CLUB_A,
+        userId: ATHLETE_A1,
+        title: "Turnuva ücreti",
+        amountCents: 15000,
+        status: "unpaid",
+        dueAt: "2026-09-10T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+      })
+    );
+  });
+
+  it("clubAdmin cannot create a payment that starts as already paid", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "payments", "payment-fake-paid"), {
+        ...MANUAL_PAYMENT_FIXTURE,
+        status: "paid",
+      })
+    );
+  });
+
+  it("clubAdmin cannot create a payment with a zero/negative amount", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "payments", "payment-zero"), {
+        ...MANUAL_PAYMENT_FIXTURE,
+        amountCents: 0,
+      })
+    );
+  });
+
+  it("clubAdmin cannot directly create an online-method payment", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "payments", "payment-fake-online"), {
+        ...MANUAL_PAYMENT_FIXTURE,
+        paymentMethod: "online",
+      })
+    );
+  });
+
+  it("parent/athlete cannot create a payment", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(
+      setDoc(doc(db, "payments", "payment-parent-attempt"), MANUAL_PAYMENT_FIXTURE)
+    );
+  });
+
+  it("clubAdmin can mark a manual payment as paid", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(
+      setDoc(doc(db, "payments", "payment-manual"), { ...MANUAL_PAYMENT_FIXTURE, status: "paid" })
+    );
+  });
+
+  it("clubAdmin cannot flip an online-method payment's status by hand", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "payments", "payment-online"), { ...ONLINE_PAYMENT_FIXTURE, status: "paid" })
+    );
+  });
+
+  it("clubAdmin can still edit an online-method payment as long as status is unchanged", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(
+      setDoc(doc(db, "payments", "payment-online"), { ...ONLINE_PAYMENT_FIXTURE, title: "Güncellenmiş başlık" })
+    );
+  });
+
+  it("a member can read their own payment", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(getDoc(doc(db, "payments", "payment-manual")));
+  });
+
+  it("a member cannot read someone else's payment", async () => {
+    const db = authedFirestore(PARENT_A2);
+    await assertFails(getDoc(doc(db, "payments", "payment-manual")));
+  });
+
+  it("clubAdmin can delete a payment", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(deleteDoc(doc(db, "payments", "payment-manual")));
+  });
+
+  it("parent/athlete cannot delete a payment", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertFails(deleteDoc(doc(db, "payments", "payment-manual")));
+  });
+});
+
+describe("clubs.paymentAccount", () => {
+  it("clubAdmin cannot create a club with paymentAccount already set", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "clubs", "club-new"), {
+        id: "club-new",
+        name: "New Club",
+        ownerId: ADMIN_A,
+        paymentAccount: { provider: "stripe", status: "connected" },
+      })
+    );
+  });
+
+  it("clubAdmin cannot set paymentAccount.status to connected directly on an existing club", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(
+        doc(db, "clubs", CLUB_A),
+        { paymentAccount: { provider: "stripe", status: "connected" } },
+        { merge: true }
+      )
+    );
+  });
+
+  it("clubAdmin can still update other club fields when paymentAccount is left untouched", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(setDoc(doc(db, "clubs", CLUB_A), { name: "Renamed Club A" }, { merge: true }));
+  });
+});
+
+describe("users.billingDetails", () => {
+  const BILLING_DETAILS_FIXTURE = {
+    nationalId: "11111111111",
+    phone: "+905551112233",
+    address: "Test Address",
+    city: "Istanbul",
+  };
+
+  it("a user can write their own billingDetails", async () => {
+    const db = authedFirestore(ATHLETE_A1);
+    await assertSucceeds(
+      setDoc(doc(db, "users", ATHLETE_A1), { billingDetails: BILLING_DETAILS_FIXTURE }, { merge: true })
+    );
+  });
+
+  it("a user cannot write another user's billingDetails", async () => {
+    const db = authedFirestore(PARENT_A1);
+    await assertFails(
+      setDoc(doc(db, "users", ATHLETE_A1), { billingDetails: BILLING_DETAILS_FIXTURE }, { merge: true })
+    );
+  });
+});
+
 describe("attendanceSummaries", () => {
   const SUMMARY_FIXTURE = {
     userId: ATHLETE_A1,

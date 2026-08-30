@@ -7,9 +7,28 @@ import { theme } from "@/constants/theme";
 import type { ScheduleEvent } from "@/types/teamSync";
 
 import { getMonthPickerOptions, getScheduleTypeOptions, getScheduleTypeStyles } from "../constants/schedule.constants";
+import type { ScheduleStatusTone } from "../hooks/useScheduleData";
 import { formatMonthTitle } from "../utils/schedule-date.utils";
 import { scheduleSharedStyles } from "../styles/schedule-shared.styles";
 import { Calendar } from "./Calendar";
+
+const statusToneStyles: Record<ScheduleStatusTone, { background: string; text: string; dot: string }> = {
+  neutral: {
+    background: theme.colors.background.subtle,
+    text: theme.colors.text.secondary,
+    dot: theme.colors.text.muted,
+  },
+  success: {
+    background: theme.colors.state.successSoft,
+    text: theme.colors.text.success,
+    dot: theme.colors.state.success,
+  },
+  danger: {
+    background: theme.colors.state.dangerSoft,
+    text: theme.colors.text.danger,
+    dot: theme.colors.state.danger,
+  },
+};
 
 type CalendarSectionProps = {
   visibleMonth: Date;
@@ -18,6 +37,7 @@ type CalendarSectionProps = {
   showMonthPicker: boolean;
   showEventForm: boolean;
   statusMessage: string;
+  statusTone: ScheduleStatusTone;
   onToggleMonthPicker: () => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -61,6 +81,7 @@ export function CalendarSection({
   showMonthPicker,
   showEventForm,
   statusMessage,
+  statusTone,
   onToggleMonthPicker,
   onPrevMonth,
   onNextMonth,
@@ -214,7 +235,10 @@ export function CalendarSection({
         />
       </View>
 
-      <Text style={styles.statusText}>{statusMessage}</Text>
+      <View style={[styles.statusBanner, { backgroundColor: statusToneStyles[statusTone].background }]}>
+        <View style={[styles.statusDot, { backgroundColor: statusToneStyles[statusTone].dot }]} />
+        <Text style={[styles.statusText, { color: statusToneStyles[statusTone].text }]}>{statusMessage}</Text>
+      </View>
     </View>
   );
 }
@@ -366,11 +390,24 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSizes.md,
     fontWeight: theme.fontWeights.semibold,
   },
-  statusText: {
-    color: theme.colors.text.secondary,
-    fontSize: theme.fontSizes.md,
-    fontWeight: theme.fontWeights.regular,
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing.sm,
     marginTop: theme.spacing.lg,
+    padding: theme.spacing.md,
+    borderRadius: theme.radius.md,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: theme.radius.full,
+    marginTop: 6,
+  },
+  statusText: {
+    flex: 1,
+    fontSize: theme.fontSizes.md,
+    fontWeight: theme.fontWeights.medium,
     lineHeight: theme.lineHeights.md,
   },
 });

@@ -292,14 +292,23 @@ service cloud.firestore {
 
     match /clubs/{clubId} {
       allow create: if verifiedEmail()
-        && request.resource.data.ownerId == request.auth.uid;
+        && request.resource.data.ownerId == request.auth.uid
+        && !('paymentAccount' in request.resource.data);
 
       allow read: if belongsToCurrentUsersClub(clubId)
         || (verifiedEmail() && resource.data.ownerId == request.auth.uid);
 
+      // paymentAccount can only ever move via the Admin SDK -- the
+      // connectPaymentAccount Cloud Function (sets "pending"/"connected" for
+      // iyzico, or "pending" for Stripe) and the Stripe/iyzico webhook (flips
+      // Stripe from "pending" to "connected" once the gateway confirms the
+      // account can actually accept charges). A clubAdmin could otherwise
+      // just hand-write status: "connected" and start collecting "online"
+      // payments nothing ever settles.
       allow update: if currentUserIsClubAdmin()
         && belongsToCurrentUsersClub(clubId)
-        && request.resource.data.ownerId == resource.data.ownerId;
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.get('paymentAccount', null) == resource.data.get('paymentAccount', null);
 
       allow delete: if false;
     }
@@ -386,8 +395,31 @@ service cloud.firestore {
 
     match /payments/{paymentId} {
       allow read: if canReadPayment(resource.data);
-      allow create, update: if currentUserIsClubAdmin()
-        && request.resource.data.clubId == currentUserClubId();
+
+      // A client (even a clubAdmin) can only ever create a manual,
+      // freshly-unpaid record -- "online"-method payments are only ever
+      // created by the monthly dues generator or the checkout function,
+      // both via the Admin SDK, which bypasses these rules entirely.
+      allow create: if currentUserIsClubAdmin()
+        && request.resource.data.clubId == currentUserClubId()
+        && request.resource.data.status == 'unpaid'
+        && request.resource.data.amountCents is number
+        && request.resource.data.amountCents > 0
+        && (!('paymentMethod' in request.resource.data) || request.resource.data.paymentMethod == 'manual');
+
+      // Once a payment is "online"-method, its status can only change via
+      // the payment gateway's webhook (Admin SDK) -- a clubAdmin can still
+      // edit everything else about it (e.g. re-send/void), just not fake a
+      // paid status by hand once real money is supposed to be involved.
+      allow update: if currentUserIsClubAdmin()
+        && resource.data.clubId == currentUserClubId()
+        && request.resource.data.clubId == resource.data.clubId
+        && (
+          !('paymentMethod' in resource.data)
+          || resource.data.paymentMethod != 'online'
+          || request.resource.data.status == resource.data.status
+        );
+
       allow delete: if currentUserIsClubAdmin()
         && resource.data.clubId == currentUserClubId();
     }

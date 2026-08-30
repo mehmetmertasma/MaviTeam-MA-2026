@@ -22,6 +22,11 @@ type UpdateClubMemberInput = {
   role: Exclude<UserRole, "superAdmin">;
   status: UserStatus;
   teamIds: string[];
+  // Unset/0 = no recurring monthly due for this person. Only meaningful
+  // for athletes, but stored regardless of role -- the monthly dues
+  // generator (functions/index.js) only ever acts on it, never enforces
+  // who it's set on.
+  monthlyDuesAmountCents?: number;
 };
 
 function readString(value: unknown, fallback = "") {
@@ -48,6 +53,10 @@ function readUserStatus(value: unknown): UserStatus {
   return "active";
 }
 
+function readNumber(value: unknown, fallback = 0) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 function readTimestampString(value: unknown, fallback = new Date().toISOString()) {
   if (typeof value === "string" && value.trim() !== "") {
     return value;
@@ -71,6 +80,7 @@ function getUserProfileFromSnapshot(snapshot: QueryDocumentSnapshot): UserProfil
     status: readUserStatus(data.status),
     clubId: readString(data.clubId),
     teamIds: readStringArray(data.teamIds),
+    monthlyDuesAmountCents: readNumber(data.monthlyDuesAmountCents, 0) || undefined,
     createdAt: readTimestampString(data.createdAt),
     updatedAt: readTimestampString(data.updatedAt),
   };
@@ -149,6 +159,7 @@ export const firestoreMemberManagementService = {
         role: input.role,
         status: input.status,
         teamIds: requestedTeamIds,
+        monthlyDuesAmountCents: input.monthlyDuesAmountCents ?? 0,
         updatedAt: now,
       },
       { merge: true }

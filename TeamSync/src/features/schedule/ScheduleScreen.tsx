@@ -72,7 +72,7 @@ export default function ScheduleScreen() {
   const { language } = useTranslation();
   const copy = useMemo(() => getCopy(language), [language]);
   const locale = language === "tr" ? "tr-TR" : "en-US";
-  const { scheduleData, loadScheduleData, setScheduleData, setStatusMessage, statusMessage } =
+  const { scheduleData, loadScheduleData, setScheduleData, setStatus, statusMessage, statusTone } =
     useScheduleData();
   const [visibleMonth, setVisibleMonth] = useState(() => getMonthStart(new Date()));
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -170,12 +170,12 @@ export default function ScheduleScreen() {
       setShowEventForm(true);
     }
 
-    setStatusMessage(copy.statusSelectDay(dayNumber, formatMonthTitle(visibleMonth, language)));
+    setStatus(copy.statusSelectDay(dayNumber, formatMonthTitle(visibleMonth, language)));
   }
 
   async function handleSaveScheduleItem() {
     if (scheduleData === null) {
-      setStatusMessage(copy.statusDataNotLoaded);
+      setStatus(copy.statusDataNotLoaded, "danger");
       return;
     }
 
@@ -183,12 +183,12 @@ export default function ScheduleScreen() {
     const maxDay = getDaysInMonth(visibleMonth.getFullYear(), visibleMonth.getMonth());
 
     if (!canCreate) {
-      setStatusMessage(copy.statusMissingFields);
+      setStatus(copy.statusMissingFields, "danger");
       return;
     }
 
     if (!Number.isInteger(parsedDayNumber) || parsedDayNumber < 1 || parsedDayNumber > maxDay) {
-      setStatusMessage(copy.statusInvalidDay);
+      setStatus(copy.statusInvalidDay, "danger");
       return;
     }
 
@@ -200,7 +200,7 @@ export default function ScheduleScreen() {
     );
 
     if (startsAt === null) {
-      setStatusMessage(copy.statusInvalidTime);
+      setStatus(copy.statusInvalidTime, "danger");
       return;
     }
 
@@ -220,7 +220,7 @@ export default function ScheduleScreen() {
         setScheduleData(nextScheduleData);
         clearForm();
         setShowEventForm(false);
-        setStatusMessage(copy.statusUpdated);
+        setStatus(copy.statusUpdated, "success");
         return;
       }
 
@@ -238,9 +238,9 @@ export default function ScheduleScreen() {
       setScheduleData(nextScheduleData);
       clearForm();
       setShowEventForm(false);
-      setStatusMessage(copy.statusCreated);
+      setStatus(copy.statusCreated, "success");
     } catch {
-      setStatusMessage(editingEventId !== null ? copy.statusUpdateFailed : copy.statusCreateFailed);
+      setStatus(editingEventId !== null ? copy.statusUpdateFailed : copy.statusCreateFailed, "danger");
     }
   }
 
@@ -265,7 +265,7 @@ export default function ScheduleScreen() {
     setEditingEventId(event.id);
     setShowEventForm(true);
     setSelectedEventForDetails(null);
-    setStatusMessage(copy.statusEditReady);
+    setStatus(copy.statusEditReady);
   }
 
   async function handleDeleteEvent(event: ScheduleEvent) {
@@ -273,9 +273,9 @@ export default function ScheduleScreen() {
       const nextScheduleData = await scheduleRepository.removeScheduleEvent(event.id);
       setScheduleData(nextScheduleData);
       setSelectedEventForDetails(null);
-      setStatusMessage(copy.statusDeleted);
+      setStatus(copy.statusDeleted, "success");
     } catch {
-      setStatusMessage(copy.statusDeleteFailed);
+      setStatus(copy.statusDeleteFailed, "danger");
     }
   }
 
@@ -285,20 +285,20 @@ export default function ScheduleScreen() {
     }
 
     setShowEventForm(true);
-    setStatusMessage(copy.statusFormReady);
+    setStatus(copy.statusFormReady);
   }
 
   function closeEventForm() {
     clearForm();
     setShowEventForm(false);
-    setStatusMessage(copy.statusFormCancelled);
+    setStatus(copy.statusFormCancelled);
   }
 
   function goToToday() {
     const today = new Date();
     setVisibleMonth(getMonthStart(today));
     setSelectedDayNumber(`${today.getDate()}`);
-    setStatusMessage(copy.statusBackToToday);
+    setStatus(copy.statusBackToToday);
   }
 
   return (
@@ -319,6 +319,7 @@ export default function ScheduleScreen() {
         showMonthPicker={showMonthPicker}
         showEventForm={showEventForm}
         statusMessage={statusMessage}
+        statusTone={statusTone}
         onToggleMonthPicker={() => setShowMonthPicker((currentValue) => !currentValue)}
         onPrevMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, -1))}
         onNextMonth={() => setMonthAndKeepValidDay(addMonths(visibleMonth, 1))}

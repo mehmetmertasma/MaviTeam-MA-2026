@@ -697,10 +697,6 @@ export default function ProfileScreen() {
             />
           </Card>
         ) : null}
-
-        {!isEditing ? (
-          <AppButton title={t.profile.editProfile} onPress={startEditing} style={styles.editBottomButton} />
-        ) : null}
       </Card>
 
       {showIyzicoConnectModal ? (
@@ -764,7 +760,6 @@ const styles = StyleSheet.create({
   deleteConfirmDescription: { color: theme.colors.text.secondary, fontSize: theme.fontSizes.md, fontWeight: theme.fontWeights.regular, lineHeight: theme.lineHeights.md },
   deleteConfirmField: { marginTop: theme.spacing.xs },
   deleteConfirmButton: { alignSelf: "flex-start", minWidth: 220 },
-  editBottomButton: { marginTop: theme.spacing.lg, alignSelf: "flex-start", minWidth: 180 },
   paymentAccountRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: theme.spacing.lg, marginTop: theme.spacing.xl },
   paymentAccountTextArea: { gap: theme.spacing.sm },
   paymentAccountBadge: { alignSelf: "flex-start" },

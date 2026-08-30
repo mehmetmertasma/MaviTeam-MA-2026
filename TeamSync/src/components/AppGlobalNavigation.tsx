@@ -48,15 +48,18 @@ export function AppGlobalNavigation() {
   }
 
   const showProfileButton = pathname !== "/profile";
+  // Every sign-in/verification/setup flow lands here via router.replace, so
+  // there's never anything to go "back" to from the dashboard itself --
+  // router.canGoBack() is false, and the old fallback (send to "/") caused a
+  // visible flash of the public landing page before the workspace guard's
+  // async check bounced the user right back to /dashboard a second later.
+  // A club's dashboard is the app's actual home screen, so it simply
+  // shouldn't offer a back button at all, same as most apps' root/home tab.
+  const showBackButton = pathname !== "/dashboard";
 
   function handleBackPress() {
     if (router.canGoBack()) {
       router.back();
-      return;
-    }
-
-    if (pathname === "/dashboard") {
-      router.replace("/" as never);
       return;
     }
 
@@ -75,14 +78,16 @@ export function AppGlobalNavigation() {
             <Text style={styles.menuIcon}>☰</Text>
           </Pressable>
 
-          <Pressable
-            onPress={handleBackPress}
-            style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
-            accessibilityLabel={t.common.back}
-          >
-            <Text style={styles.backIcon}>←</Text>
-            <Text style={styles.backText}>{t.common.back}</Text>
-          </Pressable>
+          {showBackButton ? (
+            <Pressable
+              onPress={handleBackPress}
+              style={({ pressed }) => [styles.backButton, pressed ? styles.pressed : null]}
+              accessibilityLabel={t.common.back}
+            >
+              <Text style={styles.backIcon}>←</Text>
+              <Text style={styles.backText}>{t.common.back}</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         <View pointerEvents="box-none" style={styles.rightControls}>

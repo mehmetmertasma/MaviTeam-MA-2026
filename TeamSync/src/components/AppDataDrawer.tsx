@@ -1,12 +1,13 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, usePathname } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService } from "@/services/authService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { TeamSyncAppData, UserRole } from "@/types/teamSync";
+import type { UserRole } from "@/types/teamSync";
 
 type AppDataDrawerProps = {
   visible: boolean;
@@ -124,37 +125,15 @@ function canShowDrawerItem(item: DrawerItem, userRole?: UserRole) {
 export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
   const { language } = useTranslation();
   const drawerCopy = getDrawerCopy(language);
-  const [appData, setAppData] = useState<TeamSyncAppData | null>(null);
+  const pathname = usePathname();
+  // Reads the already-loaded shared app data instead of re-fetching from
+  // scratch on every open -- the drawer used to run its own independent
+  // ~12-request Firestore fetch each time, which is both wasteful and why
+  // the hardcoded "MaviTeam Kullanıcı" fallback used to flash on every open
+  // even for a user who'd already loaded the rest of the app.
+  const { appData } = useAppDataContext();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-
-  useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    let isActive = true;
-
-    async function loadDrawerData() {
-      try {
-        const loadedAppData = await teamSyncService.getAppData();
-
-        if (isActive) {
-          setAppData(loadedAppData);
-        }
-      } catch {
-        if (isActive) {
-          setAppData(null);
-        }
-      }
-    }
-
-    loadDrawerData();
-
-    return () => {
-      isActive = false;
-    };
-  }, [visible]);
 
   if (!visible) {
     return null;
@@ -232,27 +211,36 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
         </View>
 
         <ScrollView style={styles.itemsScroll} contentContainerStyle={styles.items} showsVerticalScrollIndicator={false}>
-          {visibleDrawerItems.map((item) => (
-            <Pressable
-              key={item.label}
-              disabled={item.isDisabled || isLoggingOut}
-              onPress={() => handleNavigate(item.route, item.isDisabled)}
-              style={({ pressed }) => [
-                styles.item,
-                item.isDisabled ? styles.itemDisabled : null,
-                pressed && !item.isDisabled ? styles.pressed : null,
-              ]}
-            >
-              <View style={styles.itemTextArea}>
-                <Text style={[styles.itemLabel, item.isDisabled ? styles.disabledText : null]}>{item.label}</Text>
-                <Text style={[styles.itemSubtitle, item.isDisabled ? styles.disabledText : null]}>{item.subtitle}</Text>
-              </View>
+          {visibleDrawerItems.map((item) => {
+            const isActiveItem = item.route !== undefined && item.route === pathname;
 
-              <Text style={[styles.itemArrow, item.isDisabled ? styles.disabledText : null]}>
-                {item.isDisabled ? drawerCopy.soon : "›"}
-              </Text>
-            </Pressable>
-          ))}
+            return (
+              <Pressable
+                key={item.label}
+                disabled={item.isDisabled || isLoggingOut || isActiveItem}
+                onPress={() => handleNavigate(item.route, item.isDisabled)}
+                style={({ pressed }) => [
+                  styles.item,
+                  isActiveItem ? styles.itemActive : null,
+                  item.isDisabled ? styles.itemDisabled : null,
+                  pressed && !item.isDisabled && !isActiveItem ? styles.pressed : null,
+                ]}
+              >
+                <View style={styles.itemTextArea}>
+                  <Text style={[styles.itemLabel, isActiveItem ? styles.itemLabelActive : null, item.isDisabled ? styles.disabledText : null]}>
+                    {item.label}
+                  </Text>
+                  <Text style={[styles.itemSubtitle, isActiveItem ? styles.itemSubtitleActive : null, item.isDisabled ? styles.disabledText : null]}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+
+                <Text style={[styles.itemArrow, isActiveItem ? styles.itemLabelActive : null, item.isDisabled ? styles.disabledText : null]}>
+                  {item.isDisabled ? drawerCopy.soon : isActiveItem ? "•" : "›"}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
 
         <View style={styles.logoutArea}>
@@ -401,6 +389,16 @@ const styles = StyleSheet.create({
   },
   itemDisabled: {
     opacity: 0.45,
+  },
+  itemActive: {
+    backgroundColor: theme.colors.brand.primary,
+  },
+  itemLabelActive: {
+    color: theme.colors.text.inverse,
+  },
+  itemSubtitleActive: {
+    color: theme.colors.text.inverse,
+    opacity: 0.82,
   },
   itemTextArea: {
     flex: 1,

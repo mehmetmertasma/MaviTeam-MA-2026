@@ -40,6 +40,15 @@ const routesWithoutGlobalNavigation = [
 ];
 
 const publicAuthRoutes = ["/", "/login", "/register", "/verify-email", "/privacy-policy", "/terms-of-service"];
+// Privacy Policy and Terms of Service are meant to stay readable by anyone,
+// signed in or not, with or without a club -- register.tsx and index.tsx
+// both link here for anonymous visitors, which is why they're also in
+// publicAuthRoutes/workspaceSetupRoutes above. But those two lists are
+// reused below for "does this signed-in user already have a workspace,
+// send them to /dashboard" -- without this exclusion, a logged-in club
+// member tapping either legal link from Profile would get bounced straight
+// back to /dashboard a moment after the page opened.
+const legalRoutes = ["/privacy-policy", "/terms-of-service"];
 // "/login" and "/register" are included here (even though they aren't
 // "setup" screens) so that an already-signed-in, verified, clubless user who
 // lands back on either one -- e.g. clicking a home-screen button again after
@@ -243,7 +252,7 @@ function AppContent() {
           return;
         }
 
-        if (workspace.club !== null && (routeIsPublic || routeIsWorkspaceSetup)) {
+        if (workspace.club !== null && !legalRoutes.includes(pathname) && (routeIsPublic || routeIsWorkspaceSetup)) {
           router.replace("/dashboard" as never);
         }
       } catch (workspaceError) {

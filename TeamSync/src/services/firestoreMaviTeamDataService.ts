@@ -5,6 +5,7 @@ import {
   getDoc,
   getDocs,
   limit as firestoreLimit,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
@@ -582,6 +583,99 @@ export const firestoreMaviTeamDataService = {
     messages.push(...groupVisibleSnapshots.docs.map(getChatMessageFromFirestore));
 
     return uniqueById(messages).sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+  },
+
+  subscribeToVisibleChatMessagesForCurrentUser(
+    firebaseUser: User,
+    onData: (messages: ChatMessage[]) => void,
+    onError?: (error: unknown) => void,
+    maxResults = 250
+  ): () => void {
+    const { db } = requireFirebaseServices();
+    let isCancelled = false;
+    const unsubscribes: (() => void)[] = [];
+
+    firestoreTeamSyncService
+      .getCurrentWorkspace(firebaseUser)
+      .then((workspace) => {
+        if (isCancelled) return;
+
+        if (workspace === null || workspace.club === null) {
+          onData([]);
+          return;
+        }
+
+        if (workspace.currentUser.role === "clubAdmin") {
+          const adminQuery = query(
+            collection(db, "chatMessages"),
+            where("clubId", "==", workspace.club.id),
+            firestoreLimit(maxResults)
+          );
+
+          const unsub = onSnapshot(
+            adminQuery,
+            (snapshot) => {
+              const msgs = snapshot.docs
+                .map(getChatMessageFromFirestore)
+                .sort((first, second) => first.createdAt.localeCompare(second.createdAt));
+              onData(msgs);
+            },
+            (err) => onError?.(err)
+          );
+          unsubscribes.push(unsub);
+          return;
+        }
+
+        let directDocs: ChatMessage[] = [];
+        let groupDocs: ChatMessage[] = [];
+
+        function emitMerged() {
+          const merged = uniqueById([...directDocs, ...groupDocs]).sort((first, second) =>
+            first.createdAt.localeCompare(second.createdAt)
+          );
+          onData(merged);
+        }
+
+        const directQuery = query(
+          collection(db, "chatMessages"),
+          where("clubId", "==", workspace.club.id),
+          where("directUserIds", "array-contains", firebaseUser.uid),
+          firestoreLimit(maxResults)
+        );
+
+        const unsubDirect = onSnapshot(
+          directQuery,
+          (snapshot) => {
+            directDocs = snapshot.docs.map(getChatMessageFromFirestore);
+            emitMerged();
+          },
+          (err) => onError?.(err)
+        );
+        unsubscribes.push(unsubDirect);
+
+        const groupVisibleQuery = query(
+          collection(db, "chatMessages"),
+          where("clubId", "==", workspace.club.id),
+          where("visibleUserIds", "array-contains", firebaseUser.uid),
+          firestoreLimit(maxResults)
+        );
+
+        const unsubGroup = onSnapshot(
+          groupVisibleQuery,
+          (snapshot) => {
+            groupDocs = snapshot.docs.map(getChatMessageFromFirestore);
+            emitMerged();
+          },
+          (err) => onError?.(err)
+        );
+        unsubscribes.push(unsubGroup);
+      })
+      .catch((err) => onError?.(err));
+
+    return () => {
+      isCancelled = true;
+      unsubscribes.forEach((unsub) => unsub());
+    };
   },
 
   async createChatGroup(firebaseUser: User, input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">) {

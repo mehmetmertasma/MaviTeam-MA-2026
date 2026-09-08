@@ -544,12 +544,40 @@ export const teamSyncService = {
     return nextAppData;
   },
 
+  async updateCurrentUserProfileDirect(
+    data: TeamSyncAppData,
+    updates: Partial<Pick<UserProfile, "fullName" | "billingDetails">>
+  ): Promise<TeamSyncAppData> {
+    const nextCurrentUser: UserProfile = { ...data.currentUser, ...updates, updatedAt: nowIso() };
+    const nextAppData: TeamSyncAppData = {
+      ...data,
+      currentUser: nextCurrentUser,
+      users: data.users.map((user) => (user.id === nextCurrentUser.id ? nextCurrentUser : user)),
+    };
+    await saveAppData(nextAppData);
+    await syncCurrentUserToFirestore(nextAppData);
+    return nextAppData;
+  },
+
   async updateCurrentClub(updates: Partial<Pick<Club, "name" | "sport" | "city" | "code" | "logoUrl" | "primaryColor">>) {
     const data = await loadAppData();
     const nextAppData = await saveAppData({ ...data, club: { ...data.club, ...updates, updatedAt: nowIso() } });
 
     await syncCurrentClubToFirestore(nextAppData);
 
+    return nextAppData;
+  },
+
+  async updateCurrentClubSettingsDirect(
+    data: TeamSyncAppData,
+    updates: Partial<Pick<Club, "name" | "sport" | "city" | "code" | "logoUrl" | "primaryColor">>
+  ): Promise<TeamSyncAppData> {
+    const nextAppData: TeamSyncAppData = {
+      ...data,
+      club: { ...data.club, ...updates, updatedAt: nowIso() },
+    };
+    await saveAppData(nextAppData);
+    await syncCurrentClubToFirestore(nextAppData);
     return nextAppData;
   },
 
@@ -735,6 +763,31 @@ export const teamSyncService = {
     return saveAppData({ ...data, chatGroups: [newChatGroup, ...data.chatGroups] });
   },
 
+  async createChatGroupDirect(
+    data: TeamSyncAppData,
+    input: Omit<ChatGroup, "id" | "createdAt" | "updatedAt">
+  ): Promise<{ nextAppData: TeamSyncAppData; group: ChatGroup }> {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      const createdGroup = await firestoreMaviTeamDataService.createChatGroup(firebaseUser, input);
+      const nextAppData: TeamSyncAppData = {
+        ...data,
+        chatGroups: [createdGroup, ...data.chatGroups],
+      };
+      await saveAppData(nextAppData);
+      return { nextAppData, group: createdGroup };
+    }
+
+    const createdAt = nowIso();
+    const newChatGroup: ChatGroup = { ...input, id: `chat-${Date.now()}`, createdAt, updatedAt: createdAt };
+    const nextAppData: TeamSyncAppData = {
+      ...data,
+      chatGroups: [newChatGroup, ...data.chatGroups],
+    };
+    await saveAppData(nextAppData);
+    return { nextAppData, group: newChatGroup };
+  },
+
   async createChatMessage(input: Omit<ChatMessage, "id" | "createdAt">) {
     if (authService.isConfigured()) {
       const firebaseUser = getFirebaseUserOrThrow();
@@ -745,6 +798,30 @@ export const teamSyncService = {
     const data = await loadAppData();
     const newChatMessage: ChatMessage = { ...input, id: `message-${Date.now()}`, createdAt: nowIso() };
     return saveAppData({ ...data, chatMessages: [...data.chatMessages, newChatMessage] });
+  },
+
+  async createChatMessageDirect(
+    data: TeamSyncAppData,
+    input: Omit<ChatMessage, "id" | "createdAt">
+  ): Promise<{ nextAppData: TeamSyncAppData; message: ChatMessage }> {
+    if (authService.isConfigured()) {
+      const firebaseUser = getFirebaseUserOrThrow();
+      const message = await firestoreMaviTeamDataService.createChatMessage(firebaseUser, input);
+      const nextAppData: TeamSyncAppData = {
+        ...data,
+        chatMessages: [...data.chatMessages.filter((m) => m.id !== message.id), message],
+      };
+      await saveAppData(nextAppData);
+      return { nextAppData, message };
+    }
+
+    const newChatMessage: ChatMessage = { ...input, id: `message-${Date.now()}`, createdAt: nowIso() };
+    const nextAppData: TeamSyncAppData = {
+      ...data,
+      chatMessages: [...data.chatMessages, newChatMessage],
+    };
+    await saveAppData(nextAppData);
+    return { nextAppData, message: newChatMessage };
   },
 
   async createPayment(input: Omit<Payment, "id" | "updatedAt">) {

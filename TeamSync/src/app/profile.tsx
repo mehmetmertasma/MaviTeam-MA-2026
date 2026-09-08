@@ -1,6 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import Head from "expo-router/head";
 import { openBrowserAsync } from "expo-web-browser";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -188,6 +189,7 @@ export default function ProfileScreen() {
   const { connect: connectReturnParam } = useLocalSearchParams<{ connect?: string }>();
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
@@ -222,41 +224,44 @@ export default function ProfileScreen() {
     }, [connectReturnParam, refresh, setAppData])
   );
 
-  function startEditing() {
+  const startEditing = useCallback(() => {
     if (appData !== null) {
       setDraftProfileData(getFormDataFromAppData(appData));
     }
 
     setIsEditing(true);
     setStatusMessage(copy.editingEnabled);
-  }
+  }, [appData, copy.editingEnabled]);
 
-  function cancelEditing() {
+  const cancelEditing = useCallback(() => {
     if (appData !== null) {
       setDraftProfileData(getFormDataFromAppData(appData));
     }
 
     setIsEditing(false);
     setStatusMessage(copy.editingCancelled);
-  }
+  }, [appData, copy.editingCancelled]);
 
-  async function saveProfile() {
-    if (appData === null) {
+  const updateDraftProfile = useCallback((field: keyof ProfileFormData, value: string) => {
+    setDraftProfileData((currentData) => ({
+      ...currentData,
+      [field]: value,
+    }));
+  }, []);
+
+  const saveProfile = useCallback(async () => {
+    if (appData === null || isSaving) {
       return;
     }
 
     try {
-      // Every member can rename themselves. Note: email is intentionally
-      // never sent here — it's tied to the Firebase Auth account, can't be
-      // changed via this form, and the field below is read-only.
-      let nextAppData = await teamSyncService.updateCurrentUser({
+      setIsSaving(true);
+      let nextAppData = await teamSyncService.updateCurrentUserProfileDirect(appData, {
         fullName: draftProfileData.fullName.trim() || copy.defaultUser,
       });
 
-      // Club-wide settings can only be changed by the club admin — the
-      // fields aren't even shown to other roles (see the form below).
       if (appData.currentUser.role === "clubAdmin") {
-        nextAppData = await teamSyncService.updateCurrentClub({
+        nextAppData = await teamSyncService.updateCurrentClubSettingsDirect(nextAppData, {
           name: draftProfileData.clubName.trim() || copy.defaultClub,
           sport: draftProfileData.clubSport.trim() || t.common.volleyball,
           city: draftProfileData.clubCity.trim() || copy.defaultCity,
@@ -270,10 +275,12 @@ export default function ProfileScreen() {
       setStatusMessage(t.profile.messages.updated);
     } catch {
       setStatusMessage(t.profile.messages.failedToUpdate);
+    } finally {
+      setIsSaving(false);
     }
-  }
+  }, [appData, isSaving, draftProfileData, copy.defaultUser, copy.defaultClub, copy.defaultCity, t.common.volleyball, t.profile.messages.updated, t.profile.messages.failedToUpdate, setAppData]);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     if (isSigningOut) {
       return;
     }
@@ -295,9 +302,9 @@ export default function ProfileScreen() {
       setStatusMessage(getAuthErrorMessage(logoutError, language) || copy.logoutFailed);
       setIsSigningOut(false);
     }
-  }
+  }, [isSigningOut, copy.signingOut, copy.logoutFailed, language, setAppData]);
 
-  async function handleDeleteAccount() {
+  const handleDeleteAccount = useCallback(async () => {
     const currentUserEmail = appData?.currentUser.email ?? "";
 
     if (isDeletingAccount || currentUserEmail === "" || deleteConfirmInput.trim().toLowerCase() !== currentUserEmail.trim().toLowerCase()) {
@@ -323,16 +330,13 @@ export default function ProfileScreen() {
       setStatusMessage(errorCode === "functions/failed-precondition" ? copy.deleteFailedOwner : copy.deleteFailedGeneric);
       setIsDeletingAccount(false);
     }
-  }
+  }, [appData, isDeletingAccount, deleteConfirmInput, copy.deletingAccount, copy.deleteFailedOwner, copy.deleteFailedGeneric, setAppData]);
 
-  async function handleConnectPaymentAccount() {
+  const handleConnectPaymentAccount = useCallback(async () => {
     if (appData === null || isConnectingPaymentAccount) {
       return;
     }
 
-    // US clubs get Stripe's hosted onboarding (a redirect, nothing else to
-    // collect here); TR clubs go through iyzico, which has no hosted
-    // onboarding page, so a business-details form is needed first.
     if (appData.club.country === "US") {
       try {
         setIsConnectingPaymentAccount(true);
@@ -353,9 +357,9 @@ export default function ProfileScreen() {
 
     setIyzicoConnectError("");
     setShowIyzicoConnectModal(true);
-  }
+  }, [appData, isConnectingPaymentAccount, copy.connectingAccount, copy.connectAccountError]);
 
-  async function handleSaveIyzicoSubMerchant(iyzicoSubMerchant: IyzicoSubMerchantInput) {
+  const handleSaveIyzicoSubMerchant = useCallback(async (iyzicoSubMerchant: IyzicoSubMerchantInput) => {
     if (appData === null) {
       return;
     }
@@ -373,14 +377,7 @@ export default function ProfileScreen() {
     } finally {
       setIsConnectingPaymentAccount(false);
     }
-  }
-
-  function updateDraftProfile(field: keyof ProfileFormData, value: string) {
-    setDraftProfileData((currentData) => ({
-      ...currentData,
-      [field]: value,
-    }));
-  }
+  }, [appData, refresh, setAppData, copy.connectAccountSuccess, copy.connectAccountError]);
 
   if (appData === null) {
     return (
@@ -398,6 +395,10 @@ export default function ProfileScreen() {
 
   return (
     <AppScreenLayout>
+      <Head>
+        <title>{`${t.profile.title} | MaviTeam`}</title>
+        <meta name="description" content="MaviTeam kullanıcı profili ve kulüp ayarları." />
+      </Head>
       <PageHeader title={t.profile.title} subtitle={t.profile.subtitle} />
 
       <Card variant="elevated" style={styles.heroCard}>
@@ -426,8 +427,9 @@ export default function ProfileScreen() {
         ) : (
           <View style={styles.actionRow}>
             <AppButton
-              title={t.common.save}
+              title={isSaving ? (language === "tr" ? "Kaydediliyor..." : "Saving...") : t.common.save}
               variant="secondary"
+              disabled={isSaving}
               accessibilityLabel={t.common.save}
               style={styles.actionButton}
               onPress={saveProfile}
@@ -436,6 +438,7 @@ export default function ProfileScreen() {
             <AppButton
               title={t.common.cancel}
               variant="secondary"
+              disabled={isSaving}
               accessibilityLabel={t.common.cancel}
               style={styles.actionButton}
               onPress={cancelEditing}
@@ -600,7 +603,12 @@ export default function ProfileScreen() {
             <Text style={styles.preferenceTitle}>{copy.pushNotifications}</Text>
             <Text style={styles.preferenceSubtitle}>{copy.pushDescription}</Text>
           </View>
-          <Switch value={pushNotifications} onValueChange={setPushNotifications} />
+          <Switch
+            value={pushNotifications}
+            onValueChange={setPushNotifications}
+            accessibilityLabel={copy.pushNotifications}
+            aria-label={copy.pushNotifications}
+          />
         </View>
 
         <View style={styles.preferenceRowLast}>
@@ -608,7 +616,12 @@ export default function ProfileScreen() {
             <Text style={styles.preferenceTitle}>{copy.emailNotifications}</Text>
             <Text style={styles.preferenceSubtitle}>{copy.emailDescription}</Text>
           </View>
-          <Switch value={emailNotifications} onValueChange={setEmailNotifications} />
+          <Switch
+            value={emailNotifications}
+            onValueChange={setEmailNotifications}
+            accessibilityLabel={copy.emailNotifications}
+            aria-label={copy.emailNotifications}
+          />
         </View>
       </Card>
 

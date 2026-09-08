@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
@@ -12,7 +13,7 @@ type LanguageSelectorProps = {
 // figure out what tapping does. Flag emoji were dropped entirely -- on
 // Windows they don't render as flags at all, just as literal "TR"/"US" text,
 // which was the actual clutter in the old design, not just the shape/color.
-export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
+export const LanguageSelector = memo(function LanguageSelector({ compact = false }: LanguageSelectorProps) {
   const { language, setLanguage, t } = useTranslation();
 
   return (
@@ -58,7 +59,7 @@ export function LanguageSelector({ compact = false }: LanguageSelectorProps) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

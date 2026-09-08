@@ -33,6 +33,13 @@ import type {
   UserStatus,
 } from "@/types/teamSync";
 
+export type FirestoreWorkspace = {
+  currentUser: UserProfile;
+  club: Club | null;
+};
+
+const inFlightWorkspaceRequests = new Map<string, Promise<FirestoreWorkspace | null>>();
+
 type FirestoreUserStatus = "emailVerified" | "active" | "pending" | "pendingApproval" | "removed";
 
 type EnsureUserProfileInput = {
@@ -99,11 +106,6 @@ type CreateScheduleEventInput = {
 };
 
 type UpdateScheduleEventInput = Partial<Pick<ScheduleEvent, "title" | "type" | "startsAt" | "endsAt" | "location" | "note" | "teamId">>;
-
-type FirestoreWorkspace = {
-  currentUser: UserProfile;
-  club: Club | null;
-};
 
 type FirestoreJoinRequestRow = {
   request: JoinRequest;
@@ -476,31 +478,47 @@ export const firestoreTeamSyncService = {
   },
 
   async getCurrentWorkspace(firebaseUser: User): Promise<FirestoreWorkspace | null> {
-    const { db } = requireFirebaseServices();
-    const userRef = doc(db, "users", firebaseUser.uid);
-    const userSnapshot = await getDoc(userRef);
-
-    if (!userSnapshot.exists()) {
-      return null;
+    const cachedPromise = inFlightWorkspaceRequests.get(firebaseUser.uid);
+    if (cachedPromise) {
+      return cachedPromise;
     }
 
-    const currentUser = getUserProfileFromFirestore(firebaseUser.uid, userSnapshot.data());
+    const fetchPromise = (async () => {
+      try {
+        const { db } = requireFirebaseServices();
+        const userRef = doc(db, "users", firebaseUser.uid);
+        const userSnapshot = await getDoc(userRef);
 
-    if (currentUser.clubId === "" || currentUser.status !== "active") {
-      return { currentUser, club: null };
-    }
+        if (!userSnapshot.exists()) {
+          return null;
+        }
 
-    const clubRef = doc(db, "clubs", currentUser.clubId);
-    const clubSnapshot = await getDoc(clubRef);
+        const currentUser = getUserProfileFromFirestore(firebaseUser.uid, userSnapshot.data());
 
-    if (!clubSnapshot.exists()) {
-      return { currentUser, club: null };
-    }
+        if (currentUser.clubId === "" || currentUser.status !== "active") {
+          return { currentUser, club: null };
+        }
 
-    return {
-      currentUser,
-      club: getClubFromFirestore(clubSnapshot.id, clubSnapshot.data()),
-    };
+        const clubRef = doc(db, "clubs", currentUser.clubId);
+        const clubSnapshot = await getDoc(clubRef);
+
+        if (!clubSnapshot.exists()) {
+          return { currentUser, club: null };
+        }
+
+        return {
+          currentUser,
+          club: getClubFromFirestore(clubSnapshot.id, clubSnapshot.data()),
+        };
+      } finally {
+        setTimeout(() => {
+          inFlightWorkspaceRequests.delete(firebaseUser.uid);
+        }, 2000);
+      }
+    })();
+
+    inFlightWorkspaceRequests.set(firebaseUser.uid, fetchPromise);
+    return fetchPromise;
   },
 
   async createClubWorkspace(input: CreateClubWorkspaceInput) {

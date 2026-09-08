@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { teamSyncService } from "@/services/teamSyncService";
@@ -9,32 +10,59 @@ type AppDataState = {
   error: unknown;
 };
 
-const initialState: AppDataState = { appData: null, isLoading: true, error: null };
+// Global in-memory cache mapped by user identity (uid)
+const appDataMemoryCache = new Map<string, TeamSyncAppData>();
+const CACHE_KEY_PREFIX = "maviteam_appdata_cache_";
 
-// Centralizes what used to be a `teamSyncService.getAppData()` call repeated
-// independently in the root layout, the global nav bar, and every screen —
-// each of those triggered its own full ~12-request Firestore fetch on every
-// navigation. This hook fetches once and shares the result; callers that
-// already have fresh data (e.g. a mutation's return value) can write it
-// straight into state via `setAppData` instead of forcing a refetch.
-//
-// `identityKey` must change whenever the signed-in account changes (e.g. a
-// logout followed by a different account logging back in within the same
-// session) so this refetches instead of leaving the previous account's data
-// sitting in the shared cache — `enabled` alone only tells us auth has
-// resolved at least once, not that the account underneath it changed.
+/**
+ * useAppData with SWR (Stale-While-Revalidate) & Instant Caching.
+ * 
+ * 1. Returns cached data immediately if available in memory (0ms LCP delay).
+ * 2. Asynchronously fetches latest data from Firestore in the background.
+ * 3. Persists to AsyncStorage so repeat visits and reloads never show a blank loading screen.
+ */
 export function useAppData(enabled: boolean, identityKey: string) {
-  const [state, setState] = useState<AppDataState>(initialState);
+  // Check memory cache on initialization for immediate 0ms render
+  const initialData = enabled && identityKey ? (appDataMemoryCache.get(identityKey) ?? null) : null;
+
+  const [state, setState] = useState<AppDataState>({
+    appData: initialData,
+    isLoading: initialData === null && enabled,
+    error: null,
+  });
+
   const isMountedRef = useRef(true);
   const inFlightRef = useRef<Promise<TeamSyncAppData> | null>(null);
 
   useEffect(() => {
     isMountedRef.current = true;
-
     return () => {
       isMountedRef.current = false;
     };
   }, []);
+
+  // Restore from AsyncStorage if memory cache missed on cold start
+  useEffect(() => {
+    if (!enabled || !identityKey || identityKey === "anonymous") return;
+
+    if (!appDataMemoryCache.has(identityKey)) {
+      AsyncStorage.getItem(`${CACHE_KEY_PREFIX}${identityKey}`)
+        .then((storedJson) => {
+          if (storedJson && isMountedRef.current) {
+            try {
+              const cachedData = JSON.parse(storedJson) as TeamSyncAppData;
+              if (cachedData?.currentUser?.id) {
+                appDataMemoryCache.set(identityKey, cachedData);
+                setState((current) => (current.appData === null ? { appData: cachedData, isLoading: false, error: null } : current));
+              }
+            } catch {
+              // Ignore JSON parse errors
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [enabled, identityKey]);
 
   const load = useCallback(async () => {
     if (inFlightRef.current !== null) {
@@ -47,6 +75,11 @@ export function useAppData(enabled: boolean, identityKey: string) {
     try {
       const nextAppData = await request;
 
+      if (identityKey && identityKey !== "anonymous") {
+        appDataMemoryCache.set(identityKey, nextAppData);
+        AsyncStorage.setItem(`${CACHE_KEY_PREFIX}${identityKey}`, JSON.stringify(nextAppData)).catch(() => {});
+      }
+
       if (isMountedRef.current) {
         setState({ appData: nextAppData, isLoading: false, error: null });
       }
@@ -56,30 +89,47 @@ export function useAppData(enabled: boolean, identityKey: string) {
       console.error("[TeamSync] Shared app data fetch failed:", error);
 
       if (isMountedRef.current) {
-        setState((current) => ({ ...current, isLoading: false, error }));
+        setState((current) => ({
+          ...current,
+          isLoading: false,
+          error,
+        }));
       }
 
       throw error;
     } finally {
       inFlightRef.current = null;
     }
-  }, []);
+  }, [identityKey]);
 
   useEffect(() => {
     if (!enabled) {
-      setState(initialState);
+      setState({ appData: null, isLoading: false, error: null });
       return;
     }
 
-    setState((current) => ({ ...current, isLoading: true }));
+    const currentCached = appDataMemoryCache.get(identityKey) ?? null;
+    if (currentCached) {
+      setState({ appData: currentCached, isLoading: false, error: null });
+    } else {
+      setState((current) => ({ ...current, isLoading: current.appData === null }));
+    }
+
     load().catch(() => {});
   }, [enabled, identityKey, load]);
 
   const refresh = useCallback(() => load(), [load]);
 
-  const setAppData = useCallback((nextAppData: TeamSyncAppData) => {
-    setState({ appData: nextAppData, isLoading: false, error: null });
-  }, []);
+  const setAppData = useCallback(
+    (nextAppData: TeamSyncAppData) => {
+      if (identityKey && identityKey !== "anonymous") {
+        appDataMemoryCache.set(identityKey, nextAppData);
+        AsyncStorage.setItem(`${CACHE_KEY_PREFIX}${identityKey}`, JSON.stringify(nextAppData)).catch(() => {});
+      }
+      setState({ appData: nextAppData, isLoading: false, error: null });
+    },
+    [identityKey]
+  );
 
   return {
     appData: state.appData,

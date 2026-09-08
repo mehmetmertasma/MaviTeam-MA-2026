@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import type { PropsWithChildren } from "react";
 import { Stack, router, usePathname } from "expo-router";
+import Head from "expo-router/head";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { Platform, Text, View } from "react-native";
@@ -277,6 +278,10 @@ function AppContent() {
 
   return (
     <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR }}>
+      <Head>
+        <title>MaviTeam | Spor Kulübü Yönetim Platformu</title>
+        <meta name="description" content="MaviTeam spor kulüpleri için takım yönetimi, antrenman takvimi, yoklama ve mesajlaşma platformu." />
+      </Head>
       <StatusBar style="light" />
 
       <Stack

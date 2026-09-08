@@ -1,0 +1,7 @@
+# Local documentation & scratch notes
+docs/
+docs/generate_pdf_standalone.py
+docs/notes_media/
+*.pdf
+sorunlar.pdf
+GELISTIRME_NOTLARI.md

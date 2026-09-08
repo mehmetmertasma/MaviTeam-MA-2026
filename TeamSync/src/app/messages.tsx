@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -22,6 +22,8 @@ import { TextField } from "@/components/TextField";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
 import { useAppDataContext } from "@/providers/AppDataProvider";
+import { authService } from "@/services/authService";
+import { firestoreMaviTeamDataService } from "@/services/firestoreMaviTeamDataService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ChatGroup, ChatMessage, TeamSyncAppData, UserProfile } from "@/types/teamSync";
 import { matchesSearchQuery } from "@/utils/search";
@@ -192,6 +194,7 @@ export default function MessagesScreen() {
   const copy = useMemo(() => getCopy(language), [language]);
   const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData, setAppData } = useAppDataContext();
+  const [firestoreChatMessages, setFirestoreChatMessages] = useState<ChatMessage[] | null>(null);
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [draftText, setDraftText] = useState("");
   const [showDirectPicker, setShowDirectPicker] = useState(false);
@@ -206,8 +209,28 @@ export default function MessagesScreen() {
   const [directSearchQuery, setDirectSearchQuery] = useState("");
   const [groupSearchQuery, setGroupSearchQuery] = useState("");
 
+  useEffect(() => {
+    if (!authService.isConfigured()) return;
+    const firebaseUser = authService.getCurrentUser();
+    if (firebaseUser === null) return;
+
+    const unsubscribe = firestoreMaviTeamDataService.subscribeToVisibleChatMessagesForCurrentUser(
+      firebaseUser,
+      (messages) => {
+        setFirestoreChatMessages(messages);
+      },
+      (error) => {
+        console.warn("[messages] Realtime chat subscription error:", error);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const chatGroups = appData?.chatGroups ?? EMPTY_CHAT_GROUPS;
-  const chatMessages = appData?.chatMessages ?? EMPTY_CHAT_MESSAGES;
+  const chatMessages = firestoreChatMessages ?? appData?.chatMessages ?? EMPTY_CHAT_MESSAGES;
   const users = appData?.users ?? EMPTY_USERS;
   const currentUser = appData?.currentUser;
 
@@ -279,6 +302,8 @@ export default function MessagesScreen() {
     return users.find((user) => user.id === activeChat.userId);
   }, [activeChat, users]);
 
+  const messagesScrollRef = useRef<ScrollView>(null);
+
   const visibleMessages = useMemo(() => {
     if (appData === null || activeChat === null) {
       return [];
@@ -290,6 +315,14 @@ export default function MessagesScreen() {
 
     return getDirectMessages(appData.currentUser.id, activeChat.userId, chatMessages);
   }, [activeChat, appData, chatMessages]);
+
+  useEffect(() => {
+    if (activeChat !== null && visibleMessages.length > 0) {
+      setTimeout(() => {
+        messagesScrollRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }
+  }, [activeChat, visibleMessages.length]);
 
   function clearCreateForm() {
     setNewConversationName("");
@@ -343,18 +376,17 @@ export default function MessagesScreen() {
 
     try {
       const groupName = newConversationName.trim() || `${selectedTarget.label} ${copy.defaultGroupNameSuffix}`;
-      const nextAppDataWithGroup = await teamSyncService.createChatGroup({
+      const { nextAppData: nextAppDataWithGroup, group: createdGroup } = await teamSyncService.createChatGroupDirect(appData, {
         clubId: appData.club.id,
         teamId: selectedTarget.teamId,
         name: groupName,
         visibleUserIds,
       });
 
-      const createdGroup = nextAppDataWithGroup.chatGroups[0];
       const firstMessageText = newConversationMessage.trim();
 
       if (firstMessageText.length > 0) {
-        const nextAppDataWithMessage = await teamSyncService.createChatMessage({
+        const { nextAppData: nextAppDataWithMessage } = await teamSyncService.createChatMessageDirect(nextAppDataWithGroup, {
           clubId: appData.club.id,
           groupId: createdGroup.id,
           senderUserId: appData.currentUser.id,
@@ -378,11 +410,6 @@ export default function MessagesScreen() {
   }
 
   async function sendMessage() {
-    // Guards against the double-send bug: sending a message round-trips
-    // through a full app-data reload (see teamSyncService.createChatMessage),
-    // which can take a couple seconds. Without this guard a second tap while
-    // that's in flight fires a second, independent createChatMessage call
-    // and both land -- the message shows up twice after the reload settles.
     if (appData === null || activeChat === null || isSendingMessage) {
       return;
     }
@@ -403,14 +430,11 @@ export default function MessagesScreen() {
       createdAt: new Date().toISOString(),
     };
 
-    // Show the message immediately instead of waiting on the round trip --
-    // that wait is what made sends feel like they hadn't registered.
-    setAppData({ ...appData, chatMessages: [...appData.chatMessages, optimisticMessage] });
     setDraftText("");
     setIsSendingMessage(true);
 
     try {
-      const nextAppData = await teamSyncService.createChatMessage({
+      const { nextAppData } = await teamSyncService.createChatMessageDirect(appData, {
         clubId: appData.club.id,
         groupId: activeChat.type === "group" ? activeChat.groupId : undefined,
         directUserIds: activeChat.type === "direct" ? [appData.currentUser.id, activeChat.userId] : undefined,
@@ -420,11 +444,6 @@ export default function MessagesScreen() {
 
       setAppData(nextAppData);
     } catch {
-      // Roll back the optimistic message and give the text back so nothing
-      // is silently lost, instead of leaving a message on screen that never
-      // actually made it to the server. `appData` here is still the
-      // pre-optimistic snapshot captured when this call started.
-      setAppData(appData);
       setDraftText(trimmedText);
       setStatusMessage(copy.sendMessageError);
     } finally {
@@ -470,7 +489,7 @@ export default function MessagesScreen() {
             </View>
           ) : null}
 
-          <ScrollView style={styles.messagesScroll} contentContainerStyle={styles.messagesContent}>
+          <ScrollView ref={messagesScrollRef} style={styles.messagesScroll} contentContainerStyle={styles.messagesContent}>
             {visibleMessages.length > 0 ? (
               visibleMessages.map((message) => {
                 const isMyMessage = message.senderUserId === appData.currentUser.id;

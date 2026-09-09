@@ -27,6 +27,7 @@ type EventFormProps = {
   note: string;
   onChangeNote: (value: string) => void;
   canCreate: boolean;
+  isSaving?: boolean;
   onSave: () => void;
   onCancel: () => void;
   language: "tr" | "en";
@@ -77,6 +78,7 @@ export function EventForm({
   note,
   onChangeNote,
   canCreate,
+  isSaving = false,
   onSave,
   onCancel,
   language,
@@ -205,13 +207,15 @@ export function EventForm({
         <AppButton
           title={isEditing ? copy.saveEdit : copy.saveNew}
           onPress={onSave}
-          disabled={!canCreate}
+          loading={isSaving}
+          disabled={!canCreate || isSaving}
           style={scheduleSharedStyles.actionButton}
         />
         <AppButton
           title={copy.cancel}
           variant="ghost"
           onPress={onCancel}
+          disabled={isSaving}
           style={scheduleSharedStyles.actionButton}
         />
       </View>

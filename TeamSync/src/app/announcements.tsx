@@ -134,6 +134,7 @@ export default function AnnouncementsScreen() {
   const [message, setMessage] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState(copy.statusUpdated);
 
   // Overlays a dedicated, targeted Firestore fetch on top of the shared
@@ -278,6 +279,8 @@ export default function AnnouncementsScreen() {
     }
 
     try {
+      setDeletingAnnouncementId(announcementId);
+
       if (authService.isConfigured()) {
         const firebaseUser = authService.getCurrentUser();
 
@@ -297,6 +300,8 @@ export default function AnnouncementsScreen() {
       setStatusMessage(copy.statusDeleted);
     } catch (deleteError) {
       setStatusMessage(getAuthErrorMessage(deleteError, language));
+    } finally {
+      setDeletingAnnouncementId(null);
     }
   }
 
@@ -388,12 +393,14 @@ export default function AnnouncementsScreen() {
             <AppButton
               title={isSubmitting ? copy.publishing : copy.publish}
               onPress={publishAnnouncement}
-              disabled={!canPublish}
+              loading={isSubmitting}
+              disabled={!canPublish || isSubmitting}
               style={styles.actionButton}
             />
             <AppButton
               title={copy.cancel}
               variant="ghost"
+              disabled={isSubmitting}
               onPress={() => {
                 clearForm();
                 setShowCreateForm(false);
@@ -433,6 +440,8 @@ export default function AnnouncementsScreen() {
                     <AppButton
                       title={copy.deleteLabel}
                       variant="ghost"
+                      loading={deletingAnnouncementId === announcement.id}
+                      disabled={deletingAnnouncementId !== null}
                       onPress={() => deleteAnnouncement(announcement.id)}
                       style={styles.deleteButton}
                     />

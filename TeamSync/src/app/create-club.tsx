@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -120,110 +120,124 @@ export default function CreateClubScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <ScreenCard style={styles.card}>
-        <AppBackButton fallbackHref="/" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardContainer}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ScreenCard style={styles.card}>
+          <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>{t.common.appName}</Text>
+          <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <StatusBadge label={t.createClub.badge} tone="info" style={styles.badge} />
+          <StatusBadge label={t.createClub.badge} tone="info" style={styles.badge} />
 
-        <Text style={styles.title}>{t.createClub.title}</Text>
+          <Text style={styles.title}>{t.createClub.title}</Text>
 
-        <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
+          <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
 
-        <View style={styles.ownerBox}>
-          <Text style={styles.ownerLabel}>{t.createClub.ownerInfoTitle}</Text>
-          <Text style={styles.ownerText}>{ownerFullName || t.createClub.ownerNameFallback}</Text>
-          <Text style={styles.ownerText}>{ownerEmail || t.createClub.ownerEmailFallback}</Text>
-        </View>
-
-        <View style={styles.form}>
-          <TextField
-            label={t.createClub.clubNameLabel}
-            placeholder={t.createClub.clubNamePlaceholder}
-            value={clubName}
-            onChangeText={setClubName}
-            accessibilityLabel={t.createClub.accessibility.clubName}
-          />
-
-          <TextField
-            label={t.createClub.sportLabel}
-            placeholder={t.createClub.sportPlaceholder}
-            value={sport}
-            onChangeText={setSport}
-            accessibilityLabel={t.createClub.accessibility.sport}
-          />
-
-          <TextField
-            label={t.createClub.cityLabel}
-            placeholder={t.createClub.cityPlaceholder}
-            value={city}
-            onChangeText={setCity}
-            accessibilityLabel={t.createClub.accessibility.city}
-          />
-
-          <View>
-            <Text style={styles.countryLabel}>{t.createClub.countryLabel}</Text>
-            <View style={styles.countryRow}>
-              {countryOptions.map((option) => {
-                const isSelected = option.value === country;
-
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setCountry(option.value)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: isSelected }}
-                    style={({ pressed }) => [
-                      styles.countryOption,
-                      isSelected ? styles.countryOptionSelected : null,
-                      pressed && !isSelected ? styles.pressed : null,
-                    ]}
-                  >
-                    <Text style={[styles.countryOptionText, isSelected ? styles.countryOptionTextSelected : null]}>
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Text style={styles.countryHint}>{t.createClub.countryHint}</Text>
+          <View style={styles.ownerBox}>
+            <Text style={styles.ownerLabel}>{t.createClub.ownerInfoTitle}</Text>
+            <Text style={styles.ownerText}>{ownerFullName || t.createClub.ownerNameFallback}</Text>
+            <Text style={styles.ownerText}>{ownerEmail || t.createClub.ownerEmailFallback}</Text>
           </View>
-        </View>
 
-        <View style={styles.codePreviewBox}>
-          <Text style={styles.codePreviewLabel}>{t.createClub.invitationCodePreview}</Text>
-          <Text style={styles.codePreviewValue}>{previewCode}</Text>
-          <Text style={styles.codePreviewHint}>{t.createClub.invitationCodeHint}</Text>
-        </View>
+          <View style={styles.form}>
+            <TextField
+              label={t.createClub.clubNameLabel}
+              placeholder={t.createClub.clubNamePlaceholder}
+              value={clubName}
+              onChangeText={setClubName}
+              accessibilityLabel={t.createClub.accessibility.clubName}
+            />
 
-        {error !== "" && <Text style={styles.errorText}>{error}</Text>}
+            <TextField
+              label={t.createClub.sportLabel}
+              placeholder={t.createClub.sportPlaceholder}
+              value={sport}
+              onChangeText={setSport}
+              accessibilityLabel={t.createClub.accessibility.sport}
+            />
 
-        <View style={styles.buttonGroup}>
-          <AppButton
-            title={isSubmitting ? t.createClub.submittingButton : t.createClub.submitButton}
-            onPress={handleCreateClub}
-            disabled={isSubmitting}
-            accessibilityLabel={t.createClub.accessibility.submit}
-            style={styles.button}
-          />
+            <TextField
+              label={t.createClub.cityLabel}
+              placeholder={t.createClub.cityPlaceholder}
+              value={city}
+              onChangeText={setCity}
+              accessibilityLabel={t.createClub.accessibility.city}
+            />
 
-          <Link href="/" asChild>
+            <View>
+              <Text style={styles.countryLabel}>{t.createClub.countryLabel}</Text>
+              <View style={styles.countryRow}>
+                {countryOptions.map((option) => {
+                  const isSelected = option.value === country;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => setCountry(option.value)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      style={({ pressed }) => [
+                        styles.countryOption,
+                        isSelected ? styles.countryOptionSelected : null,
+                        pressed && !isSelected ? styles.pressed : null,
+                      ]}
+                    >
+                      <Text style={[styles.countryOptionText, isSelected ? styles.countryOptionTextSelected : null]}>
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={styles.countryHint}>{t.createClub.countryHint}</Text>
+            </View>
+          </View>
+
+          <View style={styles.codePreviewBox}>
+            <Text style={styles.codePreviewLabel}>{t.createClub.invitationCodePreview}</Text>
+            <Text style={styles.codePreviewValue}>{previewCode}</Text>
+            <Text style={styles.codePreviewHint}>{t.createClub.invitationCodeHint}</Text>
+          </View>
+
+          {error !== "" && <Text style={styles.errorText}>{error}</Text>}
+
+          <View style={styles.buttonGroup}>
             <AppButton
-              title={t.createClub.backHome}
-              variant="ghost"
-              accessibilityLabel={t.createClub.accessibility.backHome}
+              title={isSubmitting ? t.createClub.submittingButton : t.createClub.submitButton}
+              onPress={handleCreateClub}
+              disabled={isSubmitting}
+              accessibilityLabel={t.createClub.accessibility.submit}
               style={styles.button}
             />
-          </Link>
-        </View>
-      </ScreenCard>
-    </ScrollView>
+
+            <Link href="/" asChild>
+              <AppButton
+                title={t.createClub.backHome}
+                variant="ghost"
+                accessibilityLabel={t.createClub.accessibility.backHome}
+                style={styles.button}
+              />
+            </Link>
+          </View>
+        </ScreenCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: {
+    flex: 1,
+    backgroundColor: theme.colors.background.app,
+  },
   scroll: {
     flex: 1,
     backgroundColor: theme.colors.background.app,

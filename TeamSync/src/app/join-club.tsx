@@ -1,6 +1,6 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -100,65 +100,75 @@ export default function JoinClubScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <ScreenCard style={styles.card}>
-        <AppBackButton fallbackHref="/" />
-        <Text style={styles.logo}>{t.common.appName}</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardContainer}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ScreenCard style={styles.card}>
+          <AppBackButton fallbackHref="/" />
+          <Text style={styles.logo}>{t.common.appName}</Text>
 
-        <StatusBadge label={t.joinClub.badge} tone="info" style={styles.badge} />
+          <StatusBadge label={t.joinClub.badge} tone="info" style={styles.badge} />
 
-        <Text style={styles.title}>{t.joinClub.title}</Text>
+          <Text style={styles.title}>{t.joinClub.title}</Text>
 
-        <Text style={styles.subtitle}>{t.joinClub.subtitle}</Text>
+          <Text style={styles.subtitle}>{t.joinClub.subtitle}</Text>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{t.joinClub.accountInfoTitle}</Text>
-          <Text style={styles.infoText}>{requestFullName || t.joinClub.accountNameFallback}</Text>
-          <Text style={styles.infoText}>{requestEmail || t.joinClub.accountEmailFallback}</Text>
-        </View>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{t.joinClub.accountInfoTitle}</Text>
+            <Text style={styles.infoText}>{requestFullName || t.joinClub.accountNameFallback}</Text>
+            <Text style={styles.infoText}>{requestEmail || t.joinClub.accountEmailFallback}</Text>
+          </View>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{t.joinClub.codeInfoTitle}</Text>
-          <Text style={styles.infoText}>{t.joinClub.codeInfoText}</Text>
-        </View>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{t.joinClub.codeInfoTitle}</Text>
+            <Text style={styles.infoText}>{t.joinClub.codeInfoText}</Text>
+          </View>
 
-        <View style={styles.form}>
-          <TextField
-            label={t.joinClub.invitationCodeLabel}
-            placeholder={t.joinClub.invitationCodePlaceholder}
-            value={inviteCode}
-            onChangeText={handleInviteCodeChange}
-            autoCapitalize="characters"
-            accessibilityLabel={t.joinClub.accessibility.invitationCode}
-          />
-        </View>
+          <View style={styles.form}>
+            <TextField
+              label={t.joinClub.invitationCodeLabel}
+              placeholder={t.joinClub.invitationCodePlaceholder}
+              value={inviteCode}
+              onChangeText={handleInviteCodeChange}
+              autoCapitalize="characters"
+              accessibilityLabel={t.joinClub.accessibility.invitationCode}
+            />
+          </View>
 
-        {error !== "" && <Text style={styles.errorText}>{error}</Text>}
+          {error !== "" && <Text style={styles.errorText}>{error}</Text>}
 
-        <View style={styles.buttonGroup}>
-          <AppButton
-            title={isSubmitting ? t.joinClub.submittingButton : t.joinClub.submitButton}
-            onPress={handleJoinClub}
-            disabled={isSubmitting}
-            accessibilityLabel={t.joinClub.accessibility.submit}
-            style={styles.button}
-          />
-
-          <Link href="/" asChild>
+          <View style={styles.buttonGroup}>
             <AppButton
-              title={t.joinClub.backHome}
-              variant="ghost"
-              accessibilityLabel={t.joinClub.accessibility.backHome}
+              title={isSubmitting ? t.joinClub.submittingButton : t.joinClub.submitButton}
+              onPress={handleJoinClub}
+              disabled={isSubmitting}
+              accessibilityLabel={t.joinClub.accessibility.submit}
               style={styles.button}
             />
-          </Link>
-        </View>
-      </ScreenCard>
-    </ScrollView>
+
+            <Link href="/" asChild>
+              <AppButton
+                title={t.joinClub.backHome}
+                variant="ghost"
+                accessibilityLabel={t.joinClub.accessibility.backHome}
+                style={styles.button}
+              />
+            </Link>
+          </View>
+        </ScreenCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: { flex: 1, backgroundColor: theme.colors.background.app },
   scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,

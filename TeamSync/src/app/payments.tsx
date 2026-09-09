@@ -205,6 +205,8 @@ export default function PaymentsScreen() {
   const [recipientQuery, setRecipientQuery] = useState("");
   const [payingPaymentId, setPayingPaymentId] = useState<string | null>(null);
   const [pendingCheckoutPaymentId, setPendingCheckoutPaymentId] = useState<string | null>(null);
+  const [isCreatingPayment, setIsCreatingPayment] = useState(false);
+  const [updatingPaymentId, setUpdatingPaymentId] = useState<string | null>(null);
 
   const users = appData?.users ?? EMPTY_USERS;
   const selectedUserId = users.find((user) => user.id === selectedUserIdState && user.status !== "removed")?.id ?? "";
@@ -323,6 +325,8 @@ export default function PaymentsScreen() {
     }
 
     try {
+      setIsCreatingPayment(true);
+
       const nextAppData = await teamSyncService.createPayment({
         clubId: appData.club.id,
         userId: selectedUserId,
@@ -338,16 +342,25 @@ export default function PaymentsScreen() {
       setStatusMessage(copy.paymentAdded);
     } catch {
       setStatusMessage(copy.createError);
+    } finally {
+      setIsCreatingPayment(false);
     }
   }
 
   async function handleChangePaymentStatus(paymentId: string, newStatus: PaymentStatus) {
+    if (updatingPaymentId !== null) {
+      return;
+    }
+
     try {
+      setUpdatingPaymentId(paymentId);
       const nextAppData = await teamSyncService.updatePaymentStatus(paymentId, newStatus);
       setAppData(nextAppData);
       setStatusMessage(copy.statusUpdated);
     } catch {
       setStatusMessage(copy.statusUpdateError);
+    } finally {
+      setUpdatingPaymentId(null);
     }
   }
 
@@ -430,8 +443,20 @@ export default function PaymentsScreen() {
             <TextField label={copy.dueDateLabel} value={dueDateText} onChangeText={setDueDateText} placeholder={copy.dueDatePlaceholder} autoCapitalize="none" containerStyle={styles.formField} />
           </View>
           <View style={styles.topActions}>
-            <AppButton title={copy.savePayment} onPress={handleCreatePayment} disabled={!canCreatePayment} style={styles.actionButton} />
-            <AppButton title={copy.cancel} variant="ghost" onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage(copy.createCanceled); }} style={styles.actionButton} />
+            <AppButton
+              title={copy.savePayment}
+              onPress={handleCreatePayment}
+              loading={isCreatingPayment}
+              disabled={!canCreatePayment || isCreatingPayment}
+              style={styles.actionButton}
+            />
+            <AppButton
+              title={copy.cancel}
+              variant="ghost"
+              disabled={isCreatingPayment}
+              onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage(copy.createCanceled); }}
+              style={styles.actionButton}
+            />
           </View>
         </Card>
       ) : null}
@@ -472,7 +497,13 @@ export default function PaymentsScreen() {
                       {copy.paymentStatusOptions.map((option) => {
                         const isSelected = payment.status === option.status;
                         return (
-                          <Pressable key={option.status} onPress={() => handleChangePaymentStatus(payment.id, option.status)} style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}>
+                          <Pressable
+                            key={option.status}
+                            disabled={updatingPaymentId === payment.id}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            onPress={() => handleChangePaymentStatus(payment.id, option.status)}
+                            style={({ pressed }) => [styles.statusButton, isSelected ? styles.statusButtonSelected : null, pressed ? styles.pressed : null]}
+                          >
                             <Text style={[styles.statusButtonText, isSelected ? styles.statusButtonTextSelected : null]}>{option.label}</Text>
                           </Pressable>
                         );
@@ -482,6 +513,7 @@ export default function PaymentsScreen() {
                   {payment.paymentMethod === "online" && payment.userId === appData.currentUser.id && payment.status !== "paid" ? (
                     <AppButton
                       title={payingPaymentId === payment.id ? copy.payingNow : copy.payNow}
+                      loading={payingPaymentId === payment.id}
                       disabled={payingPaymentId !== null}
                       onPress={() => handlePayNow(payment)}
                       style={styles.payNowButton}

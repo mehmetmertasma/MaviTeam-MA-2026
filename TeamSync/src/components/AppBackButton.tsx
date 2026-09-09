@@ -25,7 +25,13 @@ export function AppBackButton({ label = "Geri dön", fallbackHref = "/dashboard"
   }
 
   return (
-    <Pressable onPress={handlePress} style={({ pressed }) => [styles.button, pressed ? styles.pressed : null]}>
+    <Pressable
+      onPress={handlePress}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [styles.button, pressed ? styles.pressed : null]}
+    >
       <Text style={styles.icon}>←</Text>
       <Text style={styles.label}>{label}</Text>
     </Pressable>
@@ -37,6 +43,8 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
     gap: theme.spacing.sm,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.background.subtle,

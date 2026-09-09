@@ -420,16 +420,6 @@ export default function MessagesScreen() {
       return;
     }
 
-    const optimisticMessage: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      clubId: appData.club.id,
-      groupId: activeChat.type === "group" ? activeChat.groupId : undefined,
-      directUserIds: activeChat.type === "direct" ? [appData.currentUser.id, activeChat.userId] : undefined,
-      senderUserId: appData.currentUser.id,
-      text: trimmedText,
-      createdAt: new Date().toISOString(),
-    };
-
     setDraftText("");
     setIsSendingMessage(true);
 
@@ -489,7 +479,12 @@ export default function MessagesScreen() {
             </View>
           ) : null}
 
-          <ScrollView ref={messagesScrollRef} style={styles.messagesScroll} contentContainerStyle={styles.messagesContent}>
+          <ScrollView
+            ref={messagesScrollRef}
+            style={styles.messagesScroll}
+            contentContainerStyle={styles.messagesContent}
+            keyboardShouldPersistTaps="handled"
+          >
             {visibleMessages.length > 0 ? (
               visibleMessages.map((message) => {
                 const isMyMessage = message.senderUserId === appData.currentUser.id;
@@ -521,6 +516,7 @@ export default function MessagesScreen() {
             <Pressable
               onPress={sendMessage}
               disabled={isSendingMessage}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               style={({ pressed }) => [
                 styles.sendButton,
                 pressed && !isSendingMessage ? styles.pressed : null,

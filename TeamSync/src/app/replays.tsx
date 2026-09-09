@@ -181,6 +181,8 @@ export default function ReplaysScreen() {
   const [replayUrl, setReplayUrl] = useState("");
   const [selectedType, setSelectedType] = useState<ReplayType>("match");
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingReplayId, setDeletingReplayId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState(copy.statusUpdated);
 
   // Firestore-backed replay visibility (visibleUserIds) is more precise than
@@ -267,6 +269,8 @@ export default function ReplaysScreen() {
     const visibleUserIds = Array.from(new Set([appData.currentUser.id, ...targetUsers.map((user) => user.id)]));
 
     try {
+      setIsSubmitting(true);
+
       const firebaseUser = authService.getCurrentUser();
 
       if (authService.isConfigured() && firebaseUser !== null) {
@@ -301,11 +305,19 @@ export default function ReplaysScreen() {
       setStatusMessage(copy.statusSaved);
     } catch {
       setStatusMessage(copy.statusAddError);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   async function handleRemoveReplay(replayId: string) {
+    if (deletingReplayId !== null) {
+      return;
+    }
+
     try {
+      setDeletingReplayId(replayId);
+
       const firebaseUser = authService.getCurrentUser();
 
       if (authService.isConfigured() && firebaseUser !== null) {
@@ -319,6 +331,8 @@ export default function ReplaysScreen() {
       setStatusMessage(copy.statusRemoved);
     } catch {
       setStatusMessage(copy.statusRemoveError);
+    } finally {
+      setDeletingReplayId(null);
     }
   }
 
@@ -395,8 +409,20 @@ export default function ReplaysScreen() {
           <View style={styles.optionGrid}>{targetOptions.map((target) => { const isSelected = selectedTargetId === target.id; return (<Pressable key={target.id} onPress={() => setSelectedTargetId(target.id)} style={({ pressed }) => [styles.optionButton, isSelected ? styles.optionButtonSelected : null, pressed ? styles.pressed : null]}><Text style={[styles.optionButtonText, isSelected ? styles.optionButtonTextSelected : null]}>{target.label}</Text></Pressable>); })}</View>
 
           <View style={styles.actionRow}>
-            <AppButton title={copy.saveLink} onPress={handleAddReplay} disabled={!canAddReplay} style={styles.actionButton} />
-            <AppButton title={copy.cancel} variant="ghost" onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage(copy.statusCreateCancelled); }} style={styles.actionButton} />
+            <AppButton
+              title={copy.saveLink}
+              onPress={handleAddReplay}
+              loading={isSubmitting}
+              disabled={!canAddReplay || isSubmitting}
+              style={styles.actionButton}
+            />
+            <AppButton
+              title={copy.cancel}
+              variant="ghost"
+              disabled={isSubmitting}
+              onPress={() => { clearForm(); setShowCreateForm(false); setStatusMessage(copy.statusCreateCancelled); }}
+              style={styles.actionButton}
+            />
           </View>
         </Card>
       ) : null}
@@ -426,12 +452,27 @@ export default function ReplaysScreen() {
                 <Text style={styles.replayDescription}>{replay.description}</Text>
                 <Text style={styles.linkPreview} numberOfLines={1}>{replay.videoUrl}</Text>
                 <View style={styles.cardActions}>
-                  <Pressable onPress={() => handleOpenReplayLink(replay.videoUrl)} style={({ pressed }) => [styles.openButton, pressed ? styles.pressed : null]}>
+                  <Pressable
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => handleOpenReplayLink(replay.videoUrl)}
+                    style={({ pressed }) => [styles.openButton, pressed ? styles.pressed : null]}
+                  >
                     <Text style={styles.openButtonText}>{copy.openLink}</Text>
                   </Pressable>
                   {userCanDeleteReplayLinks ? (
-                    <Pressable onPress={() => handleRemoveReplay(replay.id)} style={({ pressed }) => [styles.deleteButton, pressed ? styles.pressed : null]}>
-                      <Text style={styles.deleteButtonText}>{copy.remove}</Text>
+                    <Pressable
+                      disabled={deletingReplayId !== null}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() => handleRemoveReplay(replay.id)}
+                      style={({ pressed }) => [
+                        styles.deleteButton,
+                        deletingReplayId === replay.id ? { opacity: 0.5 } : null,
+                        pressed ? styles.pressed : null,
+                      ]}
+                    >
+                      <Text style={styles.deleteButtonText}>
+                        {deletingReplayId === replay.id ? "..." : copy.remove}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>

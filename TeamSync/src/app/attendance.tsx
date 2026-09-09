@@ -248,6 +248,7 @@ export default function AttendanceScreen() {
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [newSessionLocation, setNewSessionLocation] = useState("");
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
   const [showTeamPicker, setShowTeamPicker] = useState(false);
   const [pendingRemoveEventId, setPendingRemoveEventId] = useState("");
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
@@ -424,6 +425,8 @@ export default function AttendanceScreen() {
     }
 
     try {
+      setIsSavingAttendance(true);
+
       const records = teamMembers.map((member) => ({
         userId: member.id,
         status: attendanceDraft[member.id]
@@ -444,6 +447,8 @@ export default function AttendanceScreen() {
       setStatusMessage(copy.saveSuccess);
     } catch {
       setStatusMessage(copy.saveError);
+    } finally {
+      setIsSavingAttendance(false);
     }
   }
 
@@ -743,8 +748,20 @@ export default function AttendanceScreen() {
 
         {canTakeAttendance ? (
           <View style={styles.actionRow}>
-            <AppButton title={copy.saveAttendance} onPress={handleSaveAttendance} style={styles.actionButton} />
-            <AppButton title={copy.resetChanges} variant="ghost" onPress={resetCurrentAttendance} style={styles.actionButton} />
+            <AppButton
+              title={copy.saveAttendance}
+              onPress={handleSaveAttendance}
+              loading={isSavingAttendance}
+              disabled={isSavingAttendance}
+              style={styles.actionButton}
+            />
+            <AppButton
+              title={copy.resetChanges}
+              variant="ghost"
+              onPress={resetCurrentAttendance}
+              disabled={isSavingAttendance}
+              style={styles.actionButton}
+            />
           </View>
         ) : null}
 

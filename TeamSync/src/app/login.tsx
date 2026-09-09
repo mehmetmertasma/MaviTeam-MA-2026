@@ -1,6 +1,6 @@
 import { Link, useRouter } from "expo-router";
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -133,86 +133,96 @@ export default function LoginScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <ScreenCard style={styles.card}>
-        <AppBackButton fallbackHref="/" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardContainer}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ScreenCard style={styles.card}>
+          <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>{t.common.appName}</Text>
-        <StatusBadge label={t.auth.loginBadge} tone="info" style={styles.badge} />
-        <Text style={styles.title}>{t.auth.loginTitle}</Text>
-        <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
+          <Text style={styles.logo}>{t.common.appName}</Text>
+          <StatusBadge label={t.auth.loginBadge} tone="info" style={styles.badge} />
+          <Text style={styles.title}>{t.auth.loginTitle}</Text>
+          <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
 
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{t.auth.loginStatusTitle}</Text>
-          <Text style={styles.infoText}>{statusMessage}</Text>
-        </View>
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{t.auth.loginStatusTitle}</Text>
+            <Text style={styles.infoText}>{statusMessage}</Text>
+          </View>
 
-        <View style={styles.form}>
-          <TextField
-            label={t.auth.emailLabel}
-            placeholder={t.auth.emailPlaceholder}
-            value={email}
-            onChangeText={(value) => {
-              setEmail(value);
-              clearErrorOnChange();
-            }}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            accessibilityLabel={t.auth.accessibility.email}
-          />
+          <View style={styles.form}>
+            <TextField
+              label={t.auth.emailLabel}
+              placeholder={t.auth.emailPlaceholder}
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearErrorOnChange();
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
+              accessibilityLabel={t.auth.accessibility.email}
+            />
 
-          <TextField
-            label={t.auth.passwordLabel}
-            placeholder={t.auth.passwordPlaceholder}
-            value={password}
-            onChangeText={(value) => {
-              setPassword(value);
-              clearErrorOnChange();
-            }}
-            secureTextEntry
-            autoComplete="password"
-            textContentType="password"
-            accessibilityLabel={t.auth.accessibility.password}
-          />
-        </View>
+            <TextField
+              label={t.auth.passwordLabel}
+              placeholder={t.auth.passwordPlaceholder}
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearErrorOnChange();
+              }}
+              secureTextEntry
+              autoComplete="password"
+              textContentType="password"
+              accessibilityLabel={t.auth.accessibility.password}
+            />
+          </View>
 
-        {error !== "" ? <Text style={styles.errorText}>{error}</Text> : null}
+          {error !== "" ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        <View style={styles.buttonGroup}>
-          <AppButton
-            title={isSubmitting ? t.auth.loginSubmitting : t.auth.loginButton}
-            onPress={handleLogin}
-            disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel={t.auth.accessibility.login}
-            style={styles.button}
-          />
-
-          <AppButton
-            title={t.auth.forgotPassword}
-            variant="secondary"
-            onPress={handlePasswordReset}
-            disabled={isSubmitting || !firebaseIsReady}
-            accessibilityLabel={t.auth.accessibility.resetPassword}
-            style={styles.button}
-          />
-
-          <Link href="/" asChild>
+          <View style={styles.buttonGroup}>
             <AppButton
-              title={t.auth.backHome}
-              variant="ghost"
-              accessibilityLabel={t.auth.accessibility.backHome}
+              title={isSubmitting ? t.auth.loginSubmitting : t.auth.loginButton}
+              onPress={handleLogin}
+              disabled={isSubmitting || !firebaseIsReady}
+              accessibilityLabel={t.auth.accessibility.login}
               style={styles.button}
             />
-          </Link>
-        </View>
-      </ScreenCard>
-    </ScrollView>
+
+            <AppButton
+              title={t.auth.forgotPassword}
+              variant="secondary"
+              onPress={handlePasswordReset}
+              disabled={isSubmitting || !firebaseIsReady}
+              accessibilityLabel={t.auth.accessibility.resetPassword}
+              style={styles.button}
+            />
+
+            <Link href="/" asChild>
+              <AppButton
+                title={t.auth.backHome}
+                variant="ghost"
+                accessibilityLabel={t.auth.accessibility.backHome}
+                style={styles.button}
+              />
+            </Link>
+          </View>
+        </ScreenCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: { flex: 1, backgroundColor: theme.colors.background.app },
   scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,

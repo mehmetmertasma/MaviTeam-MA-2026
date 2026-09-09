@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -173,139 +173,150 @@ export default function RegisterScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
-      <ScreenCard style={styles.card}>
-        <AppBackButton fallbackHref="/" />
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.keyboardContainer}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ScreenCard style={styles.card}>
+          <AppBackButton fallbackHref="/" />
 
-        <Text style={styles.logo}>{t.common.appName}</Text>
-        <StatusBadge label={t.auth.registerBadge} tone="info" style={styles.badge} />
-        <Text style={styles.title}>{t.auth.registerTitle}</Text>
-        <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
+          <Text style={styles.logo}>{t.common.appName}</Text>
+          <StatusBadge label={t.auth.registerBadge} tone="info" style={styles.badge} />
+          <Text style={styles.title}>{t.auth.registerTitle}</Text>
+          <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
 
-        <View style={styles.form}>
-          <TextField
-            label={t.auth.fullNameLabel}
-            value={fullName}
-            onChangeText={(value) => {
-              setFullName(value);
-              clearStatusOnChange();
-            }}
-            placeholder={t.auth.fullNamePlaceholder}
-            autoComplete="name"
-            textContentType="name"
-            accessibilityLabel={t.auth.accessibility.fullName}
-          />
+          <View style={styles.form}>
+            <TextField
+              label={t.auth.fullNameLabel}
+              value={fullName}
+              onChangeText={(value) => {
+                setFullName(value);
+                clearStatusOnChange();
+              }}
+              placeholder={t.auth.fullNamePlaceholder}
+              autoComplete="name"
+              textContentType="name"
+              accessibilityLabel={t.auth.accessibility.fullName}
+            />
 
-          <TextField
-            label={t.auth.emailLabel}
-            value={email}
-            onChangeText={(value) => {
-              setEmail(value);
-              clearStatusOnChange();
-            }}
-            placeholder={t.auth.emailPlaceholder}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            accessibilityLabel={t.auth.accessibility.email}
-          />
+            <TextField
+              label={t.auth.emailLabel}
+              value={email}
+              onChangeText={(value) => {
+                setEmail(value);
+                clearStatusOnChange();
+              }}
+              placeholder={t.auth.emailPlaceholder}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
+              accessibilityLabel={t.auth.accessibility.email}
+            />
 
-          <TextField
-            label={t.auth.passwordLabel}
-            value={password}
-            onChangeText={(value) => {
-              setPassword(value);
-              clearStatusOnChange();
-            }}
-            placeholder={t.auth.newPasswordPlaceholder}
-            secureTextEntry
-            autoComplete="new-password"
-            textContentType="newPassword"
-            accessibilityLabel={t.auth.accessibility.password}
-          />
+            <TextField
+              label={t.auth.passwordLabel}
+              value={password}
+              onChangeText={(value) => {
+                setPassword(value);
+                clearStatusOnChange();
+              }}
+              placeholder={t.auth.newPasswordPlaceholder}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              accessibilityLabel={t.auth.accessibility.password}
+            />
 
-          <TextField
-            label={t.auth.confirmPasswordLabel}
-            value={confirmPassword}
-            onChangeText={(value) => {
-              setConfirmPassword(value);
-              clearStatusOnChange();
-            }}
-            placeholder={t.auth.confirmPasswordPlaceholder}
-            secureTextEntry
-            autoComplete="new-password"
-            textContentType="newPassword"
-            accessibilityLabel={t.auth.accessibility.confirmPassword}
-          />
-        </View>
-
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>{registerCopy.accountSetupTitle}</Text>
-          <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
-        </View>
-
-        <Pressable
-          style={styles.consentRow}
-          onPress={() => setAcceptedTerms((currentValue) => !currentValue)}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: acceptedTerms }}
-          accessibilityLabel={`${registerCopy.legalConsentPrefix}${registerCopy.legalPrivacyLabel}${registerCopy.legalAnd}${registerCopy.legalTermsLabel}${registerCopy.legalConsentSuffix}`}
-        >
-          <View style={[styles.checkbox, acceptedTerms ? styles.checkboxChecked : null]}>
-            {acceptedTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            <TextField
+              label={t.auth.confirmPasswordLabel}
+              value={confirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                clearStatusOnChange();
+              }}
+              placeholder={t.auth.confirmPasswordPlaceholder}
+              secureTextEntry
+              autoComplete="new-password"
+              textContentType="newPassword"
+              accessibilityLabel={t.auth.accessibility.confirmPassword}
+            />
           </View>
 
-          <Text style={styles.legalConsentText}>
-            {registerCopy.legalConsentPrefix}
-            <Text
-              style={styles.legalLink}
-              onPress={(pressEvent) => {
-                pressEvent.stopPropagation();
-                router.push("/privacy-policy" as never);
-              }}
-            >
-              {registerCopy.legalPrivacyLabel}
+          <View style={styles.infoBox}>
+            <Text style={styles.infoTitle}>{registerCopy.accountSetupTitle}</Text>
+            <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
+          </View>
+
+          <Pressable
+            style={styles.consentRow}
+            onPress={() => setAcceptedTerms((currentValue) => !currentValue)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: acceptedTerms }}
+            accessibilityLabel={`${registerCopy.legalConsentPrefix}${registerCopy.legalPrivacyLabel}${registerCopy.legalAnd}${registerCopy.legalTermsLabel}${registerCopy.legalConsentSuffix}`}
+          >
+            <View style={[styles.checkbox, acceptedTerms ? styles.checkboxChecked : null]}>
+              {acceptedTerms ? <Text style={styles.checkboxMark}>✓</Text> : null}
+            </View>
+
+            <Text style={styles.legalConsentText}>
+              {registerCopy.legalConsentPrefix}
+              <Text
+                style={styles.legalLink}
+                onPress={(pressEvent) => {
+                  pressEvent.stopPropagation();
+                  router.push("/privacy-policy" as never);
+                }}
+              >
+                {registerCopy.legalPrivacyLabel}
+              </Text>
+              {registerCopy.legalAnd}
+              <Text
+                style={styles.legalLink}
+                onPress={(pressEvent) => {
+                  pressEvent.stopPropagation();
+                  router.push("/terms-of-service" as never);
+                }}
+              >
+                {registerCopy.legalTermsLabel}
+              </Text>
+              {registerCopy.legalConsentSuffix}
             </Text>
-            {registerCopy.legalAnd}
-            <Text
-              style={styles.legalLink}
-              onPress={(pressEvent) => {
-                pressEvent.stopPropagation();
-                router.push("/terms-of-service" as never);
-              }}
-            >
-              {registerCopy.legalTermsLabel}
-            </Text>
-            {registerCopy.legalConsentSuffix}
-          </Text>
-        </Pressable>
+          </Pressable>
 
-        <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
+          <Text style={[styles.statusText, !firebaseIsReady ? styles.warningText : null]}>{statusMessage}</Text>
 
-        <View style={styles.buttonGroup}>
-          <AppButton
-            title={isSubmitting ? t.auth.registerSubmitting : t.auth.registerButton}
-            onPress={handleContinue}
-            disabled={isSubmitting || !firebaseIsReady || !acceptedTerms}
-            accessibilityLabel={t.auth.accessibility.register}
-            style={styles.button}
-          />
+          <View style={styles.buttonGroup}>
+            <AppButton
+              title={isSubmitting ? t.auth.registerSubmitting : t.auth.registerButton}
+              onPress={handleContinue}
+              disabled={isSubmitting || !firebaseIsReady || !acceptedTerms}
+              accessibilityLabel={t.auth.accessibility.register}
+              style={styles.button}
+            />
 
-          <AppButton
-            title={t.auth.backHome}
-            variant="ghost"
-            onPress={() => router.replace("/")}
-            accessibilityLabel={t.auth.accessibility.backHome}
-            style={styles.button}
-          />
-        </View>
-      </ScreenCard>
-    </ScrollView>
+            <AppButton
+              title={t.auth.backHome}
+              variant="ghost"
+              onPress={() => router.replace("/")}
+              accessibilityLabel={t.auth.accessibility.backHome}
+              style={styles.button}
+            />
+          </View>
+        </ScreenCard>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardContainer: { flex: 1, backgroundColor: theme.colors.background.app },
   scroll: { flex: 1, backgroundColor: theme.colors.background.app },
   screen: {
     flexGrow: 1,

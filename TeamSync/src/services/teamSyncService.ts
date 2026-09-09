@@ -871,8 +871,18 @@ export const teamSyncService = {
   async saveAttendance(input: SaveAttendanceInput) {
     if (authService.isConfigured()) {
       const firebaseUser = getFirebaseUserOrThrow();
-      await firestoreMaviTeamDataService.saveAttendance(firebaseUser, input);
-      return loadAppData();
+      const savedRecords = await firestoreMaviTeamDataService.saveAttendance(firebaseUser, input);
+      const currentData = await loadAppData();
+      const nextData = {
+        ...currentData,
+        attendanceRecords: [
+          ...savedRecords,
+          ...currentData.attendanceRecords.filter(
+            (record) => !(record.teamId === input.teamId && record.sessionDate === input.sessionDate)
+          ),
+        ],
+      };
+      return saveAppData(nextData);
     }
 
     const data = await loadAppData();

@@ -1,7 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import Head from "expo-router/head";
 import { openBrowserAsync } from "expo-web-browser";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { StyleSheet, Switch, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";

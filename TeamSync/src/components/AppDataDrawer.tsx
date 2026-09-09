@@ -1,6 +1,6 @@
 import { router, usePathname } from "expo-router";
-import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
@@ -134,6 +134,23 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
   const { appData } = useAppDataContext();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const backAction = () => {
+      onClose();
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener("hardwareBackPress", backAction);
+
+    return () => {
+      backHandler.remove();
+    };
+  }, [visible, onClose]);
 
   if (!visible) {
     return null;

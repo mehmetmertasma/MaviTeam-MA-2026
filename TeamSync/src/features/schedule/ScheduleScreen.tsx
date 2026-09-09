@@ -86,6 +86,7 @@ export default function ScheduleScreen() {
   const [note, setNote] = useState("");
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [selectedEventForDetails, setSelectedEventForDetails] = useState<ScheduleEvent | null>(null);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
 
   const teamOptions = useMemo<TeamOption[]>(() => {
     const allClubOption: TeamOption = {
@@ -207,6 +208,8 @@ export default function ScheduleScreen() {
     const selectedTeam = teamOptions.find((team) => team.id === selectedTeamId) ?? teamOptions[0];
 
     try {
+      setIsSavingEvent(true);
+
       if (editingEventId !== null) {
         const nextScheduleData = await scheduleRepository.updateScheduleEvent(editingEventId, {
           teamId: selectedTeam.teamId,
@@ -241,6 +244,8 @@ export default function ScheduleScreen() {
       setStatus(copy.statusCreated, "success");
     } catch {
       setStatus(editingEventId !== null ? copy.statusUpdateFailed : copy.statusCreateFailed, "danger");
+    } finally {
+      setIsSavingEvent(false);
     }
   }
 
@@ -369,6 +374,7 @@ export default function ScheduleScreen() {
           note={note}
           onChangeNote={setNote}
           canCreate={canCreate}
+          isSaving={isSavingEvent}
           onSave={handleSaveScheduleItem}
           onCancel={closeEventForm}
         />

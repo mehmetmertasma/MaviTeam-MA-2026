@@ -48,8 +48,15 @@ async function seedFixtures() {
       [ADMIN_B]: { role: "clubAdmin", status: "active", clubId: CLUB_B, teamIds: [] },
     };
 
+    // uid/email/emailVerified are always present on a real user doc (the
+    // "create" rule requires them) -- omitting them here made every
+    // self-update rule that compares resource.data.uid/email fail with an
+    // "invalid property access" evaluation error instead of a real
+    // allow/deny decision, which happened to still pass every test that
+    // asserts a *different* update rule's specific denial, but broke the
+    // one asserting the general self-update rule succeeds.
     for (const [uid, data] of Object.entries(users)) {
-      await setDoc(doc(db, "users", uid), data);
+      await setDoc(doc(db, "users", uid), { uid, email: `${uid}@example.com`, emailVerified: true, ...data });
     }
 
     await setDoc(doc(db, "attendanceRecords", "record-a1"), {

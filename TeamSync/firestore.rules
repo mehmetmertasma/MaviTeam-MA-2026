@@ -73,6 +73,18 @@ service cloud.firestore {
       return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId && clubIsActive(clubId);
     }
 
+    // Same membership check as belongsToCurrentUsersClub, minus the
+    // suspension gate -- used only by clubs/{clubId}'s own read rule below,
+    // so that every active member (not just the club's owner) can still see
+    // their own club's name/status/subscription and land on a friendly
+    // "please renew" screen instead of a permission-denied error when it's
+    // suspended. Every other collection keeps funneling through
+    // belongsToCurrentUsersClub above, so suspension still cuts off
+    // everything else exactly as before.
+    function currentUserClubMembershipRegardlessOfSuspension(clubId) {
+      return currentUserHasProfile() && currentUserIsActive() && currentUserClubId() == clubId;
+    }
+
     function isCurrentUsersTeam(teamId) {
       return currentUserHasProfile()
         && teamId is string
@@ -271,24 +283,27 @@ service cloud.firestore {
     }
 
     match /clubs/{clubId} {
-      allow create: if verifiedEmail()
-        && request.resource.data.ownerId == request.auth.uid
-        && !('paymentAccount' in request.resource.data);
+      // A club now only ever comes into existence server-side, once payment
+      // or a promo code is confirmed (startClubSignup, or the Stripe webhook
+      // completing a checkout) -- see functions/index.js. Letting a client
+      // create its own club doc directly would let it walk straight past
+      // that entire billing gate, so this is Admin-SDK-only now.
+      allow create: if false;
 
-      allow read: if belongsToCurrentUsersClub(clubId)
+      allow read: if currentUserClubMembershipRegardlessOfSuspension(clubId)
         || (verifiedEmail() && resource.data.ownerId == request.auth.uid);
 
-      // paymentAccount can only ever move via the Admin SDK -- the
-      // connectPaymentAccount Cloud Function (sets "pending"/"connected" for
-      // iyzico, or "pending" for Stripe) and the Stripe/iyzico webhook (flips
-      // Stripe from "pending" to "connected" once the gateway confirms the
-      // account can actually accept charges). A clubAdmin could otherwise
-      // just hand-write status: "connected" and start collecting "online"
-      // payments nothing ever settles.
+      // paymentAccount and subscription can only ever move via the Admin SDK
+      // -- paymentAccount via connectPaymentAccount / the Stripe+iyzico
+      // account webhooks, subscription via startClubSignup, the Stripe
+      // subscription webhooks, cancelClubSubscription, and the grace-period
+      // cron. A clubAdmin could otherwise just hand-write
+      // subscription.status: "active" and skip paying entirely.
       allow update: if currentUserIsClubAdmin()
         && belongsToCurrentUsersClub(clubId)
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.get('paymentAccount', null) == resource.data.get('paymentAccount', null);
+        && request.resource.data.get('paymentAccount', null) == resource.data.get('paymentAccount', null)
+        && request.resource.data.get('subscription', null) == resource.data.get('subscription', null);
 
       allow delete: if false;
     }
@@ -371,6 +386,27 @@ service cloud.firestore {
     // any business reading another club's admin action history.
     match /adminAuditLog/{logId} {
       allow read, write: if false;
+    }
+
+    // Single-use, platform-admin-generated club-signup promo codes.
+    // Validity checking and redemption both happen only inside
+    // startClubSignup's Firestore transaction (Admin SDK) -- a client that
+    // could read a code's status could brute-force-guess unredeemed ones,
+    // and a client that could write one could redeem it for free without
+    // ever actually creating/paying for the club it's tied to.
+    match /promoCodes/{code} {
+      allow read, write: if false;
+    }
+
+    // A draft club captured while its first checkout is in flight; the real
+    // clubs/{id} doc is only ever created afterward, by startClubSignup or
+    // the Stripe webhook, via the Admin SDK. The client only ever polls its
+    // own signup doc for resultClubId after returning from checkout -- it
+    // must never write here, or it could fake resultClubId and walk into a
+    // club it never paid for.
+    match /pendingClubSignups/{signupId} {
+      allow read: if verifiedEmail() && resource.data.createdByUid == request.auth.uid;
+      allow write: if false;
     }
 
     match /payments/{paymentId} {

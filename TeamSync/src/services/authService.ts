@@ -56,6 +56,13 @@ function getErrorCode(error: unknown) {
     if (error.message === "CLUB_CODE_ALREADY_EXISTS") return "CLUB_CODE_ALREADY_EXISTS";
     if (error.message === "CLUB_CODE_REQUIRED") return "CLUB_CODE_REQUIRED";
     if (error.message === "EMAIL_SUPPRESSED") return "EMAIL_SUPPRESSED";
+    // startClubSignup's own error strings -- checked first, same as the
+    // club-code cases above, so they don't fall through to the generic
+    // functions/not-found / functions/failed-precondition messages below,
+    // which are worded for the (unrelated) email-verification flow.
+    if (error.message === "PROMO_CODE_NOT_FOUND") return "PROMO_CODE_NOT_FOUND";
+    if (error.message === "PROMO_CODE_ALREADY_USED") return "PROMO_CODE_ALREADY_USED";
+    if (error.message === "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE") return "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE";
   }
 
   if (typeof error === "object" && error !== null && "code" in error) {
@@ -96,6 +103,14 @@ export function getAuthErrorMessage(error: unknown, language: "tr" | "en" = "tr"
       return en
         ? "We can't send a verification code to this email address right now. Try a different address or contact us."
         : "Bu email adresine doğrulama kodu gönderilemiyor. Farklı bir email adresi dene ya da bizimle iletişime geç.";
+    case "PROMO_CODE_NOT_FOUND":
+      return en ? "That promo code was not found. Check it and try again." : "Bu promosyon kodu bulunamadı. Kontrol edip tekrar dene.";
+    case "PROMO_CODE_ALREADY_USED":
+      return en ? "That promo code has already been used." : "Bu promosyon kodu daha önce kullanılmış.";
+    case "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE":
+      return en
+        ? "Online subscriptions for Turkey-based clubs aren't available yet. Ask us for a promo code in the meantime."
+        : "Türkiye'deki kulüpler için online abonelik henüz aktif değil. Bu süre için bizden bir promosyon kodu isteyebilirsiniz.";
     case "FIRESTORE_WORKSPACE_MISSING":
       return en ? "Couldn't load your club workspace. Refresh your session and try again." : "Kulüp çalışma alanı yüklenemedi. Oturumunu yenileyip tekrar dene.";
     case "TEAM_PERMISSION_DENIED":

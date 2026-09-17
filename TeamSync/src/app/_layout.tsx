@@ -38,6 +38,7 @@ const routesWithoutGlobalNavigation = [
   "/join-request-sent",
   "/privacy-policy",
   "/terms-of-service",
+  "/subscription-locked",
 ];
 
 const publicAuthRoutes = ["/", "/login", "/register", "/verify-email", "/privacy-policy", "/terms-of-service"];
@@ -248,6 +249,25 @@ function AppContent() {
           return;
         }
 
+        // A club stays suspended (Club.status, see firestore.rules'
+        // clubIsActive) whether that's a manual platform-admin action or the
+        // subscription grace-period cron -- either way, every member is
+        // routed to a dedicated "please renew" screen instead of hitting
+        // permission-denied errors throughout the rest of the app. Legal
+        // routes stay reachable, same as the "already has a club" redirect
+        // below.
+        const clubIsSuspended = workspace.club !== null && workspace.club.status === "suspended";
+
+        if (clubIsSuspended && pathname !== "/subscription-locked" && !legalRoutes.includes(pathname)) {
+          router.replace("/subscription-locked" as never);
+          return;
+        }
+
+        if (!clubIsSuspended && pathname === "/subscription-locked") {
+          router.replace("/dashboard" as never);
+          return;
+        }
+
         if (workspace.club === null && !userHasClub && !routeIsWorkspaceSetup) {
           router.replace(getSetupRouteForSignedInUser(pathname) as never);
           return;
@@ -301,6 +321,7 @@ function AppContent() {
         <Stack.Screen name="create-club" />
         <Stack.Screen name="join-club" />
         <Stack.Screen name="join-request-sent" />
+        <Stack.Screen name="subscription-locked" />
         <Stack.Screen name="dashboard" />
         <Stack.Screen name="profile" />
         <Stack.Screen name="messages" />

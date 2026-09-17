@@ -162,6 +162,43 @@
         <div id="empty-state" class="empty" style="display: none;">No clubs yet.</div>
         <p id="app-status" class="status-text"></p>
       </div>
+
+      <div class="card" style="margin-top: 24px;">
+        <div class="top-row" style="margin-bottom: 16px;">
+          <div>
+            <h1 style="font-size: 18px;">Promo codes</h1>
+            <p class="subtitle" style="margin-bottom: 0;">Single-use codes granting free months at signup.</p>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+          <div style="flex: 0 0 120px;">
+            <label for="promo-months">Free months</label>
+            <input id="promo-months" type="number" min="1" step="1" value="6" />
+          </div>
+          <div style="flex: 1; min-width: 180px;">
+            <label for="promo-note">Note (optional)</label>
+            <input id="promo-note" type="text" placeholder="e.g. recipient name" />
+          </div>
+          <button id="promo-create-button" class="btn-primary" style="width: auto; margin-top: 0;">Generate code</button>
+        </div>
+        <p id="promo-status" class="status-text"></p>
+
+        <table style="margin-top: 12px;">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Months</th>
+              <th>Status</th>
+              <th>Redeemed by</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="promo-table-body"></tbody>
+        </table>
+        <div id="promo-empty-state" class="empty" style="display: none;">No promo codes yet.</div>
+      </div>
     </div>
   </div>
 
@@ -206,6 +243,9 @@
     const getPlatformOverview = httpsCallable(functions, "getPlatformOverview");
     const setClubStatus = httpsCallable(functions, "setClubStatus");
     const deleteClub = httpsCallable(functions, "deleteClub");
+    const createPromoCode = httpsCallable(functions, "createPromoCode");
+    const listPromoCodes = httpsCallable(functions, "listPromoCodes");
+    const revokePromoCode = httpsCallable(functions, "revokePromoCode");
 
     const signinView = document.getElementById("signin-view");
     const appView = document.getElementById("app-view");
@@ -224,6 +264,12 @@
     const deleteConfirmInput = document.getElementById("delete-confirm-input");
     const deleteConfirmButton = document.getElementById("delete-confirm-button");
     const deleteCancelButton = document.getElementById("delete-cancel-button");
+    const promoMonthsInput = document.getElementById("promo-months");
+    const promoNoteInput = document.getElementById("promo-note");
+    const promoCreateButton = document.getElementById("promo-create-button");
+    const promoStatus = document.getElementById("promo-status");
+    const promoTableBody = document.getElementById("promo-table-body");
+    const promoEmptyState = document.getElementById("promo-empty-state");
 
     let clubPendingDelete = null;
 
@@ -369,11 +415,99 @@
       }
     });
 
+    function renderPromoCodes(promoCodes) {
+      promoTableBody.innerHTML = "";
+      promoEmptyState.style.display = promoCodes.length === 0 ? "block" : "none";
+
+      for (const promo of promoCodes) {
+        const row = document.createElement("tr");
+        const redeemedByLabel = promo.redeemedByClubName
+          ? escapeHtml(promo.redeemedByClubName)
+          : promo.redeemedByClubId
+            ? escapeHtml(promo.redeemedByClubId)
+            : "—";
+        const statusBadgeClass = promo.status === "unredeemed" ? "badge-active" : "badge-suspended";
+
+        row.innerHTML = `
+          <td><code>${escapeHtml(promo.code)}</code>${promo.note ? `<div class="club-meta">${escapeHtml(promo.note)}</div>` : ""}</td>
+          <td>${promo.grantMonths}</td>
+          <td><span class="badge ${statusBadgeClass}">${escapeHtml(promo.status)}</span></td>
+          <td>${redeemedByLabel}</td>
+          <td>${formatDate(promo.createdAt)}</td>
+          <td></td>
+        `;
+
+        const actionCell = row.lastElementChild;
+        actionCell.className = "row-actions";
+
+        if (promo.status === "unredeemed") {
+          const revokeButton = document.createElement("button");
+          revokeButton.className = "btn-ghost";
+          revokeButton.textContent = "Revoke";
+          revokeButton.addEventListener("click", () => handleRevokePromoCode(promo));
+          actionCell.appendChild(revokeButton);
+        }
+
+        promoTableBody.appendChild(row);
+      }
+    }
+
+    async function loadPromoCodes() {
+      try {
+        const result = await listPromoCodes();
+        renderPromoCodes(result.data.promoCodes);
+      } catch (error) {
+        promoStatus.textContent = error?.message || "Failed to load promo codes.";
+      }
+    }
+
+    async function handleRevokePromoCode(promo) {
+      const confirmed = window.confirm(`Revoke promo code "${promo.code}"? It can no longer be redeemed.`);
+
+      if (!confirmed) {
+        return;
+      }
+
+      promoStatus.textContent = "Revoking...";
+
+      try {
+        await revokePromoCode({ code: promo.code });
+        promoStatus.textContent = "";
+        await loadPromoCodes();
+      } catch (error) {
+        promoStatus.textContent = error?.message || "Failed to revoke promo code.";
+      }
+    }
+
+    promoCreateButton.addEventListener("click", async () => {
+      const grantMonths = Number(promoMonthsInput.value);
+
+      if (!Number.isInteger(grantMonths) || grantMonths <= 0) {
+        promoStatus.textContent = "Enter a whole number of months greater than 0.";
+        return;
+      }
+
+      promoCreateButton.disabled = true;
+      promoStatus.textContent = "Generating...";
+
+      try {
+        const result = await createPromoCode({ grantMonths, note: promoNoteInput.value.trim() });
+        promoStatus.textContent = `Created code ${result.data.code} (${result.data.grantMonths} free month(s)).`;
+        promoNoteInput.value = "";
+        await loadPromoCodes();
+      } catch (error) {
+        promoStatus.textContent = error?.message || "Failed to generate promo code.";
+      } finally {
+        promoCreateButton.disabled = false;
+      }
+    });
+
     onAuthStateChanged(auth, (user) => {
       if (user) {
         signinView.style.display = "none";
         appView.style.display = "block";
         loadOverview();
+        loadPromoCodes();
       } else {
         signinView.style.display = "block";
         appView.style.display = "none";

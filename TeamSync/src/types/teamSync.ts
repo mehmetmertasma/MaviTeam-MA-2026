@@ -35,6 +35,40 @@ export type ClubPaymentAccount = {
   connectedAt?: TimestampString;
 };
 
+export type ClubSubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
+
+export type ClubSubscriptionProvider = "stripe" | "iyzico" | "none";
+
+export type ClubSubscription = {
+  status: ClubSubscriptionStatus;
+  provider: ClubSubscriptionProvider;
+  // Provider-side customer/subscription references. Absent for "none"
+  // (a promo-only trial that never touched a real payment provider).
+  customerId?: string;
+  subscriptionId?: string;
+  // End of the period already paid for. Access stays on through this date
+  // even after a cancellation, since cancelAtPeriodEnd defers lockout.
+  currentPeriodEnd?: TimestampString;
+  cancelAtPeriodEnd?: boolean;
+  // Set the moment a payment first fails or a trial expires -- the grace-
+  // period cron (functions/index.js's enforceSubscriptionGracePeriod) reads
+  // this to know when 7 days are up. Cleared as soon as payment succeeds
+  // again. Also reset by setClubStatus when a platform admin manually
+  // reactivates a still-unpaid club, giving it a fresh grace window.
+  pastDueSince?: TimestampString;
+  // Only set when the subscription was started via a promo code.
+  trialEndsAt?: TimestampString;
+  promoCodeId?: string;
+  // Dedupe keys for reminder emails/push (e.g. "trial7d", "pastDue1d") so
+  // the daily reminders cron never sends the same nudge twice.
+  remindersSent?: string[];
+  // Set only by the grace-period cron, cleared once payment succeeds --
+  // lets setClubStatus tell an automatic suspension apart from a manual one.
+  autoSuspendedAt?: TimestampString;
+  canceledAt?: TimestampString;
+  updatedAt: TimestampString;
+};
+
 export type Club = {
   id: string;
   name: string;
@@ -65,6 +99,13 @@ export type Club = {
   // account. Missing entirely = the club has never touched online
   // payments and behaves exactly as it does today (manual ledger only).
   paymentAccount?: ClubPaymentAccount;
+  // The club's own $20/mo platform subscription (distinct from
+  // paymentAccount, which is the club's *outgoing* dues-collection setup).
+  // Missing/undefined only for clubs created before this feature shipped --
+  // the one-time backfill script grandfathers them in as
+  // { status: "active", provider: "none" }. The grace-period cron skips any
+  // club still missing this field rather than ever guessing a default.
+  subscription?: ClubSubscription;
   createdAt: TimestampString;
   updatedAt: TimestampString;
 };
@@ -252,6 +293,55 @@ export type JoinRequest = {
   createdAt: TimestampString;
   reviewedByUserId?: string;
   reviewedAt?: TimestampString;
+};
+
+export type PromoCodeStatus = "unredeemed" | "redeemed" | "revoked";
+
+// Platform-admin-generated, single-use codes redeemable at club signup for a
+// number of free months. Never read or written directly by a client -- only
+// validated/redeemed inside startClubSignup's Firestore transaction and
+// managed via the admin-panel-only createPromoCode/listPromoCodes/
+// revokePromoCode callables. See firestore.rules: deny-all on this collection.
+export type PromoCode = {
+  code: string;
+  grantMonths: number;
+  status: PromoCodeStatus;
+  createdByUid: string;
+  note?: string;
+  createdAt: TimestampString;
+  redeemedByClubId?: string;
+  redeemedByUid?: string;
+  redeemedAt?: TimestampString;
+  revokedAt?: TimestampString;
+};
+
+export type PendingClubSignupStatus = "pending" | "completed" | "failed";
+
+// A draft club captured while its first checkout is in flight, so the real
+// clubs/{id} document only ever gets created (server-side, by
+// startClubSignup or the Stripe webhook) once payment is confirmed. The
+// client polls its own doc for resultClubId after returning from checkout --
+// see firestore.rules, which lets only the creator read this and never lets
+// a client write it (a client-set resultClubId would let someone walk into a
+// club they never paid for).
+export type PendingClubSignup = {
+  id: string;
+  createdByUid: string;
+  createdByFullName: string;
+  createdByEmail: string;
+  draft: {
+    name: string;
+    sport: string;
+    city: string;
+    country: ClubCountry;
+  };
+  provider: ClubSubscriptionProvider;
+  checkoutSessionId?: string;
+  status: PendingClubSignupStatus;
+  resultClubId?: string;
+  failureReason?: string;
+  createdAt: TimestampString;
+  updatedAt: TimestampString;
 };
 
 export type TeamSyncAppData = {

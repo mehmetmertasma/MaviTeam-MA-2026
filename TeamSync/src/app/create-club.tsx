@@ -1,5 +1,7 @@
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { Link, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { openBrowserAsync } from "expo-web-browser";
+import { doc, onSnapshot } from "firebase/firestore";
+import { useCallback, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
@@ -8,9 +10,10 @@ import { ScreenCard } from "@/components/ScreenCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
 import { Typography, theme } from "@/constants/theme";
+import { requireFirebaseServices } from "@/lib/firebase";
 import { useTranslation } from "@/localization";
 import { authService, getAuthErrorMessage } from "@/services/authService";
-import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
+import { paymentGatewayService } from "@/services/paymentGatewayService";
 import { teamSyncService } from "@/services/teamSyncService";
 import type { ClubCountry } from "@/types/teamSync";
 
@@ -32,9 +35,20 @@ function generatePreviewCode(clubName: string, fallbackPrefix: string) {
   return `${prefix || fallbackPrefix}${new Date().getFullYear()}`;
 }
 
+// idle: filling out the form. submitting: startClubSignup's network call is
+// in flight (covers both the instant promo-redemption path and starting a
+// paid checkout). waiting: a paid checkout was opened and we're listening on
+// its pendingClubSignups doc for the Stripe webhook to confirm payment.
+type SignupPhase = "idle" | "submitting" | "waiting";
+
 export default function CreateClubScreen() {
   const router = useRouter();
-  const { fullName, email } = useLocalSearchParams();
+  const { fullName, email, checkout: checkoutReturnParam, signupId: signupIdParam } = useLocalSearchParams<{
+    fullName?: string | string[];
+    email?: string | string[];
+    checkout?: string;
+    signupId?: string | string[];
+  }>();
   const { t, language } = useTranslation();
 
   const ownerFullName = getParamValue(fullName);
@@ -44,8 +58,12 @@ export default function CreateClubScreen() {
   const [sport, setSport] = useState("");
   const [city, setCity] = useState("");
   const [country, setCountry] = useState<ClubCountry>("TR");
+  const [promoCode, setPromoCode] = useState("");
   const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [phase, setPhase] = useState<SignupPhase>("idle");
+
+  const isPaidFlow = authService.isConfigured();
+  const isSubmitting = phase !== "idle";
 
   const countryOptions: { label: string; value: ClubCountry }[] = [
     { label: t.createClub.countryTurkey, value: "TR" },
@@ -53,6 +71,66 @@ export default function CreateClubScreen() {
   ];
 
   const previewCode = generatePreviewCode(clubName, t.createClub.defaultCodePrefix);
+
+  // Paid checkout returns here via the maviteam://create-club?checkout=...
+  // deep link (see functions/index.js's startClubSignup success_url/
+  // cancel_url) -- same pattern payments.tsx uses for its own checkout
+  // return. "return" means Stripe redirected back after a completed
+  // checkout, so we listen on the matching pendingClubSignups doc for the
+  // webhook to actually finish creating the club; "cancel" just means the
+  // user backed out, so the form is simply re-enabled.
+  useFocusEffect(
+    useCallback(() => {
+      if (checkoutReturnParam === "cancel") {
+        setPhase("idle");
+        return;
+      }
+
+      if (checkoutReturnParam !== "return") {
+        return;
+      }
+
+      const signupId = getParamValue(signupIdParam);
+
+      if (signupId === "") {
+        return;
+      }
+
+      setPhase("waiting");
+      setError("");
+
+      const { db } = requireFirebaseServices();
+      const unsubscribe = onSnapshot(
+        doc(db, "pendingClubSignups", signupId),
+        (snapshot) => {
+          const data = snapshot.data();
+
+          if (!data) {
+            return;
+          }
+
+          if (data.status === "completed" && data.resultClubId) {
+            router.replace("/dashboard");
+          } else if (data.status === "failed") {
+            setPhase("idle");
+            setError(t.createClub.validation.signupFailed);
+          }
+        },
+        () => {
+          setPhase("idle");
+          setError(t.createClub.validation.checkoutFailed);
+        }
+      );
+
+      return unsubscribe;
+    }, [
+      checkoutReturnParam,
+      signupIdParam,
+      router,
+      t.createClub.validation.signupFailed,
+      t.createClub.validation.checkoutFailed,
+    ])
+  );
 
   async function handleCreateClub() {
     const trimmedClubName = clubName.trim();
@@ -87,35 +165,48 @@ export default function CreateClubScreen() {
     }
 
     try {
-      setIsSubmitting(true);
+      setPhase("submitting");
       setError("");
 
-      const nextData = await teamSyncService.createClubWorkspace({
-        ownerFullName: ownerFullName || firebaseUser?.displayName || t.createClub.ownerFallbackName,
-        ownerEmail: ownerEmail || firebaseUser?.email || t.createClub.ownerFallbackEmail,
-        clubName: trimmedClubName,
-        sport: trimmedSport,
-        city: trimmedCity,
-        country,
-      });
-
-      if (authService.isConfigured() && firebaseUser !== null) {
-        await firestoreTeamSyncService.createClubWorkspace({
-          firebaseUser,
-          clubId: nextData.club.id,
-          clubName: nextData.club.name,
-          sport: nextData.club.sport,
-          city: nextData.club.city,
-          clubCode: nextData.club.code,
+      if (!authService.isConfigured() || firebaseUser === null) {
+        // Offline/demo mode has no backend and no billing -- unchanged.
+        await teamSyncService.createClubWorkspace({
+          ownerFullName: ownerFullName || firebaseUser?.displayName || t.createClub.ownerFallbackName,
+          ownerEmail: ownerEmail || firebaseUser?.email || t.createClub.ownerFallbackEmail,
+          clubName: trimmedClubName,
+          sport: trimmedSport,
+          city: trimmedCity,
           country,
         });
+
+        router.replace("/dashboard");
+        return;
       }
 
-      router.replace("/dashboard");
+      // The real club is now only ever created server-side, once payment or
+      // a promo code is confirmed -- see functions/index.js's
+      // startClubSignup. It either creates the club immediately (promo
+      // code) or returns a checkout to open (paid path), in which case the
+      // useFocusEffect above takes over once the browser redirects back.
+      const result = await paymentGatewayService.startClubSignup(
+        { name: trimmedClubName, sport: trimmedSport, city: trimmedCity, country },
+        promoCode.trim()
+      );
+
+      // typeof narrowing (not plain truthiness) is what actually
+      // discriminates this union for TS -- clubId is typed as a bare
+      // string on the "created" branch, not a literal, so a truthy check
+      // alone can't rule that branch out for the code below.
+      if (typeof result.clubId === "string") {
+        router.replace("/dashboard");
+        return;
+      }
+
+      setPhase("waiting");
+      await openBrowserAsync(result.checkoutUrl);
     } catch (createClubError) {
+      setPhase("idle");
       setError(getAuthErrorMessage(createClubError, language));
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -140,92 +231,127 @@ export default function CreateClubScreen() {
 
           <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
 
-          <View style={styles.ownerBox}>
-            <Text style={styles.ownerLabel}>{t.createClub.ownerInfoTitle}</Text>
-            <Text style={styles.ownerText}>{ownerFullName || t.createClub.ownerNameFallback}</Text>
-            <Text style={styles.ownerText}>{ownerEmail || t.createClub.ownerEmailFallback}</Text>
-          </View>
-
-          <View style={styles.form}>
-            <TextField
-              label={t.createClub.clubNameLabel}
-              placeholder={t.createClub.clubNamePlaceholder}
-              value={clubName}
-              onChangeText={setClubName}
-              accessibilityLabel={t.createClub.accessibility.clubName}
-            />
-
-            <TextField
-              label={t.createClub.sportLabel}
-              placeholder={t.createClub.sportPlaceholder}
-              value={sport}
-              onChangeText={setSport}
-              accessibilityLabel={t.createClub.accessibility.sport}
-            />
-
-            <TextField
-              label={t.createClub.cityLabel}
-              placeholder={t.createClub.cityPlaceholder}
-              value={city}
-              onChangeText={setCity}
-              accessibilityLabel={t.createClub.accessibility.city}
-            />
-
-            <View>
-              <Text style={styles.countryLabel}>{t.createClub.countryLabel}</Text>
-              <View style={styles.countryRow}>
-                {countryOptions.map((option) => {
-                  const isSelected = option.value === country;
-
-                  return (
-                    <Pressable
-                      key={option.value}
-                      onPress={() => setCountry(option.value)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isSelected }}
-                      style={({ pressed }) => [
-                        styles.countryOption,
-                        isSelected ? styles.countryOptionSelected : null,
-                        pressed && !isSelected ? styles.pressed : null,
-                      ]}
-                    >
-                      <Text style={[styles.countryOptionText, isSelected ? styles.countryOptionTextSelected : null]}>
-                        {option.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={styles.countryHint}>{t.createClub.countryHint}</Text>
+          {phase === "waiting" ? (
+            <View style={styles.waitingBox}>
+              <Text style={styles.waitingTitle}>{t.createClub.waitingForPaymentTitle}</Text>
+              <Text style={styles.waitingSubtitle}>{t.createClub.waitingForPaymentSubtitle}</Text>
             </View>
-          </View>
+          ) : (
+            <>
+              <View style={styles.ownerBox}>
+                <Text style={styles.ownerLabel}>{t.createClub.ownerInfoTitle}</Text>
+                <Text style={styles.ownerText}>{ownerFullName || t.createClub.ownerNameFallback}</Text>
+                <Text style={styles.ownerText}>{ownerEmail || t.createClub.ownerEmailFallback}</Text>
+              </View>
 
-          <View style={styles.codePreviewBox}>
-            <Text style={styles.codePreviewLabel}>{t.createClub.invitationCodePreview}</Text>
-            <Text style={styles.codePreviewValue}>{previewCode}</Text>
-            <Text style={styles.codePreviewHint}>{t.createClub.invitationCodeHint}</Text>
-          </View>
+              <View style={styles.form}>
+                <TextField
+                  label={t.createClub.clubNameLabel}
+                  placeholder={t.createClub.clubNamePlaceholder}
+                  value={clubName}
+                  onChangeText={setClubName}
+                  accessibilityLabel={t.createClub.accessibility.clubName}
+                />
+
+                <TextField
+                  label={t.createClub.sportLabel}
+                  placeholder={t.createClub.sportPlaceholder}
+                  value={sport}
+                  onChangeText={setSport}
+                  accessibilityLabel={t.createClub.accessibility.sport}
+                />
+
+                <TextField
+                  label={t.createClub.cityLabel}
+                  placeholder={t.createClub.cityPlaceholder}
+                  value={city}
+                  onChangeText={setCity}
+                  accessibilityLabel={t.createClub.accessibility.city}
+                />
+
+                <View>
+                  <Text style={styles.countryLabel}>{t.createClub.countryLabel}</Text>
+                  <View style={styles.countryRow}>
+                    {countryOptions.map((option) => {
+                      const isSelected = option.value === country;
+
+                      return (
+                        <Pressable
+                          key={option.value}
+                          onPress={() => setCountry(option.value)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: isSelected }}
+                          style={({ pressed }) => [
+                            styles.countryOption,
+                            isSelected ? styles.countryOptionSelected : null,
+                            pressed && !isSelected ? styles.pressed : null,
+                          ]}
+                        >
+                          <Text style={[styles.countryOptionText, isSelected ? styles.countryOptionTextSelected : null]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.countryHint}>{t.createClub.countryHint}</Text>
+                </View>
+
+                {isPaidFlow && (
+                  <View>
+                    <TextField
+                      label={t.createClub.promoCodeLabel}
+                      placeholder={t.createClub.promoCodePlaceholder}
+                      value={promoCode}
+                      onChangeText={(value) => setPromoCode(value.toUpperCase())}
+                      autoCapitalize="characters"
+                      accessibilityLabel={t.createClub.accessibility.promoCode}
+                    />
+                    <Text style={styles.countryHint}>{t.createClub.promoCodeHint}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.codePreviewBox}>
+                <Text style={styles.codePreviewLabel}>{t.createClub.invitationCodePreview}</Text>
+                <Text style={styles.codePreviewValue}>{previewCode}</Text>
+                <Text style={styles.codePreviewHint}>{t.createClub.invitationCodeHint}</Text>
+              </View>
+            </>
+          )}
 
           {error !== "" && <Text style={styles.errorText}>{error}</Text>}
 
           <View style={styles.buttonGroup}>
             <AppButton
-              title={isSubmitting ? t.createClub.submittingButton : t.createClub.submitButton}
+              title={
+                phase === "waiting"
+                  ? t.createClub.openingCheckoutButton
+                  : phase === "submitting"
+                    ? t.createClub.submittingButton
+                    : isPaidFlow
+                      ? promoCode.trim() !== ""
+                        ? t.createClub.submitButtonPromo
+                        : t.createClub.submitButtonPaid
+                      : t.createClub.submitButton
+              }
               onPress={handleCreateClub}
               disabled={isSubmitting}
               accessibilityLabel={t.createClub.accessibility.submit}
               style={styles.button}
             />
 
-            <Link href="/" asChild>
-              <AppButton
-                title={t.createClub.backHome}
-                variant="ghost"
-                accessibilityLabel={t.createClub.accessibility.backHome}
-                style={styles.button}
-              />
-            </Link>
+            {phase !== "waiting" && (
+              <Link href="/" asChild>
+                <AppButton
+                  title={t.createClub.backHome}
+                  variant="ghost"
+                  accessibilityLabel={t.createClub.accessibility.backHome}
+                  style={styles.button}
+                />
+              </Link>
+            )}
           </View>
         </ScreenCard>
       </ScrollView>
@@ -273,6 +399,25 @@ const styles = StyleSheet.create({
     color: theme.colors.text.secondary,
     textAlign: "center",
     marginBottom: theme.spacing["2xl"],
+  },
+  waitingBox: {
+    width: "100%",
+    backgroundColor: theme.colors.state.infoSoft,
+    borderRadius: theme.radius.lg,
+    padding: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
+  },
+  waitingTitle: {
+    ...Typography.label,
+    color: theme.colors.text.primary,
+    marginBottom: theme.spacing.xs,
+    textAlign: "center",
+  },
+  waitingSubtitle: {
+    ...Typography.supporting,
+    color: theme.colors.text.secondary,
+    textAlign: "center",
   },
   ownerBox: {
     width: "100%",

@@ -677,6 +677,100 @@ describe("clubs.paymentAccount", () => {
   });
 });
 
+describe("clubs.create (must go through startClubSignup, never direct)", () => {
+  it("no client, not even a verified signed-in user, can create a club document directly", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "clubs", "club-new"), {
+        id: "club-new",
+        name: "New Club",
+        ownerId: ADMIN_A,
+      })
+    );
+  });
+});
+
+describe("clubs.subscription", () => {
+  it("clubAdmin cannot hand-write subscription.status to active", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "clubs", CLUB_A), { subscription: { status: "active", provider: "none" } }, { merge: true })
+    );
+  });
+
+  it("clubAdmin can still update other club fields when subscription is left untouched", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(setDoc(doc(db, "clubs", CLUB_A), { city: "Ankara" }, { merge: true }));
+  });
+});
+
+describe("promoCodes", () => {
+  const PROMO_CODE = "FREE6MONTHS";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "promoCodes", PROMO_CODE), {
+        code: PROMO_CODE,
+        grantMonths: 6,
+        status: "unredeemed",
+        createdByUid: "platform-admin",
+        createdAt: "2026-09-01T00:00:00.000Z",
+      });
+    });
+  });
+
+  it("no client can read a promo code directly", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(getDoc(doc(db, "promoCodes", PROMO_CODE)));
+  });
+
+  it("no client can redeem (write) a promo code directly", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(doc(db, "promoCodes", PROMO_CODE), { status: "redeemed" }, { merge: true })
+    );
+  });
+});
+
+describe("pendingClubSignups", () => {
+  const SIGNUP_ID = "signup-1";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), "pendingClubSignups", SIGNUP_ID), {
+        id: SIGNUP_ID,
+        createdByUid: ADMIN_A,
+        draft: { name: "New Club", sport: "Soccer", city: "Istanbul", country: "TR" },
+        provider: "iyzico",
+        status: "pending",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      });
+    });
+  });
+
+  it("the creator can read their own pending signup", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertSucceeds(getDoc(doc(db, "pendingClubSignups", SIGNUP_ID)));
+  });
+
+  it("another user cannot read someone else's pending signup", async () => {
+    const db = authedFirestore(ADMIN_B);
+    await assertFails(getDoc(doc(db, "pendingClubSignups", SIGNUP_ID)));
+  });
+
+  it("no client, not even the creator, can write resultClubId directly", async () => {
+    const db = authedFirestore(ADMIN_A);
+    await assertFails(
+      setDoc(
+        doc(db, "pendingClubSignups", SIGNUP_ID),
+        { status: "completed", resultClubId: CLUB_A },
+        { merge: true }
+      )
+    );
+  });
+});
+
 describe("users.billingDetails", () => {
   const BILLING_DETAILS_FIXTURE = {
     nationalId: "11111111111",
@@ -782,9 +876,15 @@ describe("club suspension", () => {
     await assertSucceeds(getDoc(doc(db, "clubs", CLUB_A)));
   });
 
-  it("a suspended club's document is NOT readable by a non-owner member", async () => {
+  it("a suspended club's document is still readable by any of its active members (not just the owner) -- needed so every role lands on a friendly renew screen instead of a permission error", async () => {
     await suspendClubA();
     const db = authedFirestore(COACH_A);
+    await assertSucceeds(getDoc(doc(db, "clubs", CLUB_A)));
+  });
+
+  it("a suspended club's document is NOT readable by someone from a different club", async () => {
+    await suspendClubA();
+    const db = authedFirestore(ADMIN_B);
     await assertFails(getDoc(doc(db, "clubs", CLUB_A)));
   });
 

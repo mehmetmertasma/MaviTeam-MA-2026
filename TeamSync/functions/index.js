@@ -53,6 +53,14 @@ function getPlatformFeeCents(amountCents) {
   return Math.round(amountCents * PLATFORM_FEE_RATE);
 }
 
+// The club's own $20/mo platform subscription (separate from paymentAccount/
+// PLATFORM_FEE_RATE above, which is about a club's *outgoing* dues
+// collection). US clubs are billed a live Stripe subscription at this USD
+// price; TR/iyzico billing intentionally uses one fixed TRY price rather
+// than a live conversion, per product decision -- see startClubSignup.
+const CLUB_SUBSCRIPTION_PRICE_USD_CENTS = 2000;
+const SUBSCRIPTION_GRACE_PERIOD_DAYS = 7;
+
 const ATTENDANCE_RETENTION_DAYS = 14;
 const ATTENDANCE_CLEANUP_BATCH_SIZE = 300;
 const ATTENDANCE_STATUS_FIELDS = ["present", "absent", "late", "excused"];
@@ -170,9 +178,15 @@ function buildEmailText(code, displayName) {
   return `Hi ${displayName}, your MaviTeam verification code is ${code}. This code expires in 10 minutes.`;
 }
 
-async function sendVerificationEmail({ apiKey, to, code, displayName }) {
+// Shared Resend send path -- sendVerificationEmail below is the original
+// caller (kept throwing on failure, since a verification code that silently
+// never arrives blocks sign-up); sendTransactionalEmail is the same POST
+// factored out for callers like the subscription-reminders cron that must
+// NOT throw (best-effort, like sendExpoPushNotifications -- one club's
+// unreachable inbox shouldn't abort every other club's reminder run).
+async function sendTransactionalEmail({ apiKey, to, subject, text, html }) {
   if (!apiKey) {
-    throw new HttpsError("failed-precondition", "Email delivery is not configured yet.");
+    return { ok: false, error: "Email delivery is not configured yet." };
   }
 
   const response = await fetch(RESEND_API_URL, {
@@ -181,13 +195,7 @@ async function sendVerificationEmail({ apiKey, to, code, displayName }) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      from: FROM_EMAIL,
-      to,
-      subject: "Your MaviTeam verification code",
-      text: buildEmailText(code, displayName),
-      html: buildEmailHtml(code, displayName),
-    }),
+    body: JSON.stringify({ from: FROM_EMAIL, to, subject, text, html }),
   });
 
   let body = {};
@@ -199,14 +207,31 @@ async function sendVerificationEmail({ apiKey, to, code, displayName }) {
   }
 
   if (!response.ok) {
-    console.error("Resend verification email failed", {
-      status: response.status,
-      error: body?.message || body?.error || body,
-    });
+    return { ok: false, status: response.status, error: body?.message || body?.error || body };
+  }
+
+  return { ok: true, body };
+}
+
+async function sendVerificationEmail({ apiKey, to, code, displayName }) {
+  const result = await sendTransactionalEmail({
+    apiKey,
+    to,
+    subject: "Your MaviTeam verification code",
+    text: buildEmailText(code, displayName),
+    html: buildEmailHtml(code, displayName),
+  });
+
+  if (!result.ok) {
+    if (result.error === "Email delivery is not configured yet.") {
+      throw new HttpsError("failed-precondition", result.error);
+    }
+
+    console.error("Resend verification email failed", { status: result.status, error: result.error });
     throw new HttpsError("internal", "We could not send your verification code. Please try again.");
   }
 
-  return body;
+  return result.body;
 }
 
 exports.requestEmailVerificationCode = onCall({ secrets: [resendApiKey] }, async (request) => {
@@ -648,6 +673,209 @@ exports.generateMonthlyDues = onSchedule("every 24 hours", async () => {
   console.log("Monthly dues generation finished", result);
 });
 
+// Firestore Timestamp fields in this codebase are a mix of real ISO strings
+// (computed values like trialEndsAt/currentPeriodEnd) and Admin SDK
+// serverTimestamp() sentinels, which read back as Firestore Timestamp
+// objects, not strings (see getPlatformOverview's
+// data.createdAt?.toDate?.().toISOString() for the existing precedent).
+// This normalizes either shape to millis for comparison.
+function timestampToMillis(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value.toDate === "function") {
+    return value.toDate().getTime();
+  }
+
+  const millis = new Date(value).getTime();
+  return Number.isFinite(millis) ? millis : null;
+}
+
+// Club-subscription grace period + auto-suspend. Runs daily, same "runs
+// often, mostly no-ops" shape as runMonthlyDuesGeneration above. Skips any
+// club still missing a subscription field entirely (pre-feature legacy
+// clubs -- see the Club.subscription backfill note in
+// src/types/teamSync.ts) rather than ever guessing a default for it.
+async function runSubscriptionGraceEnforcement(db) {
+  const graceCutoffMillis = Date.now() - SUBSCRIPTION_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+  const clubsSnapshot = await db.collection("clubs").get();
+  let trialsExpired = 0;
+  let suspendedCount = 0;
+
+  for (const clubSnapshot of clubsSnapshot.docs) {
+    const club = clubSnapshot.data();
+    const subscription = club.subscription;
+
+    if (!subscription) {
+      continue;
+    }
+
+    if (subscription.status === "trialing") {
+      const trialEndsAtMillis = timestampToMillis(subscription.trialEndsAt);
+
+      if (trialEndsAtMillis !== null && trialEndsAtMillis < Date.now()) {
+        await clubSnapshot.ref.update({
+          "subscription.status": "past_due",
+          "subscription.pastDueSince": admin.firestore.FieldValue.serverTimestamp(),
+          "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+        });
+        trialsExpired += 1;
+        continue; // grace clock just started -- nothing to suspend yet
+      }
+
+      continue;
+    }
+
+    const isPastDueOrCanceled = subscription.status === "past_due" || subscription.status === "canceled";
+
+    if (!isPastDueOrCanceled || club.status === "suspended") {
+      continue;
+    }
+
+    const pastDueSinceMillis = timestampToMillis(subscription.pastDueSince);
+
+    if (pastDueSinceMillis !== null && pastDueSinceMillis < graceCutoffMillis) {
+      await clubSnapshot.ref.update({
+        status: "suspended",
+        "subscription.autoSuspendedAt": admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await db.collection("adminAuditLog").add({
+        action: "subscriptionGraceSuspend",
+        clubId: clubSnapshot.id,
+        performedByUid: "system",
+        performedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      suspendedCount += 1;
+    }
+  }
+
+  return { trialsExpired, suspendedCount };
+}
+
+exports.runSubscriptionGraceEnforcement = runSubscriptionGraceEnforcement;
+
+exports.enforceSubscriptionGracePeriod = onSchedule("every 24 hours", async () => {
+  const db = admin.firestore();
+  const result = await runSubscriptionGraceEnforcement(db);
+  console.log("Subscription grace enforcement finished", result);
+});
+
+// Renewal nudges: trial-ending-soon and past-due warnings, sent before the
+// grace cron above actually suspends the club. Runs alongside it, reusing
+// sendExpoPushNotifications and the Resend send path exactly like every
+// other notification path in this file. Dedupe is via
+// subscription.remindersSent (an array of sent keys) so a club already
+// warned today doesn't get the same nudge again tomorrow.
+async function runSubscriptionReminders(db, resendKey) {
+  const clubsSnapshot = await db.collection("clubs").get();
+  let remindersSent = 0;
+
+  for (const clubSnapshot of clubsSnapshot.docs) {
+    const club = clubSnapshot.data();
+    const subscription = club.subscription;
+
+    if (!subscription) {
+      continue;
+    }
+
+    const alreadySent = new Set(Array.isArray(subscription.remindersSent) ? subscription.remindersSent : []);
+    let reminderKey = null;
+    let subject = null;
+    let message = null;
+
+    if (subscription.status === "trialing" && subscription.trialEndsAt) {
+      const trialEndsAtMillis = timestampToMillis(subscription.trialEndsAt);
+      const daysLeft = trialEndsAtMillis === null ? null : Math.ceil((trialEndsAtMillis - Date.now()) / (24 * 60 * 60 * 1000));
+
+      if (daysLeft !== null && daysLeft <= 7 && daysLeft > 1 && !alreadySent.has("trial7d")) {
+        reminderKey = "trial7d";
+        subject = `${club.name}: your free trial ends in ${daysLeft} days`;
+        message = `Your MaviTeam free trial for ${club.name} ends in ${daysLeft} days. Add a payment method to keep your club active.`;
+      } else if (daysLeft !== null && daysLeft <= 1 && !alreadySent.has("trial1d")) {
+        reminderKey = "trial1d";
+        subject = `${club.name}: your free trial ends tomorrow`;
+        message = `Your MaviTeam free trial for ${club.name} ends tomorrow. Add a payment method to keep your club active.`;
+      }
+    } else if (subscription.status === "past_due" && subscription.pastDueSince) {
+      const pastDueSinceMillis = timestampToMillis(subscription.pastDueSince);
+      const daysPastDue = pastDueSinceMillis === null ? null : Math.floor((Date.now() - pastDueSinceMillis) / (24 * 60 * 60 * 1000));
+
+      if (daysPastDue !== null && daysPastDue >= 1 && !alreadySent.has("pastDue1d")) {
+        reminderKey = "pastDue1d";
+        subject = `${club.name}: payment failed, please renew`;
+        message = `MaviTeam couldn't charge ${club.name}'s subscription. You have ${Math.max(SUBSCRIPTION_GRACE_PERIOD_DAYS - daysPastDue, 0)} day(s) left to renew before the club is suspended.`;
+      } else if (daysPastDue !== null && daysPastDue >= SUBSCRIPTION_GRACE_PERIOD_DAYS - 1 && !alreadySent.has("pastDue6d")) {
+        reminderKey = "pastDue6d";
+        subject = `${club.name}: last chance, suspending tomorrow`;
+        message = `MaviTeam will suspend ${club.name} tomorrow unless the subscription is renewed today.`;
+      }
+    }
+
+    if (!reminderKey) {
+      continue;
+    }
+
+    const adminsSnapshot = await db
+      .collection("users")
+      .where("clubId", "==", clubSnapshot.id)
+      .where("role", "==", "clubAdmin")
+      .where("status", "==", "active")
+      .get();
+
+    if (adminsSnapshot.empty) {
+      continue;
+    }
+
+    const adminUserIds = adminsSnapshot.docs.map((adminDoc) => adminDoc.id);
+
+    await sendExpoPushNotifications(db, adminUserIds, null, {
+      title: subject,
+      body: truncateForNotification(message),
+      data: { route: "/profile" },
+    });
+
+    for (const adminDoc of adminsSnapshot.docs) {
+      const email = adminDoc.data().email;
+
+      if (!email) {
+        continue;
+      }
+
+      const result = await sendTransactionalEmail({
+        apiKey: resendKey,
+        to: email,
+        subject,
+        text: message,
+        html: `<p>${escapeHtml(message)}</p>`,
+      });
+
+      if (!result.ok) {
+        console.warn("[runSubscriptionReminders] email send failed", { clubId: clubSnapshot.id, error: result.error });
+      }
+    }
+
+    await clubSnapshot.ref.update({
+      "subscription.remindersSent": admin.firestore.FieldValue.arrayUnion(reminderKey),
+    });
+
+    remindersSent += 1;
+  }
+
+  return { remindersSent };
+}
+
+exports.runSubscriptionReminders = runSubscriptionReminders;
+
+exports.sendSubscriptionReminders = onSchedule({ schedule: "every 24 hours", secrets: [resendApiKey] }, async () => {
+  const db = admin.firestore();
+  const result = await runSubscriptionReminders(db, resendApiKey.value());
+  console.log("Subscription reminders finished", result);
+});
+
 // Online dues payments: iyzico (TR) / Stripe (US). Every write to
 // clubs/{id}.paymentAccount below uses the Admin SDK specifically because
 // firestore.rules blocks clients from ever moving that field themselves
@@ -959,6 +1187,352 @@ exports.createCheckoutSession = onCall(
   }
 );
 
+// ---------------------------------------------------------------------------
+// Club subscriptions ($20/mo, auto-recurring until canceled) + promo codes.
+//
+// A club is now only ever created after payment or a promo code is
+// confirmed -- see firestore.rules, where clubs/{id} "create" is Admin-SDK
+// only. startClubSignup below is the one place that happens: either
+// synchronously (promo code) or via a pendingClubSignups draft that the
+// Stripe webhook resolves once checkout completes (paid path).
+// ---------------------------------------------------------------------------
+
+function normalizeClubCode(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9ÇĞİÖŞÜ]/g, "");
+}
+
+// Mirrors create-club.tsx's generatePreviewCode -- club codes are now only
+// ever minted here (server-side), since club creation itself moved
+// server-side, but the format stays identical to what users already saw
+// previewed in the old client-only flow.
+function generateClubCode(clubName) {
+  const prefix = normalizeClubCode(clubName).slice(0, 3);
+  return `${prefix || "CLB"}${new Date().getFullYear()}`;
+}
+
+function getCurrencyForCountry(country) {
+  return country === "US" ? "USD" : "TRY";
+}
+
+function normalizeClubDraft(rawDraft) {
+  const draft = rawDraft && typeof rawDraft === "object" ? rawDraft : {};
+  const name = String(draft.name || "").trim();
+  const sport = String(draft.sport || "").trim();
+  const city = String(draft.city || "").trim();
+  const country = draft.country === "US" ? "US" : "TR";
+
+  if (name === "" || sport === "" || city === "") {
+    throw new HttpsError("invalid-argument", "name, sport, and city are required.");
+  }
+
+  return { name, sport, city, country };
+}
+
+// Shared by the promo-code path (synchronous) and the Stripe webhook's
+// subscription checkout completion (async, after payment is confirmed).
+// Writes the club, reserves its invite code, and upgrades the caller's own
+// user profile to clubAdmin -- the same three writes
+// firestoreTeamSyncService.createClubWorkspace used to do client-side,
+// just via the Admin SDK now, plus an optional extra step (promo-code
+// redemption) folded into the same atomic transaction.
+async function createClubFromSignup(db, { clubId, draft, ownerUid, ownerFullName, ownerEmail, ownerEmailVerified, subscription, withinTransaction }) {
+  const clubCode = generateClubCode(draft.name);
+  const clubCodeRef = db.doc(`clubCodes/${clubCode}`);
+  const clubRef = db.doc(`clubs/${clubId}`);
+  const userRef = db.doc(`users/${ownerUid}`);
+  const now = admin.firestore.FieldValue.serverTimestamp();
+
+  await db.runTransaction(async (transaction) => {
+    const existingClubCode = await transaction.get(clubCodeRef);
+
+    if (existingClubCode.exists) {
+      throw new HttpsError("already-exists", "CLUB_CODE_ALREADY_EXISTS");
+    }
+
+    // withinTransaction may return a partial object to merge into
+    // subscription (e.g. the promo path's computed trialEndsAt) -- it must
+    // come back as a return value rather than a separate transaction.update
+    // after clubRef is set() below, since writes to the same doc within one
+    // transaction apply in call order and a later set() would otherwise
+    // silently wipe out an earlier patch.
+    const subscriptionOverrides = withinTransaction ? (await withinTransaction(transaction)) || {} : {};
+
+    transaction.set(clubRef, {
+      id: clubId,
+      name: draft.name,
+      sport: draft.sport,
+      city: draft.city,
+      code: clubCode,
+      ownerId: ownerUid,
+      primaryColor: "#2563eb",
+      logoUrl: "",
+      country: draft.country,
+      currency: getCurrencyForCountry(draft.country),
+      subscription: { ...subscription, ...subscriptionOverrides },
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    transaction.set(clubCodeRef, {
+      code: clubCode,
+      clubId,
+      clubName: draft.name,
+      ownerId: ownerUid,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    transaction.set(
+      userRef,
+      {
+        uid: ownerUid,
+        fullName: ownerFullName,
+        email: ownerEmail,
+        emailVerified: ownerEmailVerified,
+        role: "clubAdmin",
+        status: "active",
+        clubId,
+        teamIds: [],
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  });
+
+  return { clubId, clubCode };
+}
+
+async function assertCallerHasNoClub(db, uid) {
+  const userSnapshot = await db.doc(`users/${uid}`).get();
+
+  if (userSnapshot.exists && userSnapshot.data().clubId) {
+    throw new HttpsError("failed-precondition", "You already belong to a club.");
+  }
+}
+
+exports.startClubSignup = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in to create a club.");
+  }
+
+  if (!request.auth.token.email_verified) {
+    throw new HttpsError("failed-precondition", "Please verify your email first.");
+  }
+
+  const user = {
+    uid: request.auth.uid,
+    email: request.auth.token.email || "",
+    name: request.auth.token.name || "MaviTeam User",
+  };
+  const db = admin.firestore();
+  await assertCallerHasNoClub(db, user.uid);
+
+  const draft = normalizeClubDraft(request.data?.clubDraft);
+  const promoCode = String(request.data?.promoCode || "").trim().toUpperCase();
+
+  // --- Promo path: redeem + create the club synchronously, in one
+  // transaction (no pendingClubSignups needed -- there's no async payment
+  // step to wait on).
+  if (promoCode !== "") {
+    const clubId = db.collection("clubs").doc().id;
+    const promoCodeRef = db.doc(`promoCodes/${promoCode}`);
+
+    await createClubFromSignup(db, {
+      clubId,
+      draft,
+      ownerUid: user.uid,
+      ownerFullName: user.name,
+      ownerEmail: user.email,
+      ownerEmailVerified: true,
+      subscription: {
+        status: "trialing",
+        provider: "none",
+        promoCodeId: promoCode,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      withinTransaction: async (transaction) => {
+        const promoSnapshot = await transaction.get(promoCodeRef);
+
+        if (!promoSnapshot.exists) {
+          throw new HttpsError("not-found", "PROMO_CODE_NOT_FOUND");
+        }
+
+        const promo = promoSnapshot.data();
+
+        if (promo.status !== "unredeemed") {
+          throw new HttpsError("failed-precondition", "PROMO_CODE_ALREADY_USED");
+        }
+
+        const grantMonths = Number(promo.grantMonths) > 0 ? Number(promo.grantMonths) : 1;
+        const trialEndsAt = new Date();
+        trialEndsAt.setMonth(trialEndsAt.getMonth() + grantMonths);
+
+        transaction.update(promoCodeRef, {
+          status: "redeemed",
+          redeemedByClubId: clubId,
+          redeemedByUid: user.uid,
+          redeemedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Merged into the club's subscription object by createClubFromSignup
+        // before it writes the club doc -- see the comment there on why this
+        // has to come back as a return value instead of a follow-up write.
+        return { trialEndsAt: trialEndsAt.toISOString() };
+      },
+    });
+
+    return { clubId };
+  }
+
+  // --- Paid path: create a pending signup, then start a real checkout.
+  // The club itself doesn't exist yet -- see the stripeWebhook handler for
+  // "checkout.session.completed" with session.mode === "subscription".
+  const pendingSignupRef = db.collection("pendingClubSignups").doc();
+  const provider = draft.country === "US" ? "stripe" : "iyzico";
+
+  await pendingSignupRef.set({
+    id: pendingSignupRef.id,
+    createdByUid: user.uid,
+    // Captured now, from the signed-in app account, rather than re-derived
+    // from Stripe's customer/session data once the webhook fires -- the
+    // Stripe customer is created fresh for this checkout and may not carry
+    // the same name/email as the MaviTeam account completing it.
+    createdByFullName: user.name,
+    createdByEmail: user.email,
+    draft,
+    provider,
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  if (provider === "iyzico") {
+    // TR recurring billing needs iyzico's separate Subscription API (a
+    // distinct product from the one-off Checkout Form used for athlete
+    // dues elsewhere in this file) -- not wired up yet. Ship US/Stripe
+    // first; TR clubs can sign up with a promo code in the meantime.
+    await pendingSignupRef.update({ status: "failed", failureReason: "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE" });
+    throw new HttpsError("unimplemented", "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE");
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value());
+  const customer = await stripe.customers.create({
+    email: user.email,
+    metadata: { signupId: pendingSignupRef.id },
+  });
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer: customer.id,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          unit_amount: CLUB_SUBSCRIPTION_PRICE_USD_CENTS,
+          recurring: { interval: "month" },
+          product_data: { name: "MaviTeam club subscription" },
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: `maviteam://create-club?checkout=return&signupId=${pendingSignupRef.id}`,
+    cancel_url: "maviteam://create-club?checkout=cancel",
+    metadata: { signupId: pendingSignupRef.id },
+  });
+
+  await pendingSignupRef.update({ checkoutSessionId: session.id, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  return { pendingSignupId: pendingSignupRef.id, checkoutUrl: session.url };
+});
+
+// Lets a clubAdmin start renewal checkout for an EXISTING club whose
+// subscription lapsed (trial ended / past due / canceled) -- reuses the same
+// Stripe subscription-mode checkout as startClubSignup's paid path, just
+// against a club that already exists instead of a pendingClubSignups draft.
+exports.startSubscriptionRenewalCheckout = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  const clubId = String(request.data?.clubId || "").trim();
+
+  if (clubId === "") {
+    throw new HttpsError("invalid-argument", "clubId is required.");
+  }
+
+  await requireClubAdminOfClub(request, clubId);
+
+  const db = admin.firestore();
+  const clubRef = db.doc(`clubs/${clubId}`);
+  const clubSnapshot = await clubRef.get();
+
+  if (!clubSnapshot.exists) {
+    throw new HttpsError("not-found", "Club not found.");
+  }
+
+  const club = clubSnapshot.data();
+
+  if (club.country !== "US") {
+    throw new HttpsError("unimplemented", "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE");
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value());
+  const customerId =
+    club.subscription?.provider === "stripe" && club.subscription?.customerId
+      ? club.subscription.customerId
+      : (await stripe.customers.create({ email: request.auth.token.email, metadata: { clubId } })).id;
+
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer: customerId,
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          unit_amount: CLUB_SUBSCRIPTION_PRICE_USD_CENTS,
+          recurring: { interval: "month" },
+          product_data: { name: "MaviTeam club subscription" },
+        },
+        quantity: 1,
+      },
+    ],
+    success_url: "maviteam://subscription-locked?checkout=return",
+    cancel_url: "maviteam://subscription-locked?checkout=cancel",
+    metadata: { renewClubId: clubId },
+  });
+
+  return { checkoutUrl: session.url };
+});
+
+// Cancellation only ever takes effect at the end of the already-paid period
+// (Stripe's Billing Portal defaults to cancel_at_period_end) -- the club
+// keeps full access until then, and only gets suspended once
+// customer.subscription.deleted actually fires in stripeWebhook below.
+exports.cancelClubSubscription = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  const clubId = String(request.data?.clubId || "").trim();
+
+  if (clubId === "") {
+    throw new HttpsError("invalid-argument", "clubId is required.");
+  }
+
+  await requireClubAdminOfClub(request, clubId);
+
+  const db = admin.firestore();
+  const clubSnapshot = await db.doc(`clubs/${clubId}`).get();
+  const club = clubSnapshot.exists ? clubSnapshot.data() : null;
+
+  if (!club?.subscription?.customerId || club.subscription.provider !== "stripe") {
+    throw new HttpsError("failed-precondition", "This club has no active Stripe subscription to cancel.");
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value());
+  const portalSession = await stripe.billingPortal.sessions.create({
+    customer: club.subscription.customerId,
+    return_url: "maviteam://profile?billing=return",
+  });
+
+  return { url: portalSession.url };
+});
+
 exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
@@ -981,6 +1555,8 @@ exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecr
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
     const paymentId = session.metadata?.paymentId;
+    const signupId = session.metadata?.signupId;
+    const renewClubId = session.metadata?.renewClubId;
 
     if (paymentId) {
       await db.doc(`payments/${paymentId}`).set(
@@ -992,6 +1568,189 @@ exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecr
         },
         { merge: true }
       );
+    } else if (signupId && session.mode === "subscription") {
+      // First-ever payment for a brand-new club signup -- the club itself
+      // doesn't exist until this fires (see startClubSignup's paid path).
+      const pendingSignupRef = db.doc(`pendingClubSignups/${signupId}`);
+      const pendingSnapshot = await pendingSignupRef.get();
+
+      // Guards against a duplicate webhook delivery creating a second club
+      // for the same signup -- Stripe can and does redeliver events.
+      if (pendingSnapshot.exists && pendingSnapshot.data().status === "pending") {
+        const pending = pendingSnapshot.data();
+
+        try {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
+          const clubId = db.collection("clubs").doc().id;
+
+          await createClubFromSignup(db, {
+            clubId,
+            draft: pending.draft,
+            ownerUid: pending.createdByUid,
+            ownerFullName: pending.createdByFullName,
+            ownerEmail: pending.createdByEmail,
+            ownerEmailVerified: true,
+            subscription: {
+              status: "active",
+              provider: "stripe",
+              customerId: session.customer,
+              subscriptionId: session.subscription,
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+              cancelAtPeriodEnd: false,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+          });
+
+          await pendingSignupRef.update({
+            status: "completed",
+            resultClubId: clubId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } catch (creationError) {
+          console.error("Failed to create club from completed subscription checkout", creationError);
+          await pendingSignupRef.update({
+            status: "failed",
+            failureReason: String(creationError?.message || creationError),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    } else if (renewClubId && session.mode === "subscription") {
+      // Renewal checkout for an existing club whose subscription lapsed --
+      // see startSubscriptionRenewalCheckout.
+      const subscription = await stripe.subscriptions.retrieve(session.subscription);
+
+      await db.doc(`clubs/${renewClubId}`).set(
+        {
+          status: "active",
+          subscription: {
+            status: "active",
+            provider: "stripe",
+            customerId: session.customer,
+            subscriptionId: session.subscription,
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+            cancelAtPeriodEnd: false,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  // Ongoing recurring charges for an existing club subscription. Looked up
+  // by subscriptionId (set once, at creation/renewal, above) the same way
+  // account.updated below looks a club up by its Stripe account id.
+  if (event.type === "invoice.paid") {
+    const invoice = event.data.object;
+    const subscriptionId = invoice.subscription;
+
+    if (subscriptionId) {
+      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
+
+      if (!clubsSnapshot.empty) {
+        const clubDoc = clubsSnapshot.docs[0];
+        const club = clubDoc.data();
+        const updates = {
+          "subscription.status": "active",
+          "subscription.currentPeriodEnd": new Date(invoice.period_end * 1000).toISOString(),
+          "subscription.pastDueSince": admin.firestore.FieldValue.delete(),
+          "subscription.autoSuspendedAt": admin.firestore.FieldValue.delete(),
+          "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        // Only reactivate a club the grace-period cron itself suspended for
+        // non-payment -- a club a platform admin suspended for some other
+        // reason should stay suspended even if its subscription happens to
+        // still be charging successfully.
+        if (club.status === "suspended" && club.subscription?.autoSuspendedAt) {
+          updates.status = "active";
+        }
+
+        await clubDoc.ref.update(updates);
+      }
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  if (event.type === "invoice.payment_failed") {
+    const invoice = event.data.object;
+    const subscriptionId = invoice.subscription;
+
+    if (subscriptionId) {
+      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
+
+      if (!clubsSnapshot.empty) {
+        const clubDoc = clubsSnapshot.docs[0];
+        const club = clubDoc.data();
+
+        // Only set pastDueSince the first time this subscription goes past
+        // due -- Stripe retries a failed invoice multiple times (Smart
+        // Retries) before giving up, and re-firing this on every retry
+        // would keep pushing the 7-day grace deadline back forever.
+        if (club.subscription?.status !== "past_due" || !club.subscription?.pastDueSince) {
+          await clubDoc.ref.update({
+            "subscription.status": "past_due",
+            "subscription.pastDueSince": admin.firestore.FieldValue.serverTimestamp(),
+            "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object;
+    const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
+
+    if (!clubsSnapshot.empty) {
+      await clubsSnapshot.docs[0].ref.update({
+        "subscription.cancelAtPeriodEnd": Boolean(subscription.cancel_at_period_end),
+        "subscription.currentPeriodEnd": new Date(subscription.current_period_end * 1000).toISOString(),
+        "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    res.status(200).send("OK");
+    return;
+  }
+
+  // Fires once a cancellation actually takes effect (cancel_at_period_end,
+  // set by cancelClubSubscription's Billing Portal session) -- the club had
+  // full access up through the period it already paid for, so unlike
+  // invoice.payment_failed above there's no additional grace period here;
+  // it's suspended immediately.
+  if (event.type === "customer.subscription.deleted") {
+    const subscription = event.data.object;
+    const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
+
+    if (!clubsSnapshot.empty) {
+      const clubDoc = clubsSnapshot.docs[0];
+
+      await clubDoc.ref.update({
+        status: "suspended",
+        "subscription.status": "canceled",
+        "subscription.canceledAt": admin.firestore.FieldValue.serverTimestamp(),
+        "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await db.collection("adminAuditLog").add({
+        action: "subscriptionCanceledSuspend",
+        clubId: clubDoc.id,
+        performedByUid: "system",
+        performedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
     }
 
     res.status(200).send("OK");
@@ -1151,12 +1910,31 @@ exports.setClubStatus = onCall(async (request) => {
     throw new HttpsError("not-found", "Club not found.");
   }
 
-  const previousStatus = clubSnapshot.data()?.status === "suspended" ? "suspended" : "active";
+  const club = clubSnapshot.data();
+  const previousStatus = club?.status === "suspended" ? "suspended" : "active";
 
-  await clubRef.update({
+  const updates = {
     status: nextStatus,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  };
+
+  // Manually reactivating a club the grace-period cron auto-suspended for
+  // non-payment doesn't mean the subscription is now paid -- it just gives
+  // the club a fresh SUBSCRIPTION_GRACE_PERIOD_DAYS window to pay or enter a
+  // promo code before the cron can suspend it again. Reactivating a club
+  // suspended for some other reason (or already paid up) leaves the
+  // subscription state untouched.
+  if (
+    nextStatus === "active" &&
+    club?.subscription &&
+    (club.subscription.status === "past_due" || club.subscription.status === "canceled")
+  ) {
+    updates["subscription.pastDueSince"] = admin.firestore.FieldValue.serverTimestamp();
+    updates["subscription.autoSuspendedAt"] = admin.firestore.FieldValue.delete();
+    updates["subscription.updatedAt"] = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  await clubRef.update(updates);
 
   await db.collection("adminAuditLog").add({
     action: "setClubStatus",
@@ -1253,6 +2031,121 @@ exports.deleteClub = onCall(async (request) => {
   });
 
   return { ok: true, clubId, deletedCounts };
+});
+
+// Promo codes: single-use, platform-admin-generated, redeemable at club
+// signup for a number of free months (see startClubSignup). Ambiguous
+// characters (0/O, 1/I) are excluded from the alphabet so a code is easy to
+// read back over a phone call or a screenshot.
+const PROMO_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const PROMO_CODE_LENGTH = 8;
+const PROMO_CODE_GENERATION_ATTEMPTS = 10;
+
+function generateRandomPromoCode() {
+  let code = "";
+
+  for (let i = 0; i < PROMO_CODE_LENGTH; i += 1) {
+    code += PROMO_CODE_ALPHABET[randomInt(PROMO_CODE_ALPHABET.length)];
+  }
+
+  return code;
+}
+
+exports.createPromoCode = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const grantMonths = Number(request.data?.grantMonths);
+
+  if (!Number.isInteger(grantMonths) || grantMonths <= 0) {
+    throw new HttpsError("invalid-argument", "grantMonths must be a positive integer.");
+  }
+
+  const note = String(request.data?.note || "").trim();
+  const db = admin.firestore();
+
+  for (let attempt = 0; attempt < PROMO_CODE_GENERATION_ATTEMPTS; attempt += 1) {
+    const code = generateRandomPromoCode();
+    const codeRef = db.doc(`promoCodes/${code}`);
+    // eslint-disable-next-line no-await-in-loop -- a handful of sequential
+    // collision checks is fine here; this only runs when a platform admin
+    // generates a code by hand, never in a hot path.
+    const existing = await codeRef.get();
+
+    if (existing.exists) {
+      continue;
+    }
+
+    await codeRef.set({
+      code,
+      grantMonths,
+      status: "unredeemed",
+      createdByUid: request.auth.uid,
+      note: note || null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { code, grantMonths };
+  }
+
+  throw new HttpsError("internal", "Could not generate a unique promo code -- please try again.");
+});
+
+exports.listPromoCodes = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const db = admin.firestore();
+  const snapshot = await db.collection("promoCodes").orderBy("createdAt", "desc").get();
+
+  const promoCodes = await Promise.all(
+    snapshot.docs.map(async (docSnapshot) => {
+      const data = docSnapshot.data();
+      let redeemedByClubName = null;
+
+      if (data.redeemedByClubId) {
+        const clubSnapshot = await db.doc(`clubs/${data.redeemedByClubId}`).get();
+        redeemedByClubName = clubSnapshot.exists ? clubSnapshot.data().name || null : null;
+      }
+
+      return {
+        code: docSnapshot.id,
+        grantMonths: data.grantMonths,
+        status: data.status,
+        note: data.note || "",
+        createdAt: data.createdAt?.toDate?.().toISOString() ?? null,
+        redeemedByClubId: data.redeemedByClubId || null,
+        redeemedByClubName,
+        redeemedAt: data.redeemedAt?.toDate?.().toISOString() ?? null,
+      };
+    })
+  );
+
+  return { promoCodes };
+});
+
+exports.revokePromoCode = onCall(async (request) => {
+  requirePlatformAdmin(request);
+
+  const code = String(request.data?.code || "").trim().toUpperCase();
+
+  if (code === "") {
+    throw new HttpsError("invalid-argument", "code is required.");
+  }
+
+  const db = admin.firestore();
+  const codeRef = db.doc(`promoCodes/${code}`);
+  const snapshot = await codeRef.get();
+
+  if (!snapshot.exists) {
+    throw new HttpsError("not-found", "Promo code not found.");
+  }
+
+  if (snapshot.data().status !== "unredeemed") {
+    throw new HttpsError("failed-precondition", "Only an unredeemed code can be revoked.");
+  }
+
+  await codeRef.update({ status: "revoked", revokedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  return { ok: true, code };
 });
 
 // Push notifications -- the first Firestore-triggered functions in this

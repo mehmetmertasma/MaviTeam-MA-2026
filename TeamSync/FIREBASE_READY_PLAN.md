@@ -40,6 +40,8 @@ payments/{paymentId}
 replays/{replayId}
 joinRequests/{requestId}
 emailVerificationCodes/{userId}
+promoCodes/{code}
+pendingClubSignups/{signupId}
 ```
 
 Every club-owned document should include `clubId`. Security rules use `clubId`, user `role`, user `status`, and user `teamIds` to separate club data.
@@ -96,9 +98,13 @@ The code is written against each provider's standard test/sandbox setup —
 none of this works until real credentials are set. Before launch:
 
 - Create a Stripe account, enable Connect, and get a **test-mode** secret
-  key. After first deploying `stripeWebhook`, register its URL as a webhook
-  endpoint in the Stripe dashboard (subscribed to `checkout.session.completed`
-  and `account.updated`) to get its signing secret.
+  key. After first deploying `stripeWebhook`, register its URL
+  (`https://us-central1-teamsync-29ea1.cloudfunctions.net/stripeWebhook`) as
+  a webhook endpoint in the Stripe dashboard, subscribed to:
+  `checkout.session.completed`, `account.updated`, `invoice.paid`,
+  `invoice.payment_failed`, `customer.subscription.updated`,
+  `customer.subscription.deleted` (the last four are for club subscriptions,
+  see below, not the per-athlete dues flow) — to get its signing secret.
 - Create an iyzico **sandbox** merchant account to get sandbox API/secret
   keys. iyzico has no hosted onboarding page for sub-merchants, so a TR
   club admin's business details (name, IBAN, national ID, etc.) are
@@ -116,6 +122,43 @@ none of this works until real credentials are set. Before launch:
 - MaviTeam currently takes a 2% platform fee on every online payment
   (`platformFeeCents`, hardcoded in `functions/index.js`) — revisit if the
   business decides on a different rate.
+
+## Club Subscriptions ($20/mo + promo codes)
+
+Every new club now has to pay $20/month (real Stripe recurring billing, US
+clubs only for now) or redeem a single-use promo code before it's actually
+created — see `startClubSignup` in `functions/index.js`. This is a
+*different* Stripe integration from the per-athlete dues flow above (a
+separate Checkout mode, `"subscription"` instead of `"payment"`), but reuses
+the same `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` secrets and the same
+`stripeWebhook` endpoint. Before launch:
+
+- Make sure the `stripeWebhook` endpoint (see above) is subscribed to
+  `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`,
+  and `customer.subscription.deleted` in addition to
+  `checkout.session.completed` — without these, subscriptions will start but
+  never renew, fail, or cancel correctly.
+- Confirm end-to-end in Stripe test mode: sign up a new club with a test
+  card, confirm it's created once `checkout.session.completed` fires,
+  simulate `invoice.payment_failed` (Stripe CLI: `stripe trigger
+  invoice.payment_failed`) and confirm the club goes `past_due`, then wait
+  out (or manually adjust) the 7-day grace period and confirm
+  `enforceSubscriptionGracePeriod` suspends it. **Not yet verified** — no
+  real Stripe test-mode run has been done against this flow.
+- Generate at least one promo code from the admin panel (Promo codes card)
+  and confirm redeeming it at signup creates a club immediately with a
+  6-month (or however many months specified) trial, no payment required.
+- **TR/iyzico club subscriptions are not implemented.** `startClubSignup`
+  and `startSubscriptionRenewalCheckout` both throw
+  `TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE` for non-US clubs — iyzico's recurring
+  Subscription API (distinct from the one-off Checkout Form used for dues
+  above) has never been integrated here. TR clubs can only join via promo
+  code until this is built as its own follow-up.
+- `enforceSubscriptionGracePeriod` and `sendSubscriptionReminders` are
+  scheduled Cloud Functions (`onSchedule`) — they deploy automatically with
+  `npm run deploy:firebase:functions`, no extra setup needed, but confirm
+  they show up under Cloud Scheduler in the Firebase/GCP console after first
+  deploy.
 
 ## Manual Launch QA
 

@@ -11,7 +11,7 @@ import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { AppGlobalNavigation } from "@/components/AppGlobalNavigation";
 import { theme } from "@/constants/theme";
 import { usePushNotificationRegistration } from "@/hooks/usePushNotificationRegistration";
-import { AppDataProvider } from "@/providers/AppDataProvider";
+import { AppDataProvider, useAppDataContext } from "@/providers/AppDataProvider";
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 import { LanguageProvider, useTranslation } from "@/localization";
 import { Sentry, initSentry } from "@/lib/sentry";
@@ -157,6 +157,7 @@ function AppContent() {
   const insets = useSafeAreaInsets();
   const { t, isLanguageReady } = useTranslation();
   const { user, isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
+  const { appData, refresh: refreshAppData } = useAppDataContext();
   const routeIsPublic = publicAuthRoutes.includes(pathname);
   const routeIsWorkspaceSetup = workspaceSetupRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
@@ -258,6 +259,25 @@ function AppContent() {
           return;
         }
 
+        // Safety net for the whole class of bug where useAppDataContext's
+        // cached snapshot disagrees with what Firestore actually has right
+        // now (a club was just created, a suspension was just lifted, a
+        // renewal just went through) but nothing told the cache to forget
+        // its old answer -- this is the one place every navigation already
+        // passes through, so it catches any such case even if a specific
+        // screen's own refresh() call is missing or misses a spot. Not
+        // awaited: this only needs to kick a background refresh, never to
+        // block the redirect decisions below.
+        const cachedClub = appData?.club ?? null;
+        const freshClub = workspace.club;
+        const appDataIsStale =
+          (freshClub === null) !== (cachedClub === null) ||
+          (freshClub !== null && cachedClub !== null && (freshClub.id !== cachedClub.id || freshClub.status !== cachedClub.status));
+
+        if (appDataIsStale) {
+          refreshAppData().catch(() => {});
+        }
+
         const userHasClub = workspace.currentUser.clubId !== "";
         const userIsPendingApproval = workspace.currentUser.status === "pending" && userHasClub;
         const userWasRemoved = workspace.currentUser.status === "removed";
@@ -309,7 +329,7 @@ function AppContent() {
     return () => {
       isActive = false;
     };
-  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, routeIsWorkspaceSetup, user]);
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, routeIsWorkspaceSetup, user, appData, refreshAppData]);
 
   if (!isLanguageReady) {
     return <LoadingScreen message={t.common.loading} />;

@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Typography, theme } from "@/constants/theme";
 import { requireFirebaseServices } from "@/lib/firebase";
 import { useTranslation } from "@/localization";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { useAuthContext } from "@/providers/AuthProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
@@ -28,6 +29,7 @@ export default function SubscriptionLockedScreen() {
   const router = useRouter();
   const { t, language } = useTranslation();
   const { user } = useAuthContext();
+  const { refresh } = useAppDataContext();
 
   const [club, setClub] = useState<Club | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -120,7 +122,15 @@ export default function SubscriptionLockedScreen() {
 
         if (data && data.status !== "suspended") {
           unsubscribeRenewalListenerRef.current?.();
-          router.replace("/dashboard" as never);
+          // This screen deliberately never used useAppDataContext for its
+          // own rendering (see the file-level comment), but the dashboard
+          // we're about to land on does -- its cache still holds whatever
+          // was fetched before the club got suspended (or never fetched at
+          // all), so it has to be refreshed explicitly or /dashboard will
+          // render from that stale snapshot instead of the now-renewed club.
+          refresh()
+            .catch(() => {})
+            .then(() => router.replace("/dashboard" as never));
         }
       });
     } catch (renewError) {

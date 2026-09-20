@@ -12,6 +12,7 @@ import { TextField } from "@/components/TextField";
 import { Typography, theme } from "@/constants/theme";
 import { requireFirebaseServices } from "@/lib/firebase";
 import { useTranslation } from "@/localization";
+import { useAppDataContext } from "@/providers/AppDataProvider";
 import { authService, getAuthErrorMessage } from "@/services/authService";
 import { paymentGatewayService } from "@/services/paymentGatewayService";
 import { teamSyncService } from "@/services/teamSyncService";
@@ -50,6 +51,7 @@ export default function CreateClubScreen() {
     signupId?: string | string[];
   }>();
   const { t, language } = useTranslation();
+  const { refresh } = useAppDataContext();
 
   const ownerFullName = getParamValue(fullName);
   const ownerEmail = getParamValue(email);
@@ -110,7 +112,15 @@ export default function CreateClubScreen() {
           }
 
           if (data.status === "completed" && data.resultClubId) {
-            router.replace("/dashboard");
+            // useAppDataContext's cache was seeded (no club yet) the moment
+            // this screen mounted and never invalidated since -- without
+            // refreshing it first, /dashboard would render from that stale
+            // "no club" snapshot even though _layout.tsx's own guard (which
+            // reads Firestore directly, not the cache) correctly lets the
+            // navigation through.
+            refresh()
+              .catch(() => {})
+              .then(() => router.replace("/dashboard"));
           } else if (data.status === "failed") {
             setPhase("idle");
             setError(t.createClub.validation.signupFailed);
@@ -127,6 +137,7 @@ export default function CreateClubScreen() {
       checkoutReturnParam,
       signupIdParam,
       router,
+      refresh,
       t.createClub.validation.signupFailed,
       t.createClub.validation.checkoutFailed,
     ])
@@ -198,6 +209,10 @@ export default function CreateClubScreen() {
       // string on the "created" branch, not a literal, so a truthy check
       // alone can't rule that branch out for the code below.
       if (typeof result.clubId === "string") {
+        // Same staleness issue as the checkout-return branch above -- the
+        // app-wide data cache still thinks this account has no club until
+        // explicitly refreshed.
+        await refresh().catch(() => {});
         router.replace("/dashboard");
         return;
       }

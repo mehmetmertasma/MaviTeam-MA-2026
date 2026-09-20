@@ -127,8 +127,10 @@ export default function AvailabilityScreen() {
   const [statusByUserId, setStatusByUserId] = useState<Record<string, AvailabilityStatus>>({});
   const [noteByUserId, setNoteByUserId] = useState<Record<string, string>>({});
   const [myNoteState, setMyNote] = useState("");
-  const [statusMessage, setStatusMessage] = useState(copy.availabilityUpdated);
-  const [lastSavedAt, setLastSavedAt] = useState(copy.notSavedYet);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.availabilityUpdated;
+  const [customLastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const lastSavedAt = customLastSavedAt ?? copy.notSavedYet;
   const [rosterSearchQuery, setRosterSearchQuery] = useState("");
 
   const events = appData?.scheduleEvents ?? EMPTY_EVENTS;

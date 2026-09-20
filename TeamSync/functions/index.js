@@ -1543,78 +1543,111 @@ exports.cancelClubSubscription = onCall({ secrets: [stripeSecretKey] }, async (r
 exports.stripeWebhook = onRequest(
   { secrets: [stripeSecretKey, stripeWebhookSecret, stripeConnectWebhookSecret] },
   async (req, res) => {
-  if (req.method !== "POST") {
-    res.status(405).send("Method Not Allowed");
-    return;
-  }
-
-  const stripe = new Stripe(stripeSecretKey.value());
-  let event;
-  // Two separate webhook destinations point at this same URL -- "Your
-  // account" scope (checkout/invoice/subscription events, signed with
-  // STRIPE_WEBHOOK_SECRET) and "Connected accounts" scope (account.updated,
-  // signed with STRIPE_CONNECT_WEBHOOK_SECRET). Each destination has its own
-  // signing secret, so a request might validly be signed with either one --
-  // try both before rejecting it.
-  const candidateSecrets = [stripeWebhookSecret.value(), stripeConnectWebhookSecret.value()];
-  let verificationError;
-
-  for (const secret of candidateSecrets) {
-    try {
-      event = stripe.webhooks.constructEvent(req.rawBody, req.headers["stripe-signature"], secret);
-      verificationError = null;
-      break;
-    } catch (error) {
-      verificationError = error;
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
     }
-  }
 
-  if (verificationError) {
-    console.error("Stripe webhook signature verification failed", verificationError);
-    res.status(400).send("Invalid signature");
-    return;
-  }
+    const stripe = new Stripe(stripeSecretKey.value());
+    let event;
+    // Two separate webhook destinations point at this same URL -- "Your
+    // account" scope (checkout/invoice/subscription events, signed with
+    // STRIPE_WEBHOOK_SECRET) and "Connected accounts" scope (account.updated,
+    // signed with STRIPE_CONNECT_WEBHOOK_SECRET). Each destination has its own
+    // signing secret, so a request might validly be signed with either one --
+    // try both before rejecting it.
+    const candidateSecrets = [stripeWebhookSecret.value(), stripeConnectWebhookSecret.value()];
+    let verificationError;
 
-  const db = admin.firestore();
+    for (const secret of candidateSecrets) {
+      try {
+        event = stripe.webhooks.constructEvent(req.rawBody, req.headers["stripe-signature"], secret);
+        verificationError = null;
+        break;
+      } catch (error) {
+        verificationError = error;
+      }
+    }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const paymentId = session.metadata?.paymentId;
-    const signupId = session.metadata?.signupId;
-    const renewClubId = session.metadata?.renewClubId;
+    if (verificationError) {
+      console.error("Stripe webhook signature verification failed", verificationError);
+      res.status(400).send("Invalid signature");
+      return;
+    }
 
-    if (paymentId) {
-      await db.doc(`payments/${paymentId}`).set(
-        {
-          status: "paid",
-          paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          providerPaymentId: session.payment_intent,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } else if (signupId && session.mode === "subscription") {
-      // First-ever payment for a brand-new club signup -- the club itself
-      // doesn't exist until this fires (see startClubSignup's paid path).
-      const pendingSignupRef = db.doc(`pendingClubSignups/${signupId}`);
-      const pendingSnapshot = await pendingSignupRef.get();
+    const db = admin.firestore();
 
-      // Guards against a duplicate webhook delivery creating a second club
-      // for the same signup -- Stripe can and does redeliver events.
-      if (pendingSnapshot.exists && pendingSnapshot.data().status === "pending") {
-        const pending = pendingSnapshot.data();
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const paymentId = session.metadata?.paymentId;
+      const signupId = session.metadata?.signupId;
+      const renewClubId = session.metadata?.renewClubId;
 
-        try {
-          const subscription = await stripe.subscriptions.retrieve(session.subscription);
-          const clubId = db.collection("clubs").doc().id;
+      if (paymentId) {
+        await db.doc(`payments/${paymentId}`).set(
+          {
+            status: "paid",
+            paidAt: admin.firestore.FieldValue.serverTimestamp(),
+            providerPaymentId: session.payment_intent,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } else if (signupId && session.mode === "subscription") {
+        // First-ever payment for a brand-new club signup -- the club itself
+        // doesn't exist until this fires (see startClubSignup's paid path).
+        const pendingSignupRef = db.doc(`pendingClubSignups/${signupId}`);
+        const pendingSnapshot = await pendingSignupRef.get();
 
-          await createClubFromSignup(db, {
-            clubId,
-            draft: pending.draft,
-            ownerUid: pending.createdByUid,
-            ownerFullName: pending.createdByFullName,
-            ownerEmail: pending.createdByEmail,
-            ownerEmailVerified: true,
+        // Guards against a duplicate webhook delivery creating a second club
+        // for the same signup -- Stripe can and does redeliver events.
+        if (pendingSnapshot.exists && pendingSnapshot.data().status === "pending") {
+          const pending = pendingSnapshot.data();
+
+          try {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription);
+            const clubId = db.collection("clubs").doc().id;
+
+            await createClubFromSignup(db, {
+              clubId,
+              draft: pending.draft,
+              ownerUid: pending.createdByUid,
+              ownerFullName: pending.createdByFullName,
+              ownerEmail: pending.createdByEmail,
+              ownerEmailVerified: true,
+              subscription: {
+                status: "active",
+                provider: "stripe",
+                customerId: session.customer,
+                subscriptionId: session.subscription,
+                currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
+                cancelAtPeriodEnd: false,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            });
+
+            await pendingSignupRef.update({
+              status: "completed",
+              resultClubId: clubId,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          } catch (creationError) {
+            console.error("Failed to create club from completed subscription checkout", creationError);
+            await pendingSignupRef.update({
+              status: "failed",
+              failureReason: String(creationError?.message || creationError),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      } else if (renewClubId && session.mode === "subscription") {
+        // Renewal checkout for an existing club whose subscription lapsed --
+        // see startSubscriptionRenewalCheckout.
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+
+        await db.doc(`clubs/${renewClubId}`).set(
+          {
+            status: "active",
             subscription: {
               status: "active",
               provider: "stripe",
@@ -1624,197 +1657,164 @@ exports.stripeWebhook = onRequest(
               cancelAtPeriodEnd: false,
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             },
-          });
-
-          await pendingSignupRef.update({
-            status: "completed",
-            resultClubId: clubId,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        } catch (creationError) {
-          console.error("Failed to create club from completed subscription checkout", creationError);
-          await pendingSignupRef.update({
-            status: "failed",
-            failureReason: String(creationError?.message || creationError),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      }
-    } else if (renewClubId && session.mode === "subscription") {
-      // Renewal checkout for an existing club whose subscription lapsed --
-      // see startSubscriptionRenewalCheckout.
-      const subscription = await stripe.subscriptions.retrieve(session.subscription);
-
-      await db.doc(`clubs/${renewClubId}`).set(
-        {
-          status: "active",
-          subscription: {
-            status: "active",
-            provider: "stripe",
-            customerId: session.customer,
-            subscriptionId: session.subscription,
-            currentPeriodEnd: new Date(subscription.current_period_end * 1000).toISOString(),
-            cancelAtPeriodEnd: false,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-
-    res.status(200).send("OK");
-    return;
-  }
-
-  // Ongoing recurring charges for an existing club subscription. Looked up
-  // by subscriptionId (set once, at creation/renewal, above) the same way
-  // account.updated below looks a club up by its Stripe account id.
-  if (event.type === "invoice.paid") {
-    const invoice = event.data.object;
-    const subscriptionId = invoice.subscription;
-
-    if (subscriptionId) {
-      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
-
-      if (!clubsSnapshot.empty) {
-        const clubDoc = clubsSnapshot.docs[0];
-        const club = clubDoc.data();
-        const updates = {
-          "subscription.status": "active",
-          "subscription.currentPeriodEnd": new Date(invoice.period_end * 1000).toISOString(),
-          "subscription.pastDueSince": admin.firestore.FieldValue.delete(),
-          "subscription.autoSuspendedAt": admin.firestore.FieldValue.delete(),
-          "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
-
-        // Only reactivate a club the grace-period cron itself suspended for
-        // non-payment -- a club a platform admin suspended for some other
-        // reason should stay suspended even if its subscription happens to
-        // still be charging successfully.
-        if (club.status === "suspended" && club.subscription?.autoSuspendedAt) {
-          updates.status = "active";
-        }
-
-        await clubDoc.ref.update(updates);
-      }
-    }
-
-    res.status(200).send("OK");
-    return;
-  }
-
-  if (event.type === "invoice.payment_failed") {
-    const invoice = event.data.object;
-    const subscriptionId = invoice.subscription;
-
-    if (subscriptionId) {
-      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
-
-      if (!clubsSnapshot.empty) {
-        const clubDoc = clubsSnapshot.docs[0];
-        const club = clubDoc.data();
-
-        // Only set pastDueSince the first time this subscription goes past
-        // due -- Stripe retries a failed invoice multiple times (Smart
-        // Retries) before giving up, and re-firing this on every retry
-        // would keep pushing the 7-day grace deadline back forever.
-        if (club.subscription?.status !== "past_due" || !club.subscription?.pastDueSince) {
-          await clubDoc.ref.update({
-            "subscription.status": "past_due",
-            "subscription.pastDueSince": admin.firestore.FieldValue.serverTimestamp(),
-            "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-          });
-        }
-      }
-    }
-
-    res.status(200).send("OK");
-    return;
-  }
-
-  if (event.type === "customer.subscription.updated") {
-    const subscription = event.data.object;
-    const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
-
-    if (!clubsSnapshot.empty) {
-      await clubsSnapshot.docs[0].ref.update({
-        "subscription.cancelAtPeriodEnd": Boolean(subscription.cancel_at_period_end),
-        "subscription.currentPeriodEnd": new Date(subscription.current_period_end * 1000).toISOString(),
-        "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    res.status(200).send("OK");
-    return;
-  }
-
-  // Fires once a cancellation actually takes effect (cancel_at_period_end,
-  // set by cancelClubSubscription's Billing Portal session) -- the club had
-  // full access up through the period it already paid for, so unlike
-  // invoice.payment_failed above there's no additional grace period here;
-  // it's suspended immediately.
-  if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object;
-    const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
-
-    if (!clubsSnapshot.empty) {
-      const clubDoc = clubsSnapshot.docs[0];
-
-      await clubDoc.ref.update({
-        status: "suspended",
-        "subscription.status": "canceled",
-        "subscription.canceledAt": admin.firestore.FieldValue.serverTimestamp(),
-        "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      await db.collection("adminAuditLog").add({
-        action: "subscriptionCanceledSuspend",
-        clubId: clubDoc.id,
-        performedByUid: "system",
-        performedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-
-    res.status(200).send("OK");
-    return;
-  }
-
-  // A club isn't actually "connected" until Stripe confirms the account can
-  // accept charges -- connectPaymentAccount only ever sets "pending".
-  if (event.type === "account.updated") {
-    const account = event.data.object;
-
-    if (account.charges_enabled) {
-      const clubsSnapshot = await db
-        .collection("clubs")
-        .where("paymentAccount.externalAccountId", "==", account.id)
-        .limit(1)
-        .get();
-
-      if (!clubsSnapshot.empty) {
-        await clubsSnapshot.docs[0].ref.set(
-          {
-            paymentAccount: {
-              provider: "stripe",
-              status: "connected",
-              externalAccountId: account.id,
-              connectedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
           },
           { merge: true }
         );
       }
+
+      res.status(200).send("OK");
+      return;
     }
 
-    res.status(200).send("OK");
-    return;
-  }
+    // Ongoing recurring charges for an existing club subscription. Looked up
+    // by subscriptionId (set once, at creation/renewal, above) the same way
+    // account.updated below looks a club up by its Stripe account id.
+    if (event.type === "invoice.paid") {
+      const invoice = event.data.object;
+      const subscriptionId = invoice.subscription;
 
-  res.status(200).send("Ignored");
-});
+      if (subscriptionId) {
+        const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
+
+        if (!clubsSnapshot.empty) {
+          const clubDoc = clubsSnapshot.docs[0];
+          const club = clubDoc.data();
+          const updates = {
+            "subscription.status": "active",
+            "subscription.currentPeriodEnd": new Date(invoice.period_end * 1000).toISOString(),
+            "subscription.pastDueSince": admin.firestore.FieldValue.delete(),
+            "subscription.autoSuspendedAt": admin.firestore.FieldValue.delete(),
+            "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          };
+
+          // Only reactivate a club the grace-period cron itself suspended for
+          // non-payment -- a club a platform admin suspended for some other
+          // reason should stay suspended even if its subscription happens to
+          // still be charging successfully.
+          if (club.status === "suspended" && club.subscription?.autoSuspendedAt) {
+            updates.status = "active";
+          }
+
+          await clubDoc.ref.update(updates);
+        }
+      }
+
+      res.status(200).send("OK");
+      return;
+    }
+
+    if (event.type === "invoice.payment_failed") {
+      const invoice = event.data.object;
+      const subscriptionId = invoice.subscription;
+
+      if (subscriptionId) {
+        const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscriptionId).limit(1).get();
+
+        if (!clubsSnapshot.empty) {
+          const clubDoc = clubsSnapshot.docs[0];
+          const club = clubDoc.data();
+
+          // Only set pastDueSince the first time this subscription goes past
+          // due -- Stripe retries a failed invoice multiple times (Smart
+          // Retries) before giving up, and re-firing this on every retry
+          // would keep pushing the 7-day grace deadline back forever.
+          if (club.subscription?.status !== "past_due" || !club.subscription?.pastDueSince) {
+            await clubDoc.ref.update({
+              "subscription.status": "past_due",
+              "subscription.pastDueSince": admin.firestore.FieldValue.serverTimestamp(),
+              "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        }
+      }
+
+      res.status(200).send("OK");
+      return;
+    }
+
+    if (event.type === "customer.subscription.updated") {
+      const subscription = event.data.object;
+      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
+
+      if (!clubsSnapshot.empty) {
+        await clubsSnapshot.docs[0].ref.update({
+          "subscription.cancelAtPeriodEnd": Boolean(subscription.cancel_at_period_end),
+          "subscription.currentPeriodEnd": new Date(subscription.current_period_end * 1000).toISOString(),
+          "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      res.status(200).send("OK");
+      return;
+    }
+
+    // Fires once a cancellation actually takes effect (cancel_at_period_end,
+    // set by cancelClubSubscription's Billing Portal session) -- the club had
+    // full access up through the period it already paid for, so unlike
+    // invoice.payment_failed above there's no additional grace period here;
+    // it's suspended immediately.
+    if (event.type === "customer.subscription.deleted") {
+      const subscription = event.data.object;
+      const clubsSnapshot = await db.collection("clubs").where("subscription.subscriptionId", "==", subscription.id).limit(1).get();
+
+      if (!clubsSnapshot.empty) {
+        const clubDoc = clubsSnapshot.docs[0];
+
+        await clubDoc.ref.update({
+          status: "suspended",
+          "subscription.status": "canceled",
+          "subscription.canceledAt": admin.firestore.FieldValue.serverTimestamp(),
+          "subscription.updatedAt": admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await db.collection("adminAuditLog").add({
+          action: "subscriptionCanceledSuspend",
+          clubId: clubDoc.id,
+          performedByUid: "system",
+          performedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      res.status(200).send("OK");
+      return;
+    }
+
+    // A club isn't actually "connected" until Stripe confirms the account can
+    // accept charges -- connectPaymentAccount only ever sets "pending".
+    if (event.type === "account.updated") {
+      const account = event.data.object;
+
+      if (account.charges_enabled) {
+        const clubsSnapshot = await db
+          .collection("clubs")
+          .where("paymentAccount.externalAccountId", "==", account.id)
+          .limit(1)
+          .get();
+
+        if (!clubsSnapshot.empty) {
+          await clubsSnapshot.docs[0].ref.set(
+            {
+              paymentAccount: {
+                provider: "stripe",
+                status: "connected",
+                externalAccountId: account.id,
+                connectedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            },
+            { merge: true }
+          );
+        }
+      }
+
+      res.status(200).send("OK");
+      return;
+    }
+
+    res.status(200).send("Ignored");
+  });
 
 // iyzico's Checkout Form has no signature-verified webhook like Stripe's --
 // instead, the hosted payment page redirects the browser back here with a
@@ -1906,10 +1906,50 @@ exports.getPlatformOverview = onCall(async (request) => {
 
   clubs.sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
 
+  let latestManager = null;
+  try {
+    const managersSnapshot = await db.collection("users")
+      .where("role", "in", ["clubAdmin", "manager"])
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+
+    if (!managersSnapshot.empty) {
+      const uData = managersSnapshot.docs[0].data();
+      latestManager = {
+        name: uData.fullName || uData.displayName || uData.email || "(isimsiz yönetici)",
+        role: uData.role || "clubAdmin",
+        createdAt: uData.createdAt?.toDate?.().toISOString() ?? null,
+      };
+    } else {
+      const latestUsersSnapshot = await db.collection("users").orderBy("createdAt", "desc").limit(1).get();
+      if (!latestUsersSnapshot.empty) {
+        const uData = latestUsersSnapshot.docs[0].data();
+        latestManager = {
+          name: uData.fullName || uData.displayName || uData.email || "(isimsiz kullanıcı)",
+          role: uData.role || "clubAdmin",
+          createdAt: uData.createdAt?.toDate?.().toISOString() ?? null,
+        };
+      }
+    }
+  } catch (err) {
+    const fallbackUsers = await db.collection("users").limit(10).get();
+    if (!fallbackUsers.empty) {
+      const uData = fallbackUsers.docs[0].data();
+      latestManager = {
+        name: uData.fullName || uData.displayName || uData.email || "(isimsiz yönetici)",
+        role: uData.role || "clubAdmin",
+        createdAt: uData.createdAt?.toDate?.().toISOString() ?? null,
+      };
+    }
+  }
+
   return {
     totalClubs: clubs.length,
     totalMembers: clubs.reduce((sum, club) => sum + club.memberCount, 0),
     clubs,
+    latestManager,
+    latestMember: latestManager,
   };
 });
 
@@ -1979,7 +2019,7 @@ async function deleteAllWhereClubIdEquals(db, collectionName, clubId) {
   const DELETE_BATCH_SIZE = 400;
   let totalDeleted = 0;
 
-  for (;;) {
+  for (; ;) {
     const snapshot = await db.collection(collectionName).where("clubId", "==", clubId).limit(DELETE_BATCH_SIZE).get();
 
     if (snapshot.empty) {
@@ -2041,7 +2081,7 @@ exports.deleteClub = onCall(async (request) => {
   }
 
   if (clubData.code) {
-    await db.doc(`clubCodes/${clubData.code}`).delete().catch(() => {});
+    await db.doc(`clubCodes/${clubData.code}`).delete().catch(() => { });
   }
 
   await clubRef.delete();
@@ -2126,9 +2166,41 @@ exports.listPromoCodes = onCall(async (request) => {
       const data = docSnapshot.data();
       let redeemedByClubName = null;
 
+      // Default: calculate endDate from createdAt + grantMonths (applies to
+      // unredeemed and revoked codes so admins can see the intended duration).
+      let endDate = null;
+      const grantMonths = Number(data.grantMonths) || 1;
+
+      if (data.createdAt) {
+        const cDate = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        if (!Number.isNaN(cDate.getTime())) {
+          const eDate = new Date(cDate.getTime());
+          eDate.setMonth(eDate.getMonth() + grantMonths);
+          endDate = eDate.toISOString();
+        }
+      }
+
+      // If redeemed, prefer redeemedAt + grantMonths (more accurate).
+      if (data.redeemedAt) {
+        const rDate = data.redeemedAt.toDate ? data.redeemedAt.toDate() : new Date(data.redeemedAt);
+        if (!Number.isNaN(rDate.getTime())) {
+          const eDate = new Date(rDate.getTime());
+          eDate.setMonth(eDate.getMonth() + grantMonths);
+          endDate = eDate.toISOString();
+        }
+      }
+
       if (data.redeemedByClubId) {
         const clubSnapshot = await db.doc(`clubs/${data.redeemedByClubId}`).get();
-        redeemedByClubName = clubSnapshot.exists ? clubSnapshot.data().name || null : null;
+        if (clubSnapshot.exists) {
+          const cData = clubSnapshot.data();
+          redeemedByClubName = cData.name || null;
+          // If club has an explicit trialEndsAt, that is the ground truth.
+          if (cData.subscription?.trialEndsAt) {
+            const tea = cData.subscription.trialEndsAt;
+            endDate = typeof tea === "string" ? tea : (tea.toDate ? tea.toDate().toISOString() : endDate);
+          }
+        }
       }
 
       return {
@@ -2140,6 +2212,7 @@ exports.listPromoCodes = onCall(async (request) => {
         redeemedByClubId: data.redeemedByClubId || null,
         redeemedByClubName,
         redeemedAt: data.redeemedAt?.toDate?.().toISOString() ?? null,
+        endDate,
       };
     })
   );
@@ -2398,7 +2471,7 @@ exports.deleteMyAccount = onCall(async (request) => {
   const userSnapshot = await userRef.get();
 
   if (!userSnapshot.exists) {
-    await admin.auth().deleteUser(uid).catch(() => {});
+    await admin.auth().deleteUser(uid).catch(() => { });
     return { ok: true };
   }
 

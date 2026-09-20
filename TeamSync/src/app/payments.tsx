@@ -200,7 +200,8 @@ export default function PaymentsScreen() {
   const [paymentTitle, setPaymentTitle] = useState("");
   const [amountText, setAmountText] = useState("");
   const [dueDateText, setDueDateText] = useState("");
-  const [statusMessage, setStatusMessage] = useState(copy.paymentsUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.paymentsUpdated;
   const [searchQuery, setSearchQuery] = useState("");
   const [recipientQuery, setRecipientQuery] = useState("");
   const [payingPaymentId, setPayingPaymentId] = useState<string | null>(null);

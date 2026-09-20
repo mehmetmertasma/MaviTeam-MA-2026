@@ -203,7 +203,8 @@ export default function MessagesScreen() {
   const [newConversationTargetId, setNewConversationTargetId] = useState("all-club");
   const [newConversationMessage, setNewConversationMessage] = useState("");
   const [openMemberListGroupId, setOpenMemberListGroupId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState(copy.messagesUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.messagesUpdated;
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const [directSearchQuery, setDirectSearchQuery] = useState("");

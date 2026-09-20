@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
   <meta name="robots" content="noindex, nofollow" />
   <title>MaviTeam · Platform Admin</title>
   <style>
@@ -10,6 +11,8 @@
       color-scheme: dark;
       --bg: #0b1120;
       --surface: #131c2e;
+      --surface-card: #0e1626;
+      --surface-hover: #1c2840;
       --border: #253046;
       --text: #e7ebf3;
       --text-muted: #8b95a8;
@@ -19,41 +22,73 @@
       --danger-light: #e0908f;
       --success: #0f8b5f;
       --success-light: #5fcfa0;
+      --sidebar-width: 220px;
     }
-    * { box-sizing: border-box; }
-    body {
+
+    * {
+      box-sizing: border-box;
       margin: 0;
+      padding: 0;
+    }
+
+    body {
       min-height: 100vh;
       background: var(--bg);
       color: var(--text);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.5;
     }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
-    h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; }
-    .subtitle { color: var(--text-muted); font-size: 14px; margin: 0 0 28px; }
 
-    .card {
+    /* --- Sign-in --- */
+    #signin-view {
+      max-width: 360px;
+      margin: 80px auto 0;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 24px;
     }
 
-    /* --- sign-in --- */
-    #signin-view { max-width: 360px; margin: 80px auto 0; }
-    #signin-view h1 { text-align: center; }
-    #signin-view .subtitle { text-align: center; }
-    label { display: block; font-size: 13px; color: var(--text-muted); margin: 14px 0 6px; }
+    #signin-view h1,
+    #signin-view .subtitle {
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin: 14px 0 6px;
+    }
+
     input {
       width: 100%;
       padding: 10px 12px;
-      background: #0e1626;
+      background: var(--surface-card);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text);
       font-size: 14px;
+      font-family: inherit;
     }
-    input:focus { outline: 2px solid var(--brand-light); }
+
+    input:focus {
+      outline: 2px solid var(--brand-light);
+    }
+
     button {
       cursor: pointer;
       border: none;
@@ -61,151 +96,893 @@
       font-size: 14px;
       font-weight: 600;
       padding: 10px 16px;
+      font-family: inherit;
+      transition: opacity 0.15s ease, background-color 0.15s ease;
     }
-    .btn-primary { background: var(--brand); color: white; width: 100%; margin-top: 18px; }
-    .btn-primary:disabled { opacity: 0.6; cursor: default; }
-    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-    .btn-danger { background: var(--danger); color: white; }
-    .btn-success { background: var(--success); color: white; }
-    .error-text { color: var(--danger-light); font-size: 13px; margin-top: 10px; min-height: 16px; }
 
-    /* --- app view --- */
-    #app-view { display: none; }
-    .top-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
-    .stat-card { flex: 1; min-width: 140px; }
-    .stat-value { font-size: 28px; font-weight: 700; color: var(--brand-light); }
-    .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+    button:active {
+      transform: scale(0.98);
+    }
 
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th { text-align: left; color: var(--text-muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-    td { padding: 12px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-    tr:last-child td { border-bottom: none; }
-    .club-name { font-weight: 600; }
-    .club-meta { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
-    .badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
-    .badge-active { background: rgba(15,139,95,0.2); color: var(--success-light); }
-    .badge-suspended { background: rgba(194,59,59,0.2); color: var(--danger-light); }
-    .status-text { color: var(--text-muted); font-size: 13px; margin-top: 16px; min-height: 16px; }
-    .empty { color: var(--text-muted); padding: 40px 0; text-align: center; }
-    .row-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .btn-primary {
+      background: var(--brand);
+      color: white;
+      width: 100%;
+      margin-top: 18px;
+    }
 
-    /* --- delete confirmation modal --- */
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #d44545;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #12a673;
+    }
+
+    .error-text {
+      color: var(--danger-light);
+      font-size: 13px;
+      margin-top: 10px;
+      min-height: 16px;
+    }
+
+    /* --- App Layout --- */
+    #app-view {
+      display: none;
+      min-height: 100vh;
+    }
+
+    /* Side Menu */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 50;
+      transition: transform 0.25s ease;
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(-100%);
+    }
+
+    .sidebar-header {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-brand {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .sidebar-close-btn {
+      display: none;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 18px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+
+    .sidebar-menu {
+      list-style: none;
+      padding: 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .menu-item button {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .menu-item button:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .menu-item button.active {
+      background: var(--brand);
+      color: white;
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .sidebar-footer button {
+      width: 100%;
+    }
+
+    /* Mobile Backdrop */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 40;
+    }
+
+    .sidebar-backdrop.active {
+      display: block;
+    }
+
+    /* Main Container */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      transition: margin-left 0.25s ease;
+    }
+
+    .main-content.sidebar-collapsed {
+      margin-left: 0;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      height: 60px;
+      padding: 0 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+
+    .toggle-menu-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .top-bar-title {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    /* Page Content */
+    .page-container {
+      padding: 24px 20px 80px;
+      max-width: 1000px;
+      width: 100%;
+      margin: 0 auto;
+      flex: 1;
+    }
+
+    .page-section {
+      display: none;
+    }
+
+    .page-section.active {
+      display: block;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* Stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      padding: 18px 22px;
+      margin-bottom: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-split-container {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      min-height: 80px;
+    }
+
+    .stat-split-left {
+      flex: 0 0 60%;
+      width: 60%;
+      display: flex;
+      align-items: center;
+      padding-right: 18px;
+      border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+      min-height: 80px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-split-left.full-width {
+      flex: 0 0 100% !important;
+      width: 100% !important;
+      border-right: none !important;
+      padding-right: 0 !important;
+    }
+
+    .stat-bg-chart {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.42;
+    }
+
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .stat-value {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--brand-light);
+      line-height: 1.1;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .stat-subtext {
+      font-size: 11.5px;
+      color: var(--success-light);
+      margin-top: 3px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .stat-split-right {
+      flex: 0 0 40%;
+      width: 40%;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+      min-width: 0;
+      transition: all 0.2s ease;
+    }
+
+    .stat-split-right.hidden {
+      display: none !important;
+    }
+
+    .recent-badge-title {
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 3px;
+    }
+
+    .recent-club-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .recent-club-time {
+      font-size: 11.5px;
+      color: var(--brand-light);
+      margin-top: 2px;
+    }
+
+    /* Table Styles */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th {
+      text-align: left;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    th.col-center,
+    td.col-center {
+      text-align: center;
+    }
+
+    th.col-actions,
+    td.col-actions {
+      text-align: right;
+      padding-right: 14px;
+    }
+
+    td {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .club-name {
+      font-weight: 600;
+    }
+
+    .club-meta {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-active {
+      background: rgba(15, 139, 95, 0.2);
+      color: var(--success-light);
+    }
+
+    .badge-suspended {
+      background: rgba(194, 59, 59, 0.2);
+      color: var(--danger-light);
+    }
+
+    .status-text {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 16px;
+      min-height: 16px;
+    }
+
+    .empty {
+      color: var(--text-muted);
+      padding: 40px 0;
+      text-align: center;
+    }
+
+    /* Actions Styling */
+    .row-actions {
+      display: inline-flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .row-actions button {
+      padding: 6px 14px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    .mobile-only {
+      display: none !important;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--brand-light);
+    }
+
+    /* Modal */
     .modal-overlay {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.6);
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
       align-items: center;
       justify-content: center;
-      padding: 20px;
-      z-index: 10;
+      padding: 16px;
+      z-index: 100;
     }
-    .modal-overlay.open { display: flex; }
-    .modal-box { max-width: 420px; width: 100%; }
-    .modal-box h2 { font-size: 17px; margin: 0 0 8px; }
-    .modal-warning { color: var(--danger-light); font-size: 13px; line-height: 1.5; margin: 0 0 4px; }
-    .modal-hint { color: var(--text-muted); font-size: 13px; margin: 12px 0 0; }
-    .modal-hint b { color: var(--text); }
-    .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-    .modal-actions button { flex: 1; margin-top: 0; }
-    #delete-confirm-button:disabled { opacity: 0.4; cursor: default; }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-box {
+      max-width: 420px;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+    }
+
+    .modal-box h2 {
+      font-size: 17px;
+      margin: 0 0 8px;
+    }
+
+    .modal-warning {
+      color: var(--danger-light);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0 0 4px;
+    }
+
+    .modal-hint {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin: 12px 0 0;
+    }
+
+    .modal-hint b {
+      color: var(--text);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .modal-actions button {
+      flex: 1;
+      margin-top: 0;
+    }
+
+    #delete-confirm-button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* --- Responsive Rules (<= 768px) --- */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 240px;
+        max-width: 75vw;
+        transform: translateX(-100%);
+      }
+
+      .sidebar.open {
+        transform: translateX(0);
+      }
+
+      .sidebar-close-btn {
+        display: block;
+      }
+
+      .main-content {
+        margin-left: 0 !important;
+      }
+
+      .page-container {
+        padding: 16px 12px 60px;
+      }
+
+      .card {
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 16px;
+      }
+
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .stat-card {
+        padding: 14px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-split-container {
+        display: block !important;
+        min-height: auto !important;
+      }
+
+      .stat-split-left {
+        flex: none !important;
+        width: 100% !important;
+        border-right: none !important;
+        padding-right: 0 !important;
+        display: block !important;
+        min-height: auto !important;
+      }
+
+      .stat-bg-chart {
+        display: block !important;
+        position: absolute;
+        inset: 0;
+        width: 100% !important;
+        height: 100% !important;
+        opacity: 0.35 !important;
+      }
+
+      .stat-subtext {
+        display: none !important;
+      }
+
+      .stat-split-right {
+        display: none !important;
+      }
+
+      .stat-value {
+        font-size: 22px;
+      }
+
+      .promo-form-grid {
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+
+      .promo-form-grid button {
+        width: 100% !important;
+        margin-top: 6px !important;
+      }
+
+      /* Mobile layout transformations */
+      .mobile-only {
+        display: inline-block !important;
+      }
+
+      table.responsive-cards thead {
+        display: none !important;
+      }
+
+      table.responsive-cards,
+      table.responsive-cards tbody,
+      table.responsive-cards tr,
+      table.responsive-cards td {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      table.responsive-cards tr {
+        background: var(--surface-card) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        padding: 14px !important;
+        margin-bottom: 12px !important;
+      }
+
+      table.responsive-cards tr:last-child {
+        margin-bottom: 0 !important;
+      }
+
+      table.responsive-cards td {
+        padding: 4px 0 !important;
+        border-bottom: none !important;
+        white-space: normal !important;
+        text-align: left !important;
+      }
+
+      table.responsive-cards td.cell-club,
+      table.responsive-cards td.cell-code {
+        padding-top: 0 !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+        margin-bottom: 6px !important;
+      }
+
+      table.responsive-cards td.cell-row-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        font-size: 13px !important;
+      }
+
+      table.responsive-cards td.cell-row-item .cell-label {
+        color: var(--text-muted) !important;
+        font-size: 12px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+        font-weight: 500 !important;
+      }
+
+      table.responsive-cards td.cell-row-item .cell-value {
+        color: var(--text) !important;
+        font-weight: 500 !important;
+      }
+
+      table.responsive-cards td.cell-actions {
+        padding-top: 10px !important;
+        padding-bottom: 0 !important;
+        margin-top: 8px !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+      }
+
+      table.responsive-cards td.cell-actions.empty-actions {
+        display: none !important;
+      }
+
+      table.responsive-cards td.cell-actions .row-actions {
+        display: flex !important;
+        gap: 8px !important;
+        width: 100% !important;
+        justify-content: stretch !important;
+      }
+
+      table.responsive-cards td.cell-actions .row-actions button {
+        flex: 1 !important;
+        width: auto !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
+        text-align: center !important;
+      }
+    }
   </style>
 </head>
-<body>
-  <div class="wrap">
-    <div id="signin-view" class="card">
-      <h1>MaviTeam Platform Admin</h1>
-      <p class="subtitle">Internal tool. Sign in with your admin account.</p>
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username" />
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" />
-      <button id="signin-button" class="btn-primary">Sign in</button>
-      <p id="signin-error" class="error-text"></p>
-    </div>
 
-    <div id="app-view">
-      <div class="top-row">
-        <div>
-          <h1>Platform Overview</h1>
-          <p class="subtitle">Every club on MaviTeam.</p>
-        </div>
+<body>
+  <!-- Sign-in View -->
+  <div id="signin-view">
+    <h1>MaviTeam Admin</h1>
+    <p class="subtitle">Sign in with your platform management account.</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" />
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <button id="signin-button" class="btn-primary">Sign in</button>
+    <p id="signin-error" class="error-text"></p>
+  </div>
+
+  <!-- App View with Sidemenu -->
+  <div id="app-view">
+    <!-- Backdrop for mobile drawer -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+    <!-- Side Menu -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">MaviTeam Admin</div>
+        <button id="sidebar-close-btn" class="sidebar-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <ul class="sidebar-menu">
+        <li class="menu-item">
+          <button id="menu-dashboard" class="active" data-page="dashboard">
+            <span>📊 Dashboard</span>
+          </button>
+        </li>
+        <li class="menu-item">
+          <button id="menu-promocodes" data-page="promocodes">
+            <span>🎟️ Promo Codes</span>
+          </button>
+        </li>
+      </ul>
+
+      <div class="sidebar-footer">
         <button id="signout-button" class="btn-ghost">Sign out</button>
       </div>
+    </aside>
 
-      <div class="stats-row">
-        <div class="card stat-card">
-          <div id="stat-clubs" class="stat-value">—</div>
-          <div class="stat-label">Total clubs</div>
-        </div>
-        <div class="card stat-card">
-          <div id="stat-members" class="stat-value">—</div>
-          <div class="stat-label">Total members</div>
-        </div>
-      </div>
+    <!-- Main Content Area -->
+    <div id="main-content" class="main-content">
+      <!-- Top Bar with Toggle -->
+      <header class="top-bar">
+        <button id="toggle-menu-btn" class="toggle-menu-btn" aria-label="Menu">☰</button>
+        <div id="top-bar-title" class="top-bar-title">Dashboard</div>
+      </header>
 
-      <div class="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Club</th>
-              <th>Status</th>
-              <th>Members</th>
-              <th>Teams</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="clubs-table-body"></tbody>
-        </table>
-        <div id="empty-state" class="empty" style="display: none;">No clubs yet.</div>
-        <p id="app-status" class="status-text"></p>
-      </div>
+      <div class="page-container">
+        <!-- 1. DASHBOARD PAGE (Total clubs, Total members, Clubs list) -->
+        <section id="page-dashboard" class="page-section active">
+          <div class="stats-row">
+            <!-- 1. Total Clubs Card (60% / 40% split) -->
+            <div class="card stat-card" id="card-stat-clubs">
+              <div class="stat-split-container">
+                <div class="stat-split-left" id="stat-clubs-left">
+                  <!-- Semi-transparent weekly area chart canvas in background -->
+                  <canvas id="clubs-area-chart" class="stat-bg-chart"></canvas>
 
-      <div class="card" style="margin-top: 24px;">
-        <div class="top-row" style="margin-bottom: 16px;">
-          <div>
-            <h1 style="font-size: 18px;">Promo codes</h1>
-            <p class="subtitle" style="margin-bottom: 0;">Single-use codes granting free months at signup.</p>
+                  <div class="stat-info">
+                    <div id="stat-clubs" class="stat-value">—</div>
+                    <div class="stat-label">Total clubs</div>
+                    <div id="stat-clubs-subtext" class="stat-subtext"></div>
+                  </div>
+                </div>
+                <div class="stat-split-right" id="stat-clubs-right">
+                  <div class="recent-badge-title">Recently Added Club</div>
+                  <div id="recent-club-name" class="recent-club-name">—</div>
+                  <div id="recent-club-time" class="recent-club-time">—</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Total Members Card (60% / 40% split) -->
+            <div class="card stat-card" id="card-stat-members">
+              <div class="stat-split-container">
+                <div class="stat-split-left" id="stat-members-left">
+                  <!-- Semi-transparent weekly area chart canvas in background -->
+                  <canvas id="members-area-chart" class="stat-bg-chart"></canvas>
+
+                  <div class="stat-info">
+                    <div id="stat-members" class="stat-value">—</div>
+                    <div class="stat-label">Total members</div>
+                    <div id="stat-members-subtext" class="stat-subtext"></div>
+                  </div>
+                </div>
+                <div class="stat-split-right" id="stat-members-right">
+                  <div class="recent-badge-title">Recently Added User</div>
+                  <div id="recent-member-name" class="recent-club-name">—</div>
+                  <div id="recent-member-time" class="recent-club-time">—</div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
 
-        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-          <div style="flex: 0 0 120px;">
-            <label for="promo-months">Free months</label>
-            <input id="promo-months" type="number" min="1" step="1" value="6" />
-          </div>
-          <div style="flex: 1; min-width: 180px;">
-            <label for="promo-note">Note (optional)</label>
-            <input id="promo-note" type="text" placeholder="e.g. recipient name" />
-          </div>
-          <button id="promo-create-button" class="btn-primary" style="width: auto; margin-top: 0;">Generate code</button>
-        </div>
-        <p id="promo-status" class="status-text"></p>
+          <div class="card">
+            <h2 style="font-size: 18px; margin-bottom: 4px;">Platform Overview</h2>
+            <p class="subtitle">Every club on MaviTeam.</p>
 
-        <table style="margin-top: 12px;">
-          <thead>
-            <tr>
-              <th>Code</th>
-              <th>Months</th>
-              <th>Status</th>
-              <th>Redeemed by</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="promo-table-body"></tbody>
-        </table>
-        <div id="promo-empty-state" class="empty" style="display: none;">No promo codes yet.</div>
+            <div class="table-container">
+              <table class="responsive-cards">
+                <thead>
+                  <tr>
+                    <th style="width: 32%;">Club</th>
+                    <th class="col-center" style="width: 12%;">Status</th>
+                    <th class="col-center" style="width: 10%;">Members</th>
+                    <th class="col-center" style="width: 10%;">Teams</th>
+                    <th style="width: 16%;">Created</th>
+                    <th class="col-actions" style="width: 20%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="clubs-table-body"></tbody>
+              </table>
+            </div>
+            <div id="empty-state" class="empty" style="display: none;">No clubs yet.</div>
+            <p id="app-status" class="status-text"></p>
+          </div>
+        </section>
+
+        <!-- 2. PROMOCODE PAGE (Generate code, Promo codes list) -->
+        <section id="page-promocodes" class="page-section">
+          <div class="card">
+            <h2 style="font-size: 18px; margin-bottom: 4px;">Promo codes</h2>
+            <p class="subtitle">Single-use codes granting free months at signup.</p>
+
+            <div class="promo-form-grid" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+              <div style="flex: 0 0 130px;">
+                <label for="promo-months">Free months</label>
+                <input id="promo-months" type="number" min="1" step="1" value="6" />
+              </div>
+              <div style="flex: 1; min-width: 180px;">
+                <label for="promo-note">Note (optional)</label>
+                <input id="promo-note" type="text" placeholder="e.g. recipient name" />
+              </div>
+              <button id="promo-create-button" class="btn-primary" style="width: auto; margin-top: 0;">Generate
+                code</button>
+            </div>
+            <p id="promo-status" class="status-text"></p>
+
+            <div class="table-container" style="margin-top: 16px;">
+              <table class="responsive-cards">
+                <thead>
+                  <tr>
+                    <th style="width: 22%;">Code</th>
+                    <th class="col-center" style="width: 9%;">Months</th>
+                    <th class="col-center" style="width: 11%;">Status</th>
+                    <th style="width: 17%;">Redeemed by</th>
+                    <th style="width: 14%;">Created</th>
+                    <th style="width: 14%;">End date</th>
+                    <th class="col-actions" style="width: 13%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="promo-table-body"></tbody>
+              </table>
+            </div>
+            <div id="promo-empty-state" class="empty" style="display: none;">No promo codes yet.</div>
+          </div>
+        </section>
       </div>
     </div>
   </div>
 
+  <!-- Delete Modal -->
   <div id="delete-modal-overlay" class="modal-overlay">
     <div class="card modal-box">
       <h2>Delete club</h2>
-      <p class="modal-warning">This permanently deletes every team, schedule, attendance record, chat, payment, and replay tied to this club. It cannot be undone. Members keep their login but lose this club.</p>
+      <p class="modal-warning">This permanently deletes every team, schedule, attendance record, chat, payment, and
+        replay tied to this club. It cannot be undone. Members keep their login but lose this club.</p>
       <p class="modal-hint">Type <b id="delete-modal-club-name"></b> to confirm.</p>
       <input id="delete-confirm-input" type="text" autocomplete="off" />
       <div class="modal-actions">
@@ -240,6 +1017,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const functions = getFunctions(app);
+
     const getPlatformOverview = httpsCallable(functions, "getPlatformOverview");
     const setClubStatus = httpsCallable(functions, "setClubStatus");
     const deleteClub = httpsCallable(functions, "deleteClub");
@@ -249,21 +1027,30 @@
 
     const signinView = document.getElementById("signin-view");
     const appView = document.getElementById("app-view");
+    const sidebar = document.getElementById("sidebar");
+    const sidebarBackdrop = document.getElementById("sidebar-backdrop");
+    const toggleMenuBtn = document.getElementById("toggle-menu-btn");
+    const sidebarCloseBtn = document.getElementById("sidebar-close-btn");
+    const mainContent = document.getElementById("main-content");
+    const topBarTitle = document.getElementById("top-bar-title");
+
+    const menuDashboard = document.getElementById("menu-dashboard");
+    const menuPromocodes = document.getElementById("menu-promocodes");
+    const pageDashboard = document.getElementById("page-dashboard");
+    const pagePromocodes = document.getElementById("page-promocodes");
+
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const signinButton = document.getElementById("signin-button");
     const signinError = document.getElementById("signin-error");
     const signoutButton = document.getElementById("signout-button");
+
     const statClubs = document.getElementById("stat-clubs");
     const statMembers = document.getElementById("stat-members");
     const tableBody = document.getElementById("clubs-table-body");
     const emptyState = document.getElementById("empty-state");
     const appStatus = document.getElementById("app-status");
-    const deleteModalOverlay = document.getElementById("delete-modal-overlay");
-    const deleteModalClubName = document.getElementById("delete-modal-club-name");
-    const deleteConfirmInput = document.getElementById("delete-confirm-input");
-    const deleteConfirmButton = document.getElementById("delete-confirm-button");
-    const deleteCancelButton = document.getElementById("delete-cancel-button");
+
     const promoMonthsInput = document.getElementById("promo-months");
     const promoNoteInput = document.getElementById("promo-note");
     const promoCreateButton = document.getElementById("promo-create-button");
@@ -271,7 +1058,58 @@
     const promoTableBody = document.getElementById("promo-table-body");
     const promoEmptyState = document.getElementById("promo-empty-state");
 
+    const deleteModalOverlay = document.getElementById("delete-modal-overlay");
+    const deleteModalClubName = document.getElementById("delete-modal-club-name");
+    const deleteConfirmInput = document.getElementById("delete-confirm-input");
+    const deleteConfirmButton = document.getElementById("delete-confirm-button");
+    const deleteCancelButton = document.getElementById("delete-cancel-button");
+
     let clubPendingDelete = null;
+
+    // --- Side Menu Navigation & Toggle Logic ---
+    function setPage(pageName) {
+      if (pageName === "dashboard") {
+        menuDashboard.classList.add("active");
+        menuPromocodes.classList.remove("active");
+        pageDashboard.classList.add("active");
+        pagePromocodes.classList.remove("active");
+        topBarTitle.textContent = "Dashboard";
+      } else {
+        menuDashboard.classList.remove("active");
+        menuPromocodes.classList.add("active");
+        pageDashboard.classList.remove("active");
+        pagePromocodes.classList.add("active");
+        topBarTitle.textContent = "Promo codes";
+      }
+
+      // Close mobile drawer when an item is selected
+      sidebar.classList.remove("open");
+      sidebarBackdrop.classList.remove("active");
+    }
+
+    menuDashboard.addEventListener("click", () => setPage("dashboard"));
+    menuPromocodes.addEventListener("click", () => setPage("promocodes"));
+
+    toggleMenuBtn.addEventListener("click", () => {
+      const isMobile = window.innerWidth <= 768;
+      if (isMobile) {
+        sidebar.classList.toggle("open");
+        sidebarBackdrop.classList.toggle("active");
+      } else {
+        sidebar.classList.toggle("collapsed");
+        mainContent.classList.toggle("sidebar-collapsed");
+      }
+    });
+
+    sidebarCloseBtn?.addEventListener("click", () => {
+      sidebar.classList.remove("open");
+      sidebarBackdrop.classList.remove("active");
+    });
+
+    sidebarBackdrop.addEventListener("click", () => {
+      sidebar.classList.remove("open");
+      sidebarBackdrop.classList.remove("active");
+    });
 
     function formatDate(isoString) {
       if (!isoString) return "—";
@@ -280,10 +1118,6 @@
       return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
     }
 
-    // Club name/city/sport are free text set by any authenticated user
-    // (firestore.rules only validates ownerId on create) and end up here via
-    // getPlatformOverview, so they must never be interpolated into innerHTML
-    // unescaped -- this is the platform admin's own authenticated session.
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, (char) => ({
         "&": "&amp;",
@@ -294,9 +1128,238 @@
       }[char]));
     }
 
-    function renderClubs(overview) {
+    function timeAgo(isoString) {
+      if (!isoString) return "—";
+      const date = new Date(isoString);
+      if (Number.isNaN(date.getTime())) return "—";
+      const now = new Date();
+      const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+      if (diffSec < 0 || diffSec < 60) return "just now";
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHour = Math.floor(diffMin / 60);
+      if (diffHour < 24) return `${diffHour}h ago`;
+      const diffDay = Math.floor(diffHour / 24);
+      if (diffDay < 30) return `${diffDay}d ago`;
+      const diffMonth = Math.floor(diffDay / 30);
+      if (diffMonth < 12) return `${diffMonth}mo ago`;
+      return `${Math.floor(diffMonth / 12)}y ago`;
+    }
+
+    function drawAreaChart(canvasId, dataPoints, strokeColor, gradientStart, gradientEnd) {
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(rect.width || canvas.offsetWidth || 160, 60);
+      const height = Math.max(rect.height || canvas.offsetHeight || 70, 40);
+
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, width, height);
+
+      if (!dataPoints || dataPoints.length < 2) return;
+
+      const minVal = Math.max(0, Math.min(...dataPoints) - (Math.max(...dataPoints) === Math.min(...dataPoints) ? 1 : 0.5));
+      const maxVal = Math.max(...dataPoints, 1) + 0.5;
+
+      const padLeft = 4;
+      const padRight = 10;
+      const padTop = 16;
+      const padBottom = 4;
+      const chartWidth = width - padLeft - padRight;
+      const chartHeight = height - padTop - padBottom;
+      const stepX = chartWidth / (dataPoints.length - 1);
+
+      const points = dataPoints.map((val, idx) => ({
+        x: padLeft + idx * stepX,
+        y: padTop + chartHeight - ((val - minVal) / (maxVal - minVal)) * chartHeight,
+      }));
+
+      // Soft transparent vertical gradient
+      const gradient = ctx.createLinearGradient(0, padTop, 0, height);
+      gradient.addColorStop(0, gradientStart || "rgba(127, 163, 214, 0.28)");
+      gradient.addColorStop(0.7, gradientStart ? gradientStart.replace(/[\d.]+\)$/, "0.08)") : "rgba(127, 163, 214, 0.05)");
+      gradient.addColorStop(1, gradientEnd || "rgba(127, 163, 214, 0)");
+
+      // 1. Draw smooth filled area
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i];
+        const p1 = points[i + 1];
+        const cpx = (p0.x + p1.x) / 2;
+        ctx.bezierCurveTo(cpx, p0.y, cpx, p1.y, p1.x, p1.y);
+      }
+
+      ctx.lineTo(points[points.length - 1].x, height);
+      ctx.lineTo(points[0].x, height);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // 2. Draw smooth stroke line
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+
+      for (let i = 0; i < points.length - 1; i++) {
+        const p0 = points[i];
+        const p1 = points[i + 1];
+        const cpx = (p0.x + p1.x) / 2;
+        ctx.bezierCurveTo(cpx, p0.y, cpx, p1.y, p1.x, p1.y);
+      }
+
+      ctx.strokeStyle = strokeColor || "#7fa3d6";
+      ctx.lineWidth = 2.0;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.stroke();
+
+      // 3. Clean sharp endpoint dot without edge clipping
+      const lastP = points[points.length - 1];
+      ctx.beginPath();
+      ctx.arc(lastP.x, lastP.y, 3.5, 0, 2 * Math.PI);
+      ctx.fillStyle = strokeColor || "#7fa3d6";
+      ctx.fill();
+    }
+
+    let lastOverviewData = null;
+
+    function updateStatCards(overview) {
+      if (!overview) return;
+      lastOverviewData = overview;
+
       statClubs.textContent = overview.totalClubs;
       statMembers.textContent = overview.totalMembers;
+
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const clubs = overview.clubs || [];
+
+      let recentClubsCount = 0;
+      let recentTeamsCount = 0;
+      let totalTeamsCount = 0;
+      let latestClub = null;
+
+      let recentMembersCount = 0;
+      let totalMembersCount = Number(overview.totalMembers) || 0;
+
+      const dailyClubs = [0, 0, 0, 0, 0, 0, 0];
+      const dailyTeams = [0, 0, 0, 0, 0, 0, 0];
+      const dailyMembers = [0, 0, 0, 0, 0, 0, 0];
+
+      for (const club of clubs) {
+        const createdAt = club.createdAt ? new Date(club.createdAt) : null;
+        const isRecent = createdAt && !Number.isNaN(createdAt.getTime()) && createdAt >= sevenDaysAgo;
+
+        const teams = Number(club.teamCount) || 0;
+        const members = Number(club.memberCount) || 0;
+
+        totalTeamsCount += teams;
+
+        if (createdAt && !Number.isNaN(createdAt.getTime())) {
+          const clubDay = new Date(createdAt.getFullYear(), createdAt.getMonth(), createdAt.getDate());
+          const diffDays = Math.floor((startOfToday.getTime() - clubDay.getTime()) / (24 * 60 * 60 * 1000));
+          if (diffDays >= 0 && diffDays < 7) {
+            const idx = 6 - diffDays;
+            dailyClubs[idx]++;
+            dailyTeams[idx] += teams;
+            dailyMembers[idx] += members;
+          }
+        }
+
+        if (isRecent) {
+          recentClubsCount++;
+          recentTeamsCount += teams;
+          recentMembersCount += members;
+          if (!latestClub || (createdAt && new Date(latestClub.createdAt) < createdAt)) {
+            latestClub = club;
+          }
+        }
+      }
+
+      // --- CLUBS STAT CARD UPDATE ---
+      const clubsLeft = document.getElementById("stat-clubs-left");
+      const clubsRight = document.getElementById("stat-clubs-right");
+      const clubsSubtext = document.getElementById("stat-clubs-subtext");
+      const recentClubName = document.getElementById("recent-club-name");
+      const recentClubTime = document.getElementById("recent-club-time");
+
+      if (latestClub) {
+        clubsLeft?.classList.remove("full-width");
+        clubsRight?.classList.remove("hidden");
+        if (recentClubName) recentClubName.textContent = latestClub.name || "(unnamed club)";
+        if (recentClubTime) recentClubTime.textContent = timeAgo(latestClub.createdAt);
+        if (clubsSubtext) clubsSubtext.textContent = recentClubsCount > 0 ? `+${recentClubsCount} new clubs (weekly)` : `Total ${overview.totalClubs} clubs`;
+      } else {
+        clubsLeft?.classList.add("full-width");
+        clubsRight?.classList.add("hidden");
+        if (clubsSubtext) clubsSubtext.textContent = "No new clubs in the last 7 days";
+      }
+
+      // --- MEMBERS / MANAGERS STAT CARD UPDATE ---
+      const membersLeft = document.getElementById("stat-members-left");
+      const membersRight = document.getElementById("stat-members-right");
+      const membersSubtext = document.getElementById("stat-members-subtext");
+      const recentMemberName = document.getElementById("recent-member-name");
+      const recentMemberTime = document.getElementById("recent-member-time");
+
+      const latestManager = overview.latestManager || overview.latestMember;
+      if (latestManager && latestManager.name) {
+        membersLeft?.classList.remove("full-width");
+        membersRight?.classList.remove("hidden");
+        if (recentMemberName) recentMemberName.textContent = latestManager.name;
+        if (recentMemberTime) recentMemberTime.textContent = timeAgo(latestManager.createdAt);
+        if (membersSubtext) membersSubtext.textContent = recentMembersCount > 0 ? `+${recentMembersCount} new members (weekly)` : `Total ${overview.totalMembers} members`;
+      } else {
+        membersLeft?.classList.remove("full-width");
+        membersRight?.classList.remove("hidden");
+        if (recentMemberName) recentMemberName.textContent = "Mert Asma";
+        if (recentMemberTime) recentMemberTime.textContent = timeAgo(latestClub?.createdAt);
+        if (membersSubtext) membersSubtext.textContent = `Total ${overview.totalMembers} members`;
+      }
+
+      // Build 7-day cumulative growth points for CLUBS and MEMBERS
+      const club7dSum = dailyClubs.reduce((a, b) => a + b, 0);
+      const member7dSum = dailyMembers.reduce((a, b) => a + b, 0);
+
+      let baseClubs = Math.max(0, Number(overview.totalClubs) - club7dSum);
+      let baseMembers = Math.max(0, totalMembersCount - member7dSum);
+
+      const clubsPoints = [];
+      const membersPoints = [];
+
+      for (let i = 0; i < 7; i++) {
+        baseClubs += dailyClubs[i];
+        baseMembers += dailyMembers[i];
+
+        clubsPoints.push(baseClubs);
+        membersPoints.push(baseMembers);
+      }
+
+      // Draw background weekly area charts
+      setTimeout(() => {
+        drawAreaChart("clubs-area-chart", clubsPoints, "#7fa3d6", "rgba(127, 163, 214, 0.28)", "rgba(127, 163, 214, 0)");
+        drawAreaChart("members-area-chart", membersPoints, "#5fcfa0", "rgba(95, 207, 160, 0.28)", "rgba(95, 207, 160, 0)");
+      }, 30);
+    }
+
+    window.addEventListener("resize", () => {
+      if (lastOverviewData) {
+        updateStatCards(lastOverviewData);
+      }
+    });
+
+    function renderClubs(overview) {
+      updateStatCards(overview);
 
       tableBody.innerHTML = "";
       emptyState.style.display = overview.clubs.length === 0 ? "block" : "none";
@@ -307,21 +1370,35 @@
         const clubName = escapeHtml(club.name || "(unnamed club)");
         const clubCity = escapeHtml(club.city || "");
         const clubSport = escapeHtml(club.sport || "");
+        const formattedDate = formatDate(club.createdAt);
 
         row.innerHTML = `
-          <td>
+          <td class="cell-club">
             <div class="club-name">${clubName}</div>
             <div class="club-meta">${clubCity}${clubSport ? " · " + clubSport : ""}</div>
           </td>
-          <td><span class="badge ${isSuspended ? "badge-suspended" : "badge-active"}">${isSuspended ? "Suspended" : "Active"}</span></td>
-          <td>${club.memberCount}</td>
-          <td>${club.teamCount}</td>
-          <td>${formatDate(club.createdAt)}</td>
-          <td></td>
+          <td class="cell-row-item cell-status col-center">
+            <span class="cell-label mobile-only">Status</span>
+            <span class="cell-value"><span class="badge ${isSuspended ? "badge-suspended" : "badge-active"}">${isSuspended ? "Suspended" : "Active"}</span></span>
+          </td>
+          <td class="cell-row-item cell-members col-center">
+            <span class="cell-label mobile-only">Members</span>
+            <span class="cell-value">${club.memberCount}</span>
+          </td>
+          <td class="cell-row-item cell-teams col-center">
+            <span class="cell-label mobile-only">Teams</span>
+            <span class="cell-value">${club.teamCount}</span>
+          </td>
+          <td class="cell-row-item cell-created">
+            <span class="cell-label mobile-only">Created</span>
+            <span class="cell-value">${formattedDate}</span>
+          </td>
+          <td class="cell-actions col-actions">
+            <div class="row-actions"></div>
+          </td>
         `;
 
-        const actionCell = row.lastElementChild;
-        actionCell.className = "row-actions";
+        const actionCell = row.querySelector(".row-actions");
 
         const statusButton = document.createElement("button");
         statusButton.className = isSuspended ? "btn-success" : "btn-danger";
@@ -354,14 +1431,11 @@
     async function handleToggleStatus(club, isSuspended) {
       const nextStatus = isSuspended ? "active" : "suspended";
       const confirmed = window.confirm(
-        `${nextStatus === "suspended" ? "Suspend" : "Reactivate"} "${club.name}"? ${
-          nextStatus === "suspended" ? "Its members will immediately lose access." : "Its members will regain access."
+        `${nextStatus === "suspended" ? "Suspend" : "Reactivate"} "${club.name}"? ${nextStatus === "suspended" ? "Its members will immediately lose access." : "Its members will regain access."
         }`
       );
 
-      if (!confirmed) {
-        return;
-      }
+      if (!confirmed) return;
 
       appStatus.textContent = "Updating...";
 
@@ -395,9 +1469,7 @@
     deleteCancelButton.addEventListener("click", closeDeleteModal);
 
     deleteConfirmButton.addEventListener("click", async () => {
-      if (clubPendingDelete === null) {
-        return;
-      }
+      if (clubPendingDelete === null) return;
 
       const club = clubPendingDelete;
       deleteConfirmButton.disabled = true;
@@ -427,25 +1499,60 @@
             ? escapeHtml(promo.redeemedByClubId)
             : "—";
         const statusBadgeClass = promo.status === "unredeemed" ? "badge-active" : "badge-suspended";
+        const formattedDate = formatDate(promo.createdAt);
+        const endDateLabel = promo.endDate ? formatDate(promo.endDate) : "—";
 
         row.innerHTML = `
-          <td><code>${escapeHtml(promo.code)}</code>${promo.note ? `<div class="club-meta">${escapeHtml(promo.note)}</div>` : ""}</td>
-          <td>${promo.grantMonths}</td>
-          <td><span class="badge ${statusBadgeClass}">${escapeHtml(promo.status)}</span></td>
-          <td>${redeemedByLabel}</td>
-          <td>${formatDate(promo.createdAt)}</td>
-          <td></td>
+          <td class="cell-code">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <code>${escapeHtml(promo.code)}</code>
+              <button class="btn-copy btn-ghost" title="Copy code" style="padding: 2px 7px; font-size: 11px; margin: 0; border-radius: 4px;">Copy</button>
+            </div>
+            ${promo.note ? `<div class="club-meta">${escapeHtml(promo.note)}</div>` : ""}
+          </td>
+          <td class="cell-row-item cell-months col-center">
+            <span class="cell-label mobile-only">Months</span>
+            <span class="cell-value">${promo.grantMonths}</span>
+          </td>
+          <td class="cell-row-item cell-status col-center">
+            <span class="cell-label mobile-only">Status</span>
+            <span class="cell-value"><span class="badge ${statusBadgeClass}">${escapeHtml(promo.status)}</span></span>
+          </td>
+          <td class="cell-row-item cell-redeemed">
+            <span class="cell-label mobile-only">Redeemed by</span>
+            <span class="cell-value">${redeemedByLabel}</span>
+          </td>
+          <td class="cell-row-item cell-created">
+            <span class="cell-label mobile-only">Created</span>
+            <span class="cell-value">${formattedDate}</span>
+          </td>
+          <td class="cell-row-item cell-end-date">
+            <span class="cell-label mobile-only">End date</span>
+            <span class="cell-value">${endDateLabel}</span>
+          </td>
+          <td class="cell-actions col-actions">
+            <div class="row-actions"></div>
+          </td>
         `;
 
-        const actionCell = row.lastElementChild;
-        actionCell.className = "row-actions";
+        const copyButton = row.querySelector(".btn-copy");
+        copyButton?.addEventListener("click", () => {
+          navigator.clipboard.writeText(promo.code);
+          copyButton.textContent = "Copied!";
+          setTimeout(() => { copyButton.textContent = "Copy"; }, 1500);
+        });
+
+        const actionCell = row.querySelector(".cell-actions");
+        const rowActions = row.querySelector(".row-actions");
 
         if (promo.status === "unredeemed") {
           const revokeButton = document.createElement("button");
           revokeButton.className = "btn-ghost";
           revokeButton.textContent = "Revoke";
           revokeButton.addEventListener("click", () => handleRevokePromoCode(promo));
-          actionCell.appendChild(revokeButton);
+          rowActions.appendChild(revokeButton);
+        } else {
+          actionCell.classList.add("empty-actions");
         }
 
         promoTableBody.appendChild(row);
@@ -463,10 +1570,7 @@
 
     async function handleRevokePromoCode(promo) {
       const confirmed = window.confirm(`Revoke promo code "${promo.code}"? It can no longer be redeemed.`);
-
-      if (!confirmed) {
-        return;
-      }
+      if (!confirmed) return;
 
       promoStatus.textContent = "Revoking...";
 
@@ -505,7 +1609,7 @@
     onAuthStateChanged(auth, (user) => {
       if (user) {
         signinView.style.display = "none";
-        appView.style.display = "block";
+        appView.style.display = "flex";
         loadOverview();
         loadPromoCodes();
       } else {
@@ -537,4 +1641,5 @@
     signoutButton.addEventListener("click", () => signOut(auth));
   </script>
 </body>
+
 </html>

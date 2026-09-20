@@ -183,7 +183,8 @@ export default function ReplaysScreen() {
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingReplayId, setDeletingReplayId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState(copy.statusUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.statusUpdated;
 
   // Firestore-backed replay visibility (visibleUserIds) is more precise than
   // the shared appData's copy, so this overlays a dedicated fetch on top of

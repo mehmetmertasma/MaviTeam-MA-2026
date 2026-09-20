@@ -121,7 +121,8 @@ export default function MembersScreen() {
   const { appData, refresh } = useAppDataContext();
   const [selectedMemberForProfile, setSelectedMemberForProfile] = useState<UserProfile | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(copy.membersUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.membersUpdated;
   const [searchQuery, setSearchQuery] = useState("");
 
   async function refreshMembersData() {

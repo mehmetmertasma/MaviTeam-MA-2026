@@ -135,7 +135,8 @@ export default function AnnouncementsScreen() {
   const [selectedTargetId, setSelectedTargetId] = useState("all-club");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingAnnouncementId, setDeletingAnnouncementId] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState(copy.statusUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.statusUpdated;
 
   // Overlays a dedicated, targeted Firestore fetch on top of the shared
   // appData instead of pulling announcements from it directly, so this

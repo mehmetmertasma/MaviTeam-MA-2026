@@ -1,8 +1,8 @@
 import type { PropsWithChildren } from "react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { defaultLanguage, translations } from "@/localization/translations";
-import { getStoredLanguage, setStoredLanguage } from "@/localization/storage";
+import { translations } from "@/localization/translations";
+import { detectLocationLanguage, getStoredLanguage, setStoredLanguage } from "@/localization/storage";
 import type { Language, TranslationDictionary } from "@/localization/types";
 
 type LanguageContextValue = {
@@ -16,7 +16,7 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 export function LanguageProvider({ children }: PropsWithChildren) {
-  const [language, setLanguageState] = useState<Language>(defaultLanguage);
+  const [language, setLanguageState] = useState<Language>(() => detectLocationLanguage());
   const [isLanguageReady, setIsLanguageReady] = useState(false);
 
   useEffect(() => {

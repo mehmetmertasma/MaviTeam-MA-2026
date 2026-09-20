@@ -4,7 +4,7 @@ import { Stack, router, usePathname } from "expo-router";
 import Head from "expo-router/head";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { Platform, Text, View } from "react-native";
+import { LogBox, Platform, Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
@@ -18,6 +18,29 @@ import { Sentry, initSentry } from "@/lib/sentry";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 initSentry();
+
+LogBox.ignoreLogs([
+  "[expo-notifications]",
+  '"shadow*" style props are deprecated',
+  "props.pointerEvents is deprecated",
+  "style.resizeMode is deprecated",
+]);
+
+if (Platform.OS === "web" && typeof window !== "undefined") {
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    const message = args.map((arg) => (typeof arg === "string" ? arg : "")).join(" ");
+    if (
+      message.includes("[expo-notifications]") ||
+      message.includes('"shadow*" style props are deprecated') ||
+      message.includes("props.pointerEvents is deprecated") ||
+      message.includes("style.resizeMode is deprecated")
+    ) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
 
 export const unstable_settings = {
   initialRouteName: "index",

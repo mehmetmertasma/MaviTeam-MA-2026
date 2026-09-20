@@ -60,7 +60,7 @@ export function EventList({ visibleMonth, visibleMonthEvents, scheduleData, onSe
                 <View style={styles.eventContent}>
                   <View style={styles.eventHeaderRow}>
                     <StatusBadge label={getScheduleTypeLabel(event.type, language)} tone={getScheduleTypeTone(event.type)} />
-                    <Text style={styles.eventTeam}>{getScheduleTeamLabel(event, scheduleData)}</Text>
+                    <Text style={styles.eventTeam}>{getScheduleTeamLabel(event, scheduleData, language === "en")}</Text>
                   </View>
                   <Text style={styles.eventTitle}>{event.title}</Text>
                   <Text style={styles.eventMeta}>

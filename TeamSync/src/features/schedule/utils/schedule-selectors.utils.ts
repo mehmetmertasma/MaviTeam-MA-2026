@@ -27,10 +27,10 @@ export function groupScheduleEventsByDate(events: ScheduleEvent[]) {
   }, {});
 }
 
-export function getScheduleTeamLabel(event: ScheduleEvent, scheduleData: { teams: Team[] }) {
+export function getScheduleTeamLabel(event: ScheduleEvent, scheduleData: { teams: Team[] }, isEn = false) {
   if (event.teamId === undefined) {
-    return "Tüm Kulüp";
+    return isEn ? "Entire Club" : "Tüm Kulüp";
   }
 
-  return scheduleData.teams.find((team) => team.id === event.teamId)?.name ?? "Takım bulunamadı";
+  return scheduleData.teams.find((team) => team.id === event.teamId)?.name ?? (isEn ? "Team not found" : "Takım bulunamadı");
 }

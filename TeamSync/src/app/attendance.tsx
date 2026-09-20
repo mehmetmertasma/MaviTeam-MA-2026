@@ -242,8 +242,12 @@ export default function AttendanceScreen() {
   const [selectedTeamIdState, setSelectedTeamId] = useState("");
   const [selectedEventIdState, setSelectedEventId] = useState("");
   const [attendanceDraft, setAttendanceDraft] = useState<Record<string, AttendanceStatus>>({});
-  const [lastSavedAt, setLastSavedAt] = useState(copy.notSavedYet);
-  const [statusMessage, setStatusMessage] = useState(copy.initialStatus);
+  const [customLastSavedAt, setCustomLastSavedAt] = useState<string | null>(null);
+  const lastSavedAt = customLastSavedAt ?? copy.notSavedYet;
+  const setLastSavedAt = setCustomLastSavedAt;
+  const [customStatusMessage, setCustomStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.initialStatus;
+  const setStatusMessage = setCustomStatusMessage;
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState("");
   const [newSessionLocation, setNewSessionLocation] = useState("");

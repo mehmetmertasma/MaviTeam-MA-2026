@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { ScreenCard } from "@/components/ScreenCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
@@ -69,13 +70,14 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    firebaseIsReady ? t.auth.firebaseReadyRegister : t.auth.firebaseMissingRegister
-  );
+  const [customStatusMessage, setCustomStatusMessage] = useState<string | null>(null);
+
+  const defaultStatusMessage = firebaseIsReady ? t.auth.firebaseReadyRegister : t.auth.firebaseMissingRegister;
+  const statusMessage = customStatusMessage ?? defaultStatusMessage;
 
   function clearStatusOnChange() {
-    if (firebaseIsReady && statusMessage !== t.auth.firebaseReadyRegister) {
-      setStatusMessage(t.auth.firebaseReadyRegister);
+    if (customStatusMessage !== null) {
+      setCustomStatusMessage(null);
     }
   }
 
@@ -86,38 +88,38 @@ export default function RegisterScreen() {
     const nextRoute = getNextRoute(next);
 
     if (!firebaseIsReady) {
-      setStatusMessage(t.auth.validation.firebaseMissing);
+      setCustomStatusMessage(t.auth.validation.firebaseMissing);
       return;
     }
 
     if (trimmedName === "") {
-      setStatusMessage(t.auth.validation.fullNameRequired);
+      setCustomStatusMessage(t.auth.validation.fullNameRequired);
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setStatusMessage(t.auth.validation.emailInvalidExample);
+      setCustomStatusMessage(t.auth.validation.emailInvalidExample);
       return;
     }
 
     if (cleanPassword.length < 6) {
-      setStatusMessage(t.auth.validation.passwordTooShort);
+      setCustomStatusMessage(t.auth.validation.passwordTooShort);
       return;
     }
 
     if (cleanPassword !== confirmPassword.trim()) {
-      setStatusMessage(t.auth.validation.passwordMismatch);
+      setCustomStatusMessage(t.auth.validation.passwordMismatch);
       return;
     }
 
     if (!acceptedTerms) {
-      setStatusMessage(registerCopy.legalConsentRequired);
+      setCustomStatusMessage(registerCopy.legalConsentRequired);
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setStatusMessage(registerCopy.creatingAccount);
+      setCustomStatusMessage(registerCopy.creatingAccount);
 
       const user = await authService.registerWithEmail({
         fullName: trimmedName,
@@ -125,7 +127,7 @@ export default function RegisterScreen() {
         password: cleanPassword,
       });
 
-      setStatusMessage(registerCopy.preparingProfile);
+      setCustomStatusMessage(registerCopy.preparingProfile);
 
       // Best-effort: this only matters if the user closes the app before
       // verifying and comes back through /login later instead of
@@ -153,7 +155,7 @@ export default function RegisterScreen() {
         console.warn("Initial verification code request failed; verify-email will retry.", codeRequestError);
       }
 
-      setStatusMessage(registerCopy.readyForNextStep);
+      setCustomStatusMessage(registerCopy.readyForNextStep);
 
       router.replace({
         pathname: "/verify-email",
@@ -166,7 +168,7 @@ export default function RegisterScreen() {
         },
       } as never);
     } catch (registerError) {
-      setStatusMessage(getAuthErrorMessage(registerError, language));
+      setCustomStatusMessage(getAuthErrorMessage(registerError, language));
     } finally {
       setIsSubmitting(false);
     }
@@ -183,7 +185,10 @@ export default function RegisterScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <ScreenCard style={styles.card}>
-          <AppBackButton fallbackHref="/" />
+          <View style={styles.topHeader}>
+            <AppBackButton fallbackHref="/" />
+            <LanguageSelector compact />
+          </View>
 
           <Text style={styles.logo}>{t.common.appName}</Text>
           <StatusBadge label={t.auth.registerBadge} tone="info" style={styles.badge} />
@@ -326,6 +331,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing["2xl"],
   },
   card: { padding: theme.spacing["3xl"] },
+  topHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.lg,
+  },
   logo: {
     ...Typography.sectionTitle,
     color: theme.colors.brand.primary,

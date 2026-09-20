@@ -107,7 +107,8 @@ export default function PendingApprovalsScreen() {
   const locale = language === "tr" ? "tr-TR" : "en-US";
   const { appData, refresh, setAppData } = useAppDataContext();
   const [firestoreRows, setFirestoreRows] = useState<RequestRow[] | null>(null);
-  const [statusMessage, setStatusMessage] = useState(copy.statusIntro);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.statusIntro;
 
   const loadApprovalData = useCallback(async () => {
     try {

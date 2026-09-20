@@ -188,7 +188,8 @@ export default function TeamsScreen() {
   const [ageGroup, setAgeGroup] = useState("");
   const [coachName, setCoachName] = useState("");
   const [isCreatingTeam, setIsCreatingTeam] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(copy.teamsUpdated);
+  const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? copy.teamsUpdated;
   const [addMemberOpenTeamId, setAddMemberOpenTeamId] = useState("");
   const [updatingMemberId, setUpdatingMemberId] = useState("");
   const [memberSearchQuery, setMemberSearchQuery] = useState("");

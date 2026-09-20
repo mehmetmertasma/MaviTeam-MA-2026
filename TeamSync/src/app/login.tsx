@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } fr
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { ScreenCard } from "@/components/ScreenCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
@@ -28,14 +29,18 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    firebaseIsReady ? t.auth.firebaseReadyLogin : t.auth.firebaseMissingLogin
-  );
+  const [customStatusMessage, setCustomStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const defaultStatusMessage = firebaseIsReady ? t.auth.firebaseReadyLogin : t.auth.firebaseMissingLogin;
+  const statusMessage = customStatusMessage ?? defaultStatusMessage;
 
   function clearErrorOnChange() {
     if (error !== "") {
       setError("");
+    }
+    if (customStatusMessage !== null) {
+      setCustomStatusMessage(null);
     }
   }
 
@@ -60,12 +65,12 @@ export default function LoginScreen() {
     try {
       setIsSubmitting(true);
       setError("");
-      setStatusMessage(t.auth.loginInProgress);
+      setCustomStatusMessage(t.auth.loginInProgress);
 
       const user = await authService.loginWithEmail({ email: trimmedEmail, password });
 
       if (!user.emailVerified) {
-        setStatusMessage(t.auth.verificationRequired);
+        setCustomStatusMessage(t.auth.verificationRequired);
 
         // Falls back to "create-club" if no intent was ever recorded (e.g.
         // an older account from before this existed) -- matches the
@@ -97,11 +102,11 @@ export default function LoginScreen() {
         return;
       }
 
-      setStatusMessage(t.auth.loginSuccess);
+      setCustomStatusMessage(t.auth.loginSuccess);
       router.replace("/dashboard" as never);
     } catch (loginError) {
       setError(getAuthErrorMessage(loginError, language));
-      setStatusMessage(t.auth.loginFailed);
+      setCustomStatusMessage(t.auth.loginFailed);
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +129,7 @@ export default function LoginScreen() {
       setIsSubmitting(true);
       setError("");
       await authService.sendPasswordReset(trimmedEmail);
-      setStatusMessage(t.auth.resetLinkSent);
+      setCustomStatusMessage(t.auth.resetLinkSent);
     } catch (resetError) {
       setError(getAuthErrorMessage(resetError, language));
     } finally {
@@ -143,7 +148,10 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <ScreenCard style={styles.card}>
-          <AppBackButton fallbackHref="/" />
+          <View style={styles.topHeader}>
+            <AppBackButton fallbackHref="/" />
+            <LanguageSelector compact />
+          </View>
 
           <Text style={styles.logo}>{t.common.appName}</Text>
           <StatusBadge label={t.auth.loginBadge} tone="info" style={styles.badge} />
@@ -232,6 +240,13 @@ const styles = StyleSheet.create({
     padding: theme.spacing["2xl"],
   },
   card: { padding: theme.spacing["3xl"] },
+  topHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.lg,
+  },
   logo: {
     ...Typography.sectionTitle,
     color: theme.colors.brand.primary,

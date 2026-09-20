@@ -87,7 +87,7 @@ export function EventDetailsBubble({ event, scheduleData, canManage, onEdit, onD
             </View>
             <View style={styles.metaBox}>
               <Text style={styles.metaLabel}>{copy.teamLabel}</Text>
-              <Text style={styles.metaValue}>{getScheduleTeamLabel(event, scheduleData)}</Text>
+              <Text style={styles.metaValue}>{getScheduleTeamLabel(event, scheduleData, language === "en")}</Text>
             </View>
             <View style={styles.metaBox}>
               <Text style={styles.metaLabel}>{copy.locationLabel}</Text>

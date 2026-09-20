@@ -1,12 +1,9 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 
+import { useTranslation } from "@/localization";
 import { scheduleRepository } from "../services/schedule.repository";
 import type { ScheduleWorkspaceData } from "../types/schedule.types";
-
-const INITIAL_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklenecek.";
-const SUCCESS_STATUS_MESSAGE = "Program merkezi MaviTeam datasından yüklendi.";
-const ERROR_STATUS_MESSAGE = "Program yüklenirken bir sorun oluştu.";
 
 // Lets the status line at the bottom of CalendarSection look like a
 // confirmation (green), a problem (red), or a neutral instruction (gray)
@@ -26,13 +23,27 @@ type UseScheduleDataResult = {
 };
 
 export function useScheduleData(): UseScheduleDataResult {
+  const { language } = useTranslation();
+  const isEn = language === "en";
+
+  const initialStatus = isEn
+    ? "Schedule will be loaded from MaviTeam data."
+    : "Program merkezi MaviTeam datasından yüklenecek.";
+  const successStatus = isEn
+    ? "Schedule loaded from MaviTeam data."
+    : "Program merkezi MaviTeam datasından yüklendi.";
+  const errorStatus = isEn
+    ? "There was a problem loading the schedule."
+    : "Program yüklenirken bir sorun oluştu.";
+
   const [scheduleData, setScheduleData] = useState<ScheduleWorkspaceData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState(INITIAL_STATUS_MESSAGE);
+  const [customStatusMessage, setCustomStatusMessage] = useState<string | null>(null);
+  const statusMessage = customStatusMessage ?? initialStatus;
   const [statusTone, setStatusTone] = useState<ScheduleStatusTone>("neutral");
 
   const setStatus = useCallback((message: string, tone: ScheduleStatusTone = "neutral") => {
-    setStatusMessage(message);
+    setCustomStatusMessage(message);
     setStatusTone(tone);
   }, []);
 
@@ -42,13 +53,13 @@ export function useScheduleData(): UseScheduleDataResult {
     try {
       const loadedScheduleData = await scheduleRepository.getScheduleData();
       setScheduleData(loadedScheduleData);
-      setStatus(SUCCESS_STATUS_MESSAGE, "success");
+      setStatus(successStatus, "success");
     } catch {
-      setStatus(ERROR_STATUS_MESSAGE, "danger");
+      setStatus(errorStatus, "danger");
     } finally {
       setIsLoading(false);
     }
-  }, [setStatus]);
+  }, [errorStatus, setStatus, successStatus]);
 
   useFocusEffect(
     useCallback(() => {

@@ -42,7 +42,14 @@ const resendWebhookSecret = defineSecret("RESEND_WEBHOOK_SECRET");
 // Stripe Connect for US clubs -- see the "connectPaymentAccount"/
 // "createCheckoutSession" functions below for how each is actually used.
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
+// Stripe issues a separate signing secret per webhook *destination*, even
+// when two destinations point at the same URL -- our "Your account" scoped
+// destination (checkout.session.completed, invoice.*, customer.subscription.*)
+// and "Connected accounts" scoped destination (account.updated) are two
+// separate destinations for that reason, so stripeWebhook below has to be
+// able to verify a request signed with either one.
 const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
+const stripeConnectWebhookSecret = defineSecret("STRIPE_CONNECT_WEBHOOK_SECRET");
 const iyzicoApiKey = defineSecret("IYZICO_API_KEY");
 const iyzicoSecretKey = defineSecret("IYZICO_SECRET_KEY");
 // MaviTeam's cut of every online dues payment; the rest goes to the club via
@@ -1533,7 +1540,9 @@ exports.cancelClubSubscription = onCall({ secrets: [stripeSecretKey] }, async (r
   return { url: portalSession.url };
 });
 
-exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
+exports.stripeWebhook = onRequest(
+  { secrets: [stripeSecretKey, stripeWebhookSecret, stripeConnectWebhookSecret] },
+  async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
     return;
@@ -1541,11 +1550,27 @@ exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecr
 
   const stripe = new Stripe(stripeSecretKey.value());
   let event;
+  // Two separate webhook destinations point at this same URL -- "Your
+  // account" scope (checkout/invoice/subscription events, signed with
+  // STRIPE_WEBHOOK_SECRET) and "Connected accounts" scope (account.updated,
+  // signed with STRIPE_CONNECT_WEBHOOK_SECRET). Each destination has its own
+  // signing secret, so a request might validly be signed with either one --
+  // try both before rejecting it.
+  const candidateSecrets = [stripeWebhookSecret.value(), stripeConnectWebhookSecret.value()];
+  let verificationError;
 
-  try {
-    event = stripe.webhooks.constructEvent(req.rawBody, req.headers["stripe-signature"], stripeWebhookSecret.value());
-  } catch (error) {
-    console.error("Stripe webhook signature verification failed", error);
+  for (const secret of candidateSecrets) {
+    try {
+      event = stripe.webhooks.constructEvent(req.rawBody, req.headers["stripe-signature"], secret);
+      verificationError = null;
+      break;
+    } catch (error) {
+      verificationError = error;
+    }
+  }
+
+  if (verificationError) {
+    console.error("Stripe webhook signature verification failed", verificationError);
     res.status(400).send("Invalid signature");
     return;
   }

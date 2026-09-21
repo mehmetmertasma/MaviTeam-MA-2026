@@ -321,6 +321,7 @@ async function syncCurrentUserToFirestore(data: TeamSyncAppData) {
     firebaseUser,
     fullName: data.currentUser.fullName,
     billingDetails: data.currentUser.billingDetails,
+    notificationPreferences: data.currentUser.notificationPreferences,
   });
 }
 
@@ -546,7 +547,7 @@ export const teamSyncService = {
 
   async updateCurrentUserProfileDirect(
     data: TeamSyncAppData,
-    updates: Partial<Pick<UserProfile, "fullName" | "billingDetails">>
+    updates: Partial<Pick<UserProfile, "fullName" | "billingDetails" | "notificationPreferences">>
   ): Promise<TeamSyncAppData> {
     const nextCurrentUser: UserProfile = { ...data.currentUser, ...updates, updatedAt: nowIso() };
     const nextAppData: TeamSyncAppData = {

@@ -2288,7 +2288,13 @@ function truncateForNotification(text) {
 
 // Looks tokens up in chunks of FIRESTORE_IN_CLAUSE_LIMIT because Firestore's
 // "in" operator caps at 30 values per query.
-async function getExpoPushTokensForUsers(db, userIds) {
+// respectPushPreference is opt-in (default false) and only ever passed true
+// by the social/activity triggers below (chat/announcement/schedule) -- the
+// subscription grace-period reminder push (runSubscriptionReminders) leaves
+// it off deliberately: a clubAdmin muting "push notifications" in profile.tsx
+// should stop getting pinged about new messages, not about their club being
+// about to get suspended for non-payment.
+async function getExpoPushTokensForUsers(db, userIds, { respectPushPreference = false } = {}) {
   const tokens = [];
 
   for (let i = 0; i < userIds.length; i += FIRESTORE_IN_CLAUSE_LIMIT) {
@@ -2299,7 +2305,13 @@ async function getExpoPushTokensForUsers(db, userIds) {
       .get();
 
     snapshot.docs.forEach((docSnapshot) => {
-      const userTokens = docSnapshot.data().expoPushTokens;
+      const data = docSnapshot.data();
+
+      if (respectPushPreference && data.notificationPreferences?.push === false) {
+        return;
+      }
+
+      const userTokens = data.expoPushTokens;
 
       if (Array.isArray(userTokens)) {
         userTokens.forEach((token) => {
@@ -2314,14 +2326,14 @@ async function getExpoPushTokensForUsers(db, userIds) {
   return Array.from(new Set(tokens));
 }
 
-async function sendExpoPushNotifications(db, userIds, excludeUserId, payload) {
+async function sendExpoPushNotifications(db, userIds, excludeUserId, payload, options) {
   const recipientIds = Array.from(new Set(userIds)).filter((userId) => userId !== excludeUserId);
 
   if (recipientIds.length === 0) {
     return;
   }
 
-  const tokens = await getExpoPushTokensForUsers(db, recipientIds);
+  const tokens = await getExpoPushTokensForUsers(db, recipientIds, options);
 
   if (tokens.length === 0) {
     return;
@@ -2417,11 +2429,17 @@ exports.onChatMessageCreated = onDocumentCreated(
     const db = admin.firestore();
     const senderName = await getSenderDisplayName(db, message.senderUserId);
 
-    await sendExpoPushNotifications(db, recipientIds, message.senderUserId, {
-      title: senderName,
-      body: truncateForNotification(message.text),
-      data: { route: "/messages" },
-    });
+    await sendExpoPushNotifications(
+      db,
+      recipientIds,
+      message.senderUserId,
+      {
+        title: senderName,
+        body: truncateForNotification(message.text),
+        data: { route: "/messages" },
+      },
+      { respectPushPreference: true }
+    );
   })
 );
 
@@ -2437,11 +2455,17 @@ exports.onAnnouncementCreated = onDocumentCreated(
     const db = admin.firestore();
     const recipientIds = await getActiveClubOrTeamUserIds(db, announcement.clubId, announcement.targetTeamId ?? null);
 
-    await sendExpoPushNotifications(db, recipientIds, announcement.createdByUserId, {
-      title: announcement.title || "Yeni duyuru",
-      body: truncateForNotification(announcement.message),
-      data: { route: "/announcements" },
-    });
+    await sendExpoPushNotifications(
+      db,
+      recipientIds,
+      announcement.createdByUserId,
+      {
+        title: announcement.title || "Yeni duyuru",
+        body: truncateForNotification(announcement.message),
+        data: { route: "/announcements" },
+      },
+      { respectPushPreference: true }
+    );
   })
 );
 
@@ -2457,11 +2481,17 @@ exports.onScheduleEventCreated = onDocumentCreated(
     const db = admin.firestore();
     const recipientIds = await getActiveClubOrTeamUserIds(db, scheduleEvent.clubId, scheduleEvent.teamId ?? null);
 
-    await sendExpoPushNotifications(db, recipientIds, scheduleEvent.createdByUserId, {
-      title: "Yeni etkinlik",
-      body: truncateForNotification(scheduleEvent.title),
-      data: { route: "/schedule" },
-    });
+    await sendExpoPushNotifications(
+      db,
+      recipientIds,
+      scheduleEvent.createdByUserId,
+      {
+        title: "Yeni etkinlik",
+        body: truncateForNotification(scheduleEvent.title),
+        data: { route: "/schedule" },
+      },
+      { respectPushPreference: true }
+    );
   })
 );
 

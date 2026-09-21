@@ -25,6 +25,7 @@ import type {
   ClubCurrency,
   ClubPaymentAccount,
   JoinRequest,
+  NotificationPreferences,
   ScheduleEvent,
   ScheduleEventType,
   Team,
@@ -65,6 +66,7 @@ type UpdateCurrentUserProfileInput = {
   firebaseUser: User;
   fullName: string;
   billingDetails?: BillingDetails;
+  notificationPreferences?: NotificationPreferences;
 };
 
 type UpdateCurrentClubSettingsInput = {
@@ -229,6 +231,20 @@ function readBillingDetails(value: unknown): BillingDetails | undefined {
   return { nationalId, phone, address, city };
 }
 
+function readNotificationPreferences(value: unknown): NotificationPreferences | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+
+  const data = value as Record<string, unknown>;
+
+  if (typeof data.push !== "boolean" || typeof data.email !== "boolean") {
+    return undefined;
+  }
+
+  return { push: data.push, email: data.email };
+}
+
 function readClubPaymentAccount(value: unknown): ClubPaymentAccount | undefined {
   if (typeof value !== "object" || value === null) {
     return undefined;
@@ -264,6 +280,7 @@ function getUserProfileFromFirestore(userId: string, data: Record<string, unknow
     teamIds: readStringArray(data.teamIds),
     monthlyDuesAmountCents: readNumber(data.monthlyDuesAmountCents, 0) || undefined,
     billingDetails: readBillingDetails(data.billingDetails),
+    notificationPreferences: readNotificationPreferences(data.notificationPreferences),
     createdAt: readTimestampString(data.createdAt),
     updatedAt: readTimestampString(data.updatedAt),
   };
@@ -1081,6 +1098,9 @@ export const firestoreTeamSyncService = {
         emailVerified: input.firebaseUser.emailVerified,
         updatedAt: serverTimestamp(),
         ...(input.billingDetails !== undefined ? { billingDetails: input.billingDetails } : {}),
+        ...(input.notificationPreferences !== undefined
+          ? { notificationPreferences: input.notificationPreferences }
+          : {}),
       },
       { merge: true }
     );

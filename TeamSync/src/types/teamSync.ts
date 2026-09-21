@@ -134,8 +134,22 @@ export type UserProfile = {
   // transaction, so this is collected once (see BillingDetailsModal) and
   // reused for every subsequent online payment instead of asking again.
   billingDetails?: BillingDetails;
+  // Unset = defaults of { push: true, email: false }, matching profile.tsx's
+  // switches before a user has ever touched them. push gates the three
+  // Firestore-triggered notifiers (chat/announcement/schedule -- see
+  // functions/index.js's sendExpoPushNotifications callers). email is
+  // persisted but intentionally gates nothing yet: the only emails this app
+  // sends today (auth verification codes, subscription grace-period
+  // reminders) are account-critical and must stay on regardless of this
+  // preference, so there is no "club activity" email to opt out of yet.
+  notificationPreferences?: NotificationPreferences;
   createdAt: TimestampString;
   updatedAt: TimestampString;
+};
+
+export type NotificationPreferences = {
+  push: boolean;
+  email: boolean;
 };
 
 export type BillingDetails = {

@@ -22,7 +22,7 @@ import { authService, getAuthErrorMessage } from "@/services/authService";
 import { paymentGatewayService } from "@/services/paymentGatewayService";
 import type { IyzicoSubMerchantInput } from "@/services/paymentGatewayService";
 import { teamSyncService } from "@/services/teamSyncService";
-import type { ClubPaymentAccountStatus, TeamSyncAppData } from "@/types/teamSync";
+import type { ClubPaymentAccountStatus, ClubSubscriptionStatus, TeamSyncAppData } from "@/types/teamSync";
 
 type ProfileFormData = {
   fullName: string;
@@ -38,6 +38,22 @@ const paymentAccountStatusTone: Record<ClubPaymentAccountStatus, StatusBadgeTone
   pending: "warning",
   connected: "success",
 };
+
+const subscriptionStatusTone: Record<ClubSubscriptionStatus, StatusBadgeTone> = {
+  trialing: "info",
+  active: "success",
+  past_due: "warning",
+  canceled: "neutral",
+};
+
+function formatSubscriptionDate(value: string | undefined, locale: string) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(locale, { day: "2-digit", month: "long", year: "numeric" });
+}
 
 const emptyFormData: ProfileFormData = {
   fullName: "",
@@ -85,6 +101,7 @@ function getProfileCopy(language: "tr" | "en") {
       pushDescription: "Announcements, schedule, and message notifications.",
       emailNotifications: "Email notifications",
       emailDescription: "Email updates for important club changes.",
+      preferencesSaveError: "Couldn't save that preference. Please try again.",
       legalTitle: "Legal",
       legalSubtitle: "Review how your data is handled and the terms you agreed to.",
       legalPrivacy: "Privacy Policy",
@@ -125,6 +142,24 @@ function getProfileCopy(language: "tr" | "en") {
       connectingAccount: "Connecting...",
       connectAccountError: "Could not connect a payment account. Please try again.",
       connectAccountSuccess: "Payment account connected.",
+      subscriptionTitle: "Club subscription",
+      subscriptionSubtitle: "MaviTeam's $20/mo plan for this club.",
+      subscriptionStatusLabels: {
+        trialing: "Free trial",
+        active: "Active",
+        past_due: "Payment failed",
+        canceled: "Canceled",
+      },
+      subscriptionRenewsOn: (date: string) => `Renews on ${date}.`,
+      subscriptionCancelsOn: (date: string) => `Access ends on ${date} -- subscription won't renew.`,
+      subscriptionTrialEndsOn: (date: string) => `Free trial ends on ${date}. Add a payment method to keep the club active afterward.`,
+      subscriptionPastDueSince: (date: string) => `The last payment failed on ${date}. Update your payment method before the grace period ends to avoid suspension.`,
+      subscriptionGrandfathered: "This club has full access with no billing attached.",
+      subscriptionNotAvailable: "Recurring subscriptions aren't available for this club's country yet.",
+      manageSubscriptionButton: "Manage subscription",
+      addPaymentMethodButton: "Add payment method",
+      subscriptionActionPending: "Opening...",
+      subscriptionActionError: "Couldn't open billing. Please try again.",
     };
   }
 
@@ -139,6 +174,7 @@ function getProfileCopy(language: "tr" | "en") {
     pushDescription: "Duyuru, program ve mesaj bildirimleri.",
     emailNotifications: "E-posta bildirimleri",
     emailDescription: "Önemli kulüp güncellemeleri için e-posta.",
+    preferencesSaveError: "Bu tercih kaydedilemedi. Lütfen tekrar dene.",
     legalTitle: "Yasal",
     legalSubtitle: "Verilerinizin nasıl kullanıldığını ve kabul ettiğiniz koşulları inceleyin.",
     legalPrivacy: "Gizlilik Politikası",
@@ -179,6 +215,24 @@ function getProfileCopy(language: "tr" | "en") {
     connectingAccount: "Bağlanıyor...",
     connectAccountError: "Ödeme hesabı bağlanamadı. Lütfen tekrar dene.",
     connectAccountSuccess: "Ödeme hesabı bağlandı.",
+    subscriptionTitle: "Kulüp aboneliği",
+    subscriptionSubtitle: "Bu kulüp için MaviTeam'in aylık 20$'lık planı.",
+    subscriptionStatusLabels: {
+      trialing: "Ücretsiz deneme",
+      active: "Aktif",
+      past_due: "Ödeme başarısız",
+      canceled: "İptal edildi",
+    },
+    subscriptionRenewsOn: (date: string) => `${date} tarihinde yenilenecek.`,
+    subscriptionCancelsOn: (date: string) => `Erişim ${date} tarihinde sona erecek -- abonelik yenilenmeyecek.`,
+    subscriptionTrialEndsOn: (date: string) => `Ücretsiz deneme ${date} tarihinde sona eriyor. Kulübün aktif kalması için bir ödeme yöntemi ekle.`,
+    subscriptionPastDueSince: (date: string) => `Son ödeme ${date} tarihinde başarısız oldu. Askıya alınmayı önlemek için ödeme yönteminizi güncelleyin.`,
+    subscriptionGrandfathered: "Bu kulübün faturalandırma olmadan tam erişimi var.",
+    subscriptionNotAvailable: "Bu kulübün ülkesi için abonelik henüz kullanılamıyor.",
+    manageSubscriptionButton: "Aboneliği yönet",
+    addPaymentMethodButton: "Ödeme yöntemi ekle",
+    subscriptionActionPending: "Açılıyor...",
+    subscriptionActionError: "Faturalandırma açılamadı. Lütfen tekrar dene.",
   };
 }
 
@@ -186,13 +240,15 @@ export default function ProfileScreen() {
   const { t, language } = useTranslation();
   const copy = getProfileCopy(language === "tr" ? "tr" : "en");
   const { appData, error: appDataError, setAppData, refresh } = useAppDataContext();
-  const { connect: connectReturnParam } = useLocalSearchParams<{ connect?: string }>();
+  const { connect: connectReturnParam, billing: billingReturnParam } = useLocalSearchParams<{
+    connect?: string;
+    billing?: string;
+  }>();
   const [draftProfileData, setDraftProfileData] = useState<ProfileFormData>(emptyFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [customStatusMessage, setStatusMessage] = useState<string | null>(null);
   const statusMessage = customStatusMessage ?? t.common.loading;
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -201,6 +257,7 @@ export default function ProfileScreen() {
   const [isConnectingPaymentAccount, setIsConnectingPaymentAccount] = useState(false);
   const [showIyzicoConnectModal, setShowIyzicoConnectModal] = useState(false);
   const [iyzicoConnectError, setIyzicoConnectError] = useState("");
+  const [isSubscriptionActionPending, setIsSubscriptionActionPending] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -217,12 +274,16 @@ export default function ProfileScreen() {
   // once the club admin finishes (or abandons) the flow -- refresh so an
   // updated paymentAccount.status (set by the stripeWebhook once Stripe
   // confirms the account can accept charges) shows up without a manual pull.
+  // ?billing=return is the same idea for cancelClubSubscription's Billing
+  // Portal round trip -- a canceled/resumed subscription only actually
+  // changes clubs/{id}.subscription once Stripe's webhook fires, which can
+  // land slightly after the portal redirects back here.
   useFocusEffect(
     useCallback(() => {
-      if (connectReturnParam === "return") {
+      if (connectReturnParam === "return" || billingReturnParam === "return") {
         refresh().then(setAppData).catch(() => undefined);
       }
-    }, [connectReturnParam, refresh, setAppData])
+    }, [connectReturnParam, billingReturnParam, refresh, setAppData])
   );
 
   const startEditing = useCallback(() => {
@@ -280,6 +341,33 @@ export default function ProfileScreen() {
       setIsSaving(false);
     }
   }, [appData, isSaving, draftProfileData, copy.defaultUser, copy.defaultClub, copy.defaultCity, t.common.volleyball, t.profile.messages.updated, t.profile.messages.failedToUpdate, setAppData]);
+
+  // Persists immediately on toggle (no separate Save step, unlike the
+  // profile-fields form above) -- optimistic-looking since the switch
+  // itself flips instantly, but rolled back to the last saved value if the
+  // write actually fails.
+  const handleToggleNotificationPreference = useCallback(
+    async (key: "push" | "email", value: boolean) => {
+      if (appData === null || isSavingPreferences) {
+        return;
+      }
+
+      const previousPreferences = appData.currentUser.notificationPreferences ?? { push: true, email: false };
+
+      try {
+        setIsSavingPreferences(true);
+        const nextAppData = await teamSyncService.updateCurrentUserProfileDirect(appData, {
+          notificationPreferences: { ...previousPreferences, [key]: value },
+        });
+        setAppData(nextAppData);
+      } catch {
+        setStatusMessage(copy.preferencesSaveError);
+      } finally {
+        setIsSavingPreferences(false);
+      }
+    },
+    [appData, isSavingPreferences, setAppData, copy.preferencesSaveError]
+  );
 
   const handleLogout = useCallback(async () => {
     if (isSigningOut) {
@@ -380,6 +468,49 @@ export default function ProfileScreen() {
     }
   }, [appData, refresh, setAppData, copy.connectAccountSuccess, copy.connectAccountError]);
 
+  // Opens Stripe's hosted Billing Portal -- covers cancel, resume-a-pending-
+  // cancellation, and updating a failed payment method all in one place, so
+  // this screen doesn't have to hand-roll separate buttons/flows for each
+  // subscription.status. Only ever reachable when a real Stripe customer
+  // exists (see the button's own guard below).
+  const handleManageSubscription = useCallback(async () => {
+    if (appData === null || isSubscriptionActionPending) {
+      return;
+    }
+
+    try {
+      setIsSubscriptionActionPending(true);
+      setStatusMessage(copy.subscriptionActionPending);
+      const { url } = await paymentGatewayService.cancelClubSubscription(appData.club.id);
+      await openBrowserAsync(url);
+    } catch {
+      setStatusMessage(copy.subscriptionActionError);
+    } finally {
+      setIsSubscriptionActionPending(false);
+    }
+  }, [appData, isSubscriptionActionPending, copy.subscriptionActionPending, copy.subscriptionActionError]);
+
+  // Converts a promo-trial club to a real paid subscription before the
+  // trial runs out -- the same checkout startSubscriptionRenewalCheckout
+  // builds for a club that's already locked out, just started proactively
+  // here instead of reactively from subscription-locked.tsx.
+  const handleAddPaymentMethod = useCallback(async () => {
+    if (appData === null || isSubscriptionActionPending) {
+      return;
+    }
+
+    try {
+      setIsSubscriptionActionPending(true);
+      setStatusMessage(copy.subscriptionActionPending);
+      const { checkoutUrl } = await paymentGatewayService.startSubscriptionRenewalCheckout(appData.club.id);
+      await openBrowserAsync(checkoutUrl);
+    } catch {
+      setStatusMessage(copy.subscriptionActionError);
+    } finally {
+      setIsSubscriptionActionPending(false);
+    }
+  }, [appData, isSubscriptionActionPending, copy.subscriptionActionPending, copy.subscriptionActionError]);
+
   if (appData === null) {
     return (
       <AppScreenLayout>
@@ -393,6 +524,40 @@ export default function ProfileScreen() {
   const currentClub = appData.club;
   const primaryTeam = appData.teams.find((team) => currentUser.teamIds.includes(team.id));
   const displayData = isEditing ? draftProfileData : getFormDataFromAppData(appData);
+  const notificationPreferences = currentUser.notificationPreferences ?? { push: true, email: false };
+
+  const subscription = currentClub.subscription;
+  const subscriptionLocale = language === "tr" ? "tr-TR" : "en-US";
+  // Mirrors functions/index.js's CLUB_SUBSCRIPTION_COUNTRY_CONFIG -- TR has
+  // no recurring-billing integration wired up yet (see startClubSignup),
+  // only US does.
+  const countrySubscriptionsAvailable = currentClub.country === "US";
+  const canManageSubscription = subscription?.provider === "stripe" && Boolean(subscription.customerId);
+  const canAddPaymentMethod =
+    !canManageSubscription && countrySubscriptionsAvailable && subscription !== undefined && subscription.status !== "active";
+
+  let subscriptionDetailText = "";
+
+  if (subscription?.status === "trialing" && subscription.trialEndsAt) {
+    subscriptionDetailText = copy.subscriptionTrialEndsOn(formatSubscriptionDate(subscription.trialEndsAt, subscriptionLocale));
+  } else if (subscription?.status === "active") {
+    subscriptionDetailText =
+      subscription.provider === "none"
+        ? copy.subscriptionGrandfathered
+        : subscription.cancelAtPeriodEnd && subscription.currentPeriodEnd
+          ? copy.subscriptionCancelsOn(formatSubscriptionDate(subscription.currentPeriodEnd, subscriptionLocale))
+          : subscription.currentPeriodEnd
+            ? copy.subscriptionRenewsOn(formatSubscriptionDate(subscription.currentPeriodEnd, subscriptionLocale))
+            : "";
+  } else if (subscription?.status === "past_due" && subscription.pastDueSince) {
+    subscriptionDetailText = copy.subscriptionPastDueSince(formatSubscriptionDate(subscription.pastDueSince, subscriptionLocale));
+  } else if (subscription?.status === "canceled" && subscription.currentPeriodEnd) {
+    subscriptionDetailText = copy.subscriptionCancelsOn(formatSubscriptionDate(subscription.currentPeriodEnd, subscriptionLocale));
+  }
+
+  if (subscriptionDetailText === "" && !countrySubscriptionsAvailable && subscription?.provider !== "none") {
+    subscriptionDetailText = copy.subscriptionNotAvailable;
+  }
 
   return (
     <AppScreenLayout>
@@ -587,6 +752,42 @@ export default function ProfileScreen() {
         </Card>
       ) : null}
 
+      {currentUser.role === "clubAdmin" && subscription ? (
+        <Card style={styles.section}>
+          <Text style={styles.sectionTitle}>{copy.subscriptionTitle}</Text>
+          <Text style={styles.sectionSubtitle}>{copy.subscriptionSubtitle}</Text>
+
+          <View style={styles.paymentAccountRow}>
+            <View style={styles.paymentAccountTextArea}>
+              <StatusBadge
+                label={copy.subscriptionStatusLabels[subscription.status]}
+                tone={subscriptionStatusTone[subscription.status]}
+                style={styles.paymentAccountBadge}
+              />
+              {subscriptionDetailText !== "" ? <Text style={styles.sectionSubtitle}>{subscriptionDetailText}</Text> : null}
+            </View>
+
+            {canManageSubscription ? (
+              <AppButton
+                title={isSubscriptionActionPending ? copy.subscriptionActionPending : copy.manageSubscriptionButton}
+                variant="secondary"
+                disabled={isSubscriptionActionPending}
+                onPress={handleManageSubscription}
+                style={styles.paymentAccountButton}
+              />
+            ) : canAddPaymentMethod ? (
+              <AppButton
+                title={isSubscriptionActionPending ? copy.subscriptionActionPending : copy.addPaymentMethodButton}
+                variant="secondary"
+                disabled={isSubscriptionActionPending}
+                onPress={handleAddPaymentMethod}
+                style={styles.paymentAccountButton}
+              />
+            ) : null}
+          </View>
+        </Card>
+      ) : null}
+
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>{t.profile.languageSettings}</Text>
         <Text style={styles.sectionSubtitle}>{t.language.subtitle}</Text>
@@ -605,8 +806,9 @@ export default function ProfileScreen() {
             <Text style={styles.preferenceSubtitle}>{copy.pushDescription}</Text>
           </View>
           <Switch
-            value={pushNotifications}
-            onValueChange={setPushNotifications}
+            value={notificationPreferences.push}
+            onValueChange={(value) => handleToggleNotificationPreference("push", value)}
+            disabled={isSavingPreferences}
             accessibilityLabel={copy.pushNotifications}
             aria-label={copy.pushNotifications}
           />
@@ -618,8 +820,9 @@ export default function ProfileScreen() {
             <Text style={styles.preferenceSubtitle}>{copy.emailDescription}</Text>
           </View>
           <Switch
-            value={emailNotifications}
-            onValueChange={setEmailNotifications}
+            value={notificationPreferences.email}
+            onValueChange={(value) => handleToggleNotificationPreference("email", value)}
+            disabled={isSavingPreferences}
             accessibilityLabel={copy.emailNotifications}
             aria-label={copy.emailNotifications}
           />

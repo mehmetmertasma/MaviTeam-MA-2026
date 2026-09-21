@@ -68,6 +68,25 @@ function getPlatformFeeCents(amountCents) {
 const CLUB_SUBSCRIPTION_PRICE_USD_CENTS = 2000;
 const SUBSCRIPTION_GRACE_PERIOD_DAYS = 7;
 
+// Single source of truth for what a club's country implies about
+// subscription billing: its currency, which provider is responsible for it,
+// and whether that provider's recurring checkout is actually wired up yet.
+// Every place that used to branch on `country === "US"` for one of these
+// facts should read it from here instead, so the three stay in sync as a
+// unit. Adding a real new country later still means building that
+// provider's actual recurring-billing integration (config alone can't
+// conjure one) -- this only removes the duplicated country ternaries, it
+// doesn't make a new country a config-only change.
+const CLUB_SUBSCRIPTION_COUNTRY_CONFIG = {
+  US: { currency: "USD", provider: "stripe", subscriptionsAvailable: true },
+  TR: { currency: "TRY", provider: "iyzico", subscriptionsAvailable: false },
+};
+const DEFAULT_CLUB_COUNTRY = "TR";
+
+function getClubCountryConfig(country) {
+  return CLUB_SUBSCRIPTION_COUNTRY_CONFIG[country] || CLUB_SUBSCRIPTION_COUNTRY_CONFIG[DEFAULT_CLUB_COUNTRY];
+}
+
 const ATTENDANCE_RETENTION_DAYS = 14;
 const ATTENDANCE_CLEANUP_BATCH_SIZE = 300;
 const ATTENDANCE_STATUS_FIELDS = ["present", "absent", "late", "excused"];
@@ -1221,7 +1240,7 @@ function generateClubCode(clubName) {
 }
 
 function getCurrencyForCountry(country) {
-  return country === "US" ? "USD" : "TRY";
+  return getClubCountryConfig(country).currency;
 }
 
 function normalizeClubDraft(rawDraft) {
@@ -1229,7 +1248,7 @@ function normalizeClubDraft(rawDraft) {
   const name = String(draft.name || "").trim();
   const sport = String(draft.sport || "").trim();
   const city = String(draft.city || "").trim();
-  const country = draft.country === "US" ? "US" : "TR";
+  const country = CLUB_SUBSCRIPTION_COUNTRY_CONFIG[draft.country] ? draft.country : DEFAULT_CLUB_COUNTRY;
 
   if (name === "" || sport === "" || city === "") {
     throw new HttpsError("invalid-argument", "name, sport, and city are required.");
@@ -1398,7 +1417,8 @@ exports.startClubSignup = onCall({ secrets: [stripeSecretKey] }, async (request)
   // The club itself doesn't exist yet -- see the stripeWebhook handler for
   // "checkout.session.completed" with session.mode === "subscription".
   const pendingSignupRef = db.collection("pendingClubSignups").doc();
-  const provider = draft.country === "US" ? "stripe" : "iyzico";
+  const countryConfig = getClubCountryConfig(draft.country);
+  const provider = countryConfig.provider;
 
   await pendingSignupRef.set({
     id: pendingSignupRef.id,
@@ -1416,7 +1436,7 @@ exports.startClubSignup = onCall({ secrets: [stripeSecretKey] }, async (request)
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  if (provider === "iyzico") {
+  if (!countryConfig.subscriptionsAvailable) {
     // TR recurring billing needs iyzico's separate Subscription API (a
     // distinct product from the one-off Checkout Form used for athlete
     // dues elsewhere in this file) -- not wired up yet. Ship US/Stripe
@@ -1478,7 +1498,7 @@ exports.startSubscriptionRenewalCheckout = onCall({ secrets: [stripeSecretKey] }
 
   const club = clubSnapshot.data();
 
-  if (club.country !== "US") {
+  if (!getClubCountryConfig(club.country).subscriptionsAvailable) {
     throw new HttpsError("unimplemented", "TR_SUBSCRIPTIONS_NOT_YET_AVAILABLE");
   }
 

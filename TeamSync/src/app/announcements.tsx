@@ -158,7 +158,14 @@ export default function AnnouncementsScreen() {
           return;
         }
 
-        const fetchedAnnouncements = await firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser);
+        const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
+
+        if (workspace === null) {
+          setStatusMessage(copy.statusSignInToView);
+          return;
+        }
+
+        const fetchedAnnouncements = await firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser, workspace);
         setFirestoreAnnouncements(fetchedAnnouncements);
         setStatusMessage(copy.statusUpdated);
         return;

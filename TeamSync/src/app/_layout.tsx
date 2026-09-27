@@ -15,7 +15,6 @@ import { AppDataProvider, useAppDataContext } from "@/providers/AppDataProvider"
 import { AuthProvider, useAuthContext } from "@/providers/AuthProvider";
 import { LanguageProvider, useTranslation } from "@/localization";
 import { Sentry, initSentry } from "@/lib/sentry";
-import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
 
 initSentry();
 
@@ -240,103 +239,57 @@ function AppContent() {
       return;
     }
 
-    const firebaseUser = user;
-    let isActive = true;
-
-    async function guardWorkspaceAccess() {
-      try {
-        const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
-
-        if (!isActive) {
-          return;
-        }
-
-        if (workspace === null) {
-          if (!routeIsWorkspaceSetup) {
-            router.replace(getSetupRouteForSignedInUser(pathname) as never);
-          }
-
-          return;
-        }
-
-        // Safety net for the whole class of bug where useAppDataContext's
-        // cached snapshot disagrees with what Firestore actually has right
-        // now (a club was just created, a suspension was just lifted, a
-        // renewal just went through) but nothing told the cache to forget
-        // its old answer -- this is the one place every navigation already
-        // passes through, so it catches any such case even if a specific
-        // screen's own refresh() call is missing or misses a spot. Not
-        // awaited: this only needs to kick a background refresh, never to
-        // block the redirect decisions below.
-        const cachedClub = appData?.club ?? null;
-        const freshClub = workspace.club;
-        const appDataIsStale =
-          (freshClub === null) !== (cachedClub === null) ||
-          (freshClub !== null && cachedClub !== null && (freshClub.id !== cachedClub.id || freshClub.status !== cachedClub.status));
-
-        if (appDataIsStale) {
-          refreshAppData().catch(() => {});
-        }
-
-        const userHasClub = workspace.currentUser.clubId !== "";
-        const userIsPendingApproval = workspace.currentUser.status === "pending" && userHasClub;
-        const userWasRemoved = workspace.currentUser.status === "removed";
-
-        if (userWasRemoved && pathname !== "/") {
-          router.replace("/" as never);
-          return;
-        }
-
-        if (userIsPendingApproval && pathname !== "/join-request-sent" && pathname !== "/join-club") {
-          router.replace("/join-request-sent" as never);
-          return;
-        }
-
-        // A club stays suspended (Club.status, see firestore.rules'
-        // clubIsActive) whether that's a manual platform-admin action or the
-        // subscription grace-period cron -- either way, every member is
-        // routed to a dedicated "please renew" screen instead of hitting
-        // permission-denied errors throughout the rest of the app. Legal
-        // routes stay reachable, same as the "already has a club" redirect
-        // below.
-        const clubIsSuspended = workspace.club !== null && workspace.club.status === "suspended";
-
-        if (clubIsSuspended && pathname !== "/subscription-locked" && !legalRoutes.includes(pathname)) {
-          router.replace("/subscription-locked" as never);
-          return;
-        }
-
-        if (!clubIsSuspended && pathname === "/subscription-locked") {
-          router.replace("/dashboard" as never);
-          return;
-        }
-
-        if (workspace.club === null && !userHasClub && !routeIsWorkspaceSetup) {
-          router.replace(getSetupRouteForSignedInUser(pathname) as never);
-          return;
-        }
-
-        if (workspace.club !== null && !legalRoutes.includes(pathname) && (routeIsPublic || routeIsWorkspaceSetup)) {
-          router.replace("/dashboard" as never);
-        }
-      } catch (workspaceError) {
-        console.warn("Workspace guard skipped because workspace data could not be loaded.", workspaceError);
-      }
+    // Use cached/loaded appData directly to prevent duplicate Firestore queries and render loops
+    if (appData === null) {
+      return;
     }
 
-    guardWorkspaceAccess();
+    const userHasClub = appData.currentUser.clubId !== "";
+    const userIsPendingApproval = appData.currentUser.status === "pending" && userHasClub;
+    const userWasRemoved = appData.currentUser.status === "removed";
 
-    return () => {
-      isActive = false;
-    };
-  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, routeIsWorkspaceSetup, user, appData, refreshAppData]);
+    if (userWasRemoved && pathname !== "/") {
+      router.replace("/" as never);
+      return;
+    }
+
+    if (userIsPendingApproval && pathname !== "/join-request-sent" && pathname !== "/join-club") {
+      router.replace("/join-request-sent" as never);
+      return;
+    }
+
+    const clubIsSuspended = appData.club !== null && appData.club.status === "suspended";
+
+    if (clubIsSuspended && pathname !== "/subscription-locked" && !legalRoutes.includes(pathname)) {
+      router.replace("/subscription-locked" as never);
+      return;
+    }
+
+    if (!clubIsSuspended && pathname === "/subscription-locked") {
+      router.replace("/dashboard" as never);
+      return;
+    }
+
+    const hasClub = appData.club !== null && appData.club.id !== "";
+
+    if (!hasClub && !userHasClub && !routeIsWorkspaceSetup) {
+      router.replace(getSetupRouteForSignedInUser(pathname) as never);
+      return;
+    }
+
+    if (hasClub && !legalRoutes.includes(pathname) && (routeIsPublic || routeIsWorkspaceSetup)) {
+      router.replace("/dashboard" as never);
+    }
+  }, [isAuthReady, isFirebaseAuthConfigured, isSignedIn, pathname, routeIsPublic, routeIsWorkspaceSetup, user, appData]);
 
   if (!isLanguageReady) {
     return <LoadingScreen message={t.common.loading} />;
   }
 
-  if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
-    return <LoadingScreen message={t.common.loading} />;
+  if (Platform.OS !== "web") {
+    if (isFirebaseAuthConfigured && !isAuthReady && !routeIsPublic) {
+      return <LoadingScreen message={t.common.loading} />;
+    }
   }
 
   return (

@@ -266,19 +266,19 @@ async function loadAppData(): Promise<TeamSyncAppData> {
   const [users, teams, scheduleEvents, announcements, joinRequests, payments, attendanceRecords, chatGroups] = await Promise.all([
     tagError("users", usersPromise),
     tagError("teams", firestoreTeamSyncService.listTeamsForClub(workspace.club.id)),
-    tagError("scheduleEvents", firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser)),
-    tagError("announcements", firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser)),
+    tagError("scheduleEvents", firestoreMaviTeamDataService.listVisibleScheduleEventsForCurrentUser(firebaseUser, workspace)),
+    tagError("announcements", firestoreMaviTeamDataService.listVisibleAnnouncementsForCurrentUser(firebaseUser, workspace)),
     tagError("joinRequests", joinRequestsPromise),
-    tagError("payments", firestoreMaviTeamDataService.listVisiblePaymentsForCurrentUser(firebaseUser)),
-    tagError("attendanceRecords", firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser)),
-    tagError("chatGroups", firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser)),
+    tagError("payments", firestoreMaviTeamDataService.listVisiblePaymentsForCurrentUser(firebaseUser, workspace)),
+    tagError("attendanceRecords", firestoreMaviTeamDataService.listVisibleAttendanceRecordsForCurrentUser(firebaseUser, workspace)),
+    tagError("chatGroups", firestoreMaviTeamDataService.listVisibleChatGroupsForCurrentUser(firebaseUser, workspace)),
   ]);
   // Chat messages are not required for the rest of the app to function, so a
   // denied/failed read here must never block loading the user's own
   // profile/club data -- this failure is swallowed rather than propagated
   // like the reads above.
   const chatMessages = await firestoreMaviTeamDataService
-    .listVisibleChatMessagesForCurrentUser(firebaseUser)
+    .listVisibleChatMessagesForCurrentUser(firebaseUser, workspace)
     .catch((error) => {
       console.warn("[loadAppData] chatMessages unavailable:", error.message ?? error);
       return [];

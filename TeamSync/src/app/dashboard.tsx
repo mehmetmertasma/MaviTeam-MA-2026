@@ -156,6 +156,46 @@ export default function DashboardScreen() {
   if (appData === null && isLoading) {
     return (
       <AppScreenLayout variant="wide">
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.logo}>MaviTeam</Text>
+            <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
+          </View>
+          <View style={styles.systemBadge}>
+            <View style={styles.systemDot} />
+            <Text style={styles.systemBadgeText}>{copy.ready}</Text>
+          </View>
+        </View>
+
+        <PageHeader
+          eyebrow={copy.pageTitle}
+          title={copy.welcome}
+          subtitle={copy.loading}
+          badge={<StatusBadge label={copy.role} tone="neutral" />}
+        />
+
+        <View style={styles.statsGrid}>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.activeClub}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.loading}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.teams}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.teams}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.events}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.events}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.role}</Text>
+            <StatusBadge label={copy.loading} tone="neutral" style={styles.statRoleBadge} />
+          </Card>
+        </View>
+
         <LoadingState label={copy.loading} />
       </AppScreenLayout>
     );
@@ -169,7 +209,7 @@ export default function DashboardScreen() {
           description={copy.errorDescription}
           retryLabel={copy.retry}
           onRetry={() => {
-            refresh().catch(() => {});
+            refresh().catch(() => { });
           }}
         />
       </AppScreenLayout>
@@ -179,6 +219,46 @@ export default function DashboardScreen() {
   if (appData === null) {
     return (
       <AppScreenLayout variant="wide">
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.logo}>MaviTeam</Text>
+            <Text style={styles.topBarSub}>{copy.appSubtitle}</Text>
+          </View>
+          <View style={styles.systemBadge}>
+            <View style={styles.systemDot} />
+            <Text style={styles.systemBadgeText}>{copy.ready}</Text>
+          </View>
+        </View>
+
+        <PageHeader
+          eyebrow={copy.pageTitle}
+          title={copy.welcome}
+          subtitle={copy.loading}
+          badge={<StatusBadge label={copy.role} tone="neutral" />}
+        />
+
+        <View style={styles.statsGrid}>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.activeClub}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.loading}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.teams}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.teams}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.events}</Text>
+            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statLabel}>{copy.events}</Text>
+          </Card>
+          <Card style={styles.statCard}>
+            <Text style={styles.statHint}>{copy.role}</Text>
+            <StatusBadge label={copy.loading} tone="neutral" style={styles.statRoleBadge} />
+          </Card>
+        </View>
+
         <LoadingState label={copy.loading} />
       </AppScreenLayout>
     );

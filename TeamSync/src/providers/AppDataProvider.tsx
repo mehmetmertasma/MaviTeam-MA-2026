@@ -8,6 +8,7 @@ import type { TeamSyncAppData } from "@/types/teamSync";
 type AppDataContextValue = {
   appData: TeamSyncAppData | null;
   isLoading: boolean;
+  isValidating: boolean;
   error: unknown;
   refresh: () => Promise<TeamSyncAppData>;
   setAppData: (nextAppData: TeamSyncAppData) => void;

@@ -17,6 +17,7 @@ import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 import { requireFirebaseServices } from "@/lib/firebase";
 import { firestoreTeamSyncService } from "@/services/firestoreTeamSyncService";
+import type { FirestoreWorkspace } from "@/services/firestoreTeamSyncService";
 import type {
   Announcement,
   AttendanceRecord,
@@ -310,11 +311,10 @@ export const firestoreMaviTeamDataService = {
       .sort((firstUser, secondUser) => firstUser.fullName.localeCompare(secondUser.fullName));
   },
 
-  async listVisibleAnnouncementsForCurrentUser(firebaseUser: User, maxResults = 50): Promise<Announcement[]> {
+  async listVisibleAnnouncementsForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 50): Promise<Announcement[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 
@@ -338,11 +338,10 @@ export const firestoreMaviTeamDataService = {
     return sortAnnouncements(announcements);
   },
 
-  async listVisibleScheduleEventsForCurrentUser(firebaseUser: User, maxResults = 150): Promise<ScheduleEvent[]> {
+  async listVisibleScheduleEventsForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 150): Promise<ScheduleEvent[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 
@@ -381,11 +380,10 @@ export const firestoreMaviTeamDataService = {
       .sort((firstRequest, secondRequest) => secondRequest.createdAt.localeCompare(firstRequest.createdAt));
   },
 
-  async listVisiblePaymentsForCurrentUser(firebaseUser: User, maxResults = 150): Promise<Payment[]> {
+  async listVisiblePaymentsForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 150): Promise<Payment[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 
@@ -450,11 +448,10 @@ export const firestoreMaviTeamDataService = {
     );
   },
 
-  async listVisibleAttendanceRecordsForCurrentUser(firebaseUser: User, maxResults = 300): Promise<AttendanceRecord[]> {
+  async listVisibleAttendanceRecordsForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 300): Promise<AttendanceRecord[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 
@@ -523,11 +520,10 @@ export const firestoreMaviTeamDataService = {
     return savedRecords;
   },
 
-  async listVisibleChatGroupsForCurrentUser(firebaseUser: User, maxResults = 100): Promise<ChatGroup[]> {
+  async listVisibleChatGroupsForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 100): Promise<ChatGroup[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 
@@ -559,11 +555,10 @@ export const firestoreMaviTeamDataService = {
   // which the query itself needs to filter on for Firestore to prove the
   // rule holds. Querying visibleUserIds directly, like the direct-message
   // query already does with directUserIds, fixes both at once.
-  async listVisibleChatMessagesForCurrentUser(firebaseUser: User, maxResults = 250): Promise<ChatMessage[]> {
+  async listVisibleChatMessagesForCurrentUser(firebaseUser: User, workspace: FirestoreWorkspace, maxResults = 250): Promise<ChatMessage[]> {
     const { db } = requireFirebaseServices();
-    const workspace = await firestoreTeamSyncService.getCurrentWorkspace(firebaseUser);
 
-    if (workspace === null || workspace.club === null) {
+    if (workspace.club === null) {
       return [];
     }
 

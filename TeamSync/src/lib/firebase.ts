@@ -1,7 +1,13 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import type { FirebaseApp, FirebaseOptions } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { 
+  getAuth, 
+  initializeAuth, 
+  browserLocalPersistence, 
+  indexedDBLocalPersistence 
+} from "firebase/auth";
 import type { Auth } from "firebase/auth";
+import { Platform } from "react-native";
 import { getFirestore, initializeFirestore } from "firebase/firestore";
 import type { Firestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
@@ -48,6 +54,19 @@ function createFirestore(app: FirebaseApp) {
   }
 }
 
+function createAuth(app: FirebaseApp): Auth {
+  if (Platform.OS === "web") {
+    try {
+      return initializeAuth(app, {
+        persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      });
+    } catch {
+      return getAuth(app);
+    }
+  }
+  return getAuth(app);
+}
+
 export const isFirebaseConfigured = hasRequiredFirebaseConfig(firebaseConfig);
 
 let cachedServices: FirebaseServices | null = null;
@@ -65,7 +84,7 @@ export function getFirebaseServices() {
 
   cachedServices = {
     app,
-    auth: getAuth(app),
+    auth: createAuth(app),
     db: createFirestore(app),
     functions: getFunctions(app, "us-central1"),
     storage: getStorage(app),

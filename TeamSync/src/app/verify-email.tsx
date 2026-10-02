@@ -231,7 +231,7 @@ export default function VerifyEmailScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen} overScrollMode="never">
       <ScreenCard style={styles.card}>
         <AppBackButton fallbackHref="/login" />
 

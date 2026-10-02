@@ -24,7 +24,11 @@ export function AppScreenLayout({ children, variant = "standard", contentStyle, 
   const horizontalPadding = isDesktop ? theme.spacing["3xl"] : isTablet ? theme.spacing["2xl"] : theme.spacing.xl;
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, scrollContentStyle]}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
+      overScrollMode="never"
+    >
       <View style={[styles.container, { maxWidth, paddingHorizontal: horizontalPadding }, contentStyle]}>
         {children}
       </View>

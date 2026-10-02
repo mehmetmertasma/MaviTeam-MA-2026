@@ -176,6 +176,7 @@ export default function SubscriptionLockedScreen() {
       style={styles.scroll}
       contentContainerStyle={styles.screen}
       keyboardShouldPersistTaps="handled"
+      overScrollMode="never"
     >
       <ScreenCard style={styles.card}>
         <Text style={styles.logo}>{t.common.appName}</Text>

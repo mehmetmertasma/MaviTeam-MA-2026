@@ -108,6 +108,7 @@ export default function JoinClubScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.screen}
         keyboardShouldPersistTaps="handled"
+        overScrollMode="never"
       >
         <ScreenCard style={styles.card}>
           <AppBackButton fallbackHref="/" />

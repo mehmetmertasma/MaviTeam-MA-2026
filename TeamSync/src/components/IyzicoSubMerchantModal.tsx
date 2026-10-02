@@ -74,7 +74,7 @@ export function IyzicoSubMerchantModal({ isSaving, errorMessage, onSave, onClose
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={copy.closeAccessibilityLabel}>
         <Pressable style={styles.panel} onPress={(pressEvent) => pressEvent.stopPropagation()}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <ScrollView contentContainerStyle={styles.scrollContent} overScrollMode="never">
             <View style={styles.header}>
               <View style={styles.headerText}>
                 <Text style={styles.title}>{copy.title}</Text>

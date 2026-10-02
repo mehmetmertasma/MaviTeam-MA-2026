@@ -146,6 +146,7 @@ export default function LoginScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.screen}
         keyboardShouldPersistTaps="handled"
+        overScrollMode="never"
       >
         <ScreenCard style={styles.card}>
           <View style={styles.topHeader}>

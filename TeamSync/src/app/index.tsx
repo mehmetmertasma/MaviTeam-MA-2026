@@ -12,7 +12,7 @@ export default function HomeScreen() {
   const { t } = useTranslation();
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen} overScrollMode="never">
       <ScreenCard centered style={styles.card}>
         <View style={styles.languageContainer}>
           <LanguageSelector compact />

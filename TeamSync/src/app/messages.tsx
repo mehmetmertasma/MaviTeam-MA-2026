@@ -485,6 +485,7 @@ export default function MessagesScreen() {
             style={styles.messagesScroll}
             contentContainerStyle={styles.messagesContent}
             keyboardShouldPersistTaps="handled"
+            overScrollMode="never"
           >
             {visibleMessages.length > 0 ? (
               visibleMessages.map((message) => {

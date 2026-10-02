@@ -76,6 +76,7 @@ export function GroupMemberBubble({
           nestedScrollEnabled
           style={styles.memberList}
           contentContainerStyle={styles.memberListContent}
+          overScrollMode="never"
         >
           {filteredMembers.map((member) => (
             <View key={member.id} style={styles.memberRow}>

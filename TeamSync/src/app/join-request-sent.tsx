@@ -86,7 +86,7 @@ export default function JoinRequestSentScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.screen} overScrollMode="never">
       <ScreenCard style={styles.card}>
         <AppBackButton label={copy.back} fallbackHref="/join-club" onPress={handleRetryCode} />
 

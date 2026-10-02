@@ -423,7 +423,7 @@ export default function PaymentsScreen() {
               ) : filteredRecipients.length === 0 ? (
                 <EmptyState title={copy.noMatchingMembersTitle} description={copy.noMatchingMembersDescription} />
               ) : (
-                <ScrollView style={styles.recipientList} nestedScrollEnabled>
+                <ScrollView style={styles.recipientList} nestedScrollEnabled overScrollMode="never">
                   {filteredRecipients.map((user) => (
                     <Pressable
                       key={user.id}

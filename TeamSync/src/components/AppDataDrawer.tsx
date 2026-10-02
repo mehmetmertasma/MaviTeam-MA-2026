@@ -227,7 +227,12 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
           </View>
         </View>
 
-        <ScrollView style={styles.itemsScroll} contentContainerStyle={styles.items} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.itemsScroll}
+          contentContainerStyle={styles.items}
+          showsVerticalScrollIndicator={false}
+          overScrollMode="never"
+        >
           {visibleDrawerItems.map((item) => {
             const isActiveItem = item.route !== undefined && item.route === pathname;
 

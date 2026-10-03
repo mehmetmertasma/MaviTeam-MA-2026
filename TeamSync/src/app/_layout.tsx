@@ -156,7 +156,7 @@ function AppContent() {
   const insets = useSafeAreaInsets();
   const { t, isLanguageReady } = useTranslation();
   const { user, isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
-  const { appData, refresh: refreshAppData } = useAppDataContext();
+  const { appData } = useAppDataContext();
   const routeIsPublic = publicAuthRoutes.includes(pathname);
   const routeIsWorkspaceSetup = workspaceSetupRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);

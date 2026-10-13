@@ -1,6 +1,6 @@
 import { router, usePathname } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { BackHandler, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppDataDrawer } from "@/components/AppDataDrawer";
@@ -43,27 +43,29 @@ export function AppGlobalNavigation() {
   const [drawerIsOpen, setDrawerIsOpen] = useState(false);
   const profileInitials = getInitials(appData?.currentUser.fullName ?? "");
 
-  if (routesWithoutTopControls.includes(pathname)) {
-    return null;
-  }
-
   const showProfileButton = pathname !== "/profile";
-  // Every sign-in/verification/setup flow lands here via router.replace, so
-  // there's never anything to go "back" to from the dashboard itself --
-  // router.canGoBack() is false, and the old fallback (send to "/") caused a
-  // visible flash of the public landing page before the workspace guard's
-  // async check bounced the user right back to /dashboard a second later.
-  // A club's dashboard is the app's actual home screen, so it simply
-  // shouldn't offer a back button at all, same as most apps' root/home tab.
   const showBackButton = pathname !== "/dashboard";
 
   function handleBackPress() {
-    if (router.canGoBack()) {
-      router.back();
+    router.replace("/dashboard" as never);
+  }
+
+  useEffect(() => {
+    if (pathname === "/dashboard" || drawerIsOpen) {
       return;
     }
 
-    router.replace("/dashboard" as never);
+    const onHardwareBack = () => {
+      router.replace("/dashboard" as never);
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
+    return () => subscription.remove();
+  }, [pathname, drawerIsOpen]);
+
+  if (routesWithoutTopControls.includes(pathname)) {
+    return null;
   }
 
   return (

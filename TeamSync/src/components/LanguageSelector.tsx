@@ -105,9 +105,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: theme.spacing.md,
   },
   compactSegment: {
-    minHeight: 30,
+    flex: 0,
+    minWidth: 38,
+    minHeight: 28,
     borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.spacing.sm,
+    paddingHorizontal: 6,
   },
   segmentActive: {
     backgroundColor: theme.colors.brand.primary,
@@ -118,7 +120,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeights.semibold,
   },
   compactSegmentText: {
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.xs,
+    fontWeight: theme.fontWeights.bold,
   },
   segmentTextActive: {
     color: theme.colors.text.inverse,

@@ -183,12 +183,10 @@ export default function DashboardScreen() {
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.teams}</Text>
             <Text style={styles.statValue}>-</Text>
-            <Text style={styles.statLabel}>{copy.teams}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.events}</Text>
             <Text style={styles.statValue}>-</Text>
-            <Text style={styles.statLabel}>{copy.events}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.role}</Text>
@@ -246,12 +244,10 @@ export default function DashboardScreen() {
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.teams}</Text>
             <Text style={styles.statValue}>-</Text>
-            <Text style={styles.statLabel}>{copy.teams}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.events}</Text>
             <Text style={styles.statValue}>-</Text>
-            <Text style={styles.statLabel}>{copy.events}</Text>
           </Card>
           <Card style={styles.statCard}>
             <Text style={styles.statHint}>{copy.role}</Text>
@@ -339,8 +335,8 @@ export default function DashboardScreen() {
 
       <View style={styles.statsGrid}>
         <Card style={styles.statCard}><Text style={styles.statHint}>{copy.activeClub}</Text><Text style={styles.statValue}>1</Text><Text style={styles.statLabel}>{club.name}</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.teams}</Text><Text style={styles.statValue}>{teams.length}</Text><Text style={styles.statLabel}>{copy.teams}</Text></Card>
-        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.events}</Text><Text style={styles.statValue}>{scheduleEvents.length}</Text><Text style={styles.statLabel}>{copy.events}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.teams}</Text><Text style={styles.statValue}>{teams.length}</Text></Card>
+        <Card style={styles.statCard}><Text style={styles.statHint}>{copy.events}</Text><Text style={styles.statValue}>{scheduleEvents.length}</Text></Card>
         <Card style={styles.statCard}>
           <Text style={styles.statHint}>{copy.role}</Text>
           <StatusBadge label={copy.roleLabels[currentUser.role]} tone="neutral" style={styles.statRoleBadge} />

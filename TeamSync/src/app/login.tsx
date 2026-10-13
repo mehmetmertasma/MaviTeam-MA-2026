@@ -1,6 +1,6 @@
 import { Link, useRouter } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -25,6 +25,9 @@ export default function LoginScreen() {
   const router = useRouter();
   const { t, language } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
+
+  const passwordInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -143,6 +146,7 @@ export default function LoginScreen() {
       style={styles.keyboardContainer}
     >
       <ScrollView
+        ref={scrollViewRef}
         style={styles.scroll}
         contentContainerStyle={styles.screen}
         keyboardShouldPersistTaps="handled"
@@ -151,18 +155,21 @@ export default function LoginScreen() {
         <ScreenCard style={styles.card}>
           <View style={styles.topHeader}>
             <AppBackButton fallbackHref="/" />
+            <Text style={styles.headerLogo}>{t.common.appName}</Text>
             <LanguageSelector compact />
           </View>
 
-          <Text style={styles.logo}>{t.common.appName}</Text>
-          <StatusBadge label={t.auth.loginBadge} tone="info" style={styles.badge} />
-          <Text style={styles.title}>{t.auth.loginTitle}</Text>
-          <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>{t.auth.loginStatusTitle}</Text>
-            <Text style={styles.infoText}>{statusMessage}</Text>
+          <View style={styles.headingSection}>
+            <Text style={styles.title}>{t.auth.loginTitle}</Text>
+            <Text style={styles.subtitle}>{t.auth.loginSubtitle}</Text>
           </View>
+
+          {customStatusMessage || !firebaseIsReady ? (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoTitle}>{t.auth.loginStatusTitle}</Text>
+              <Text style={styles.infoText}>{statusMessage}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.form}>
             <TextField
@@ -178,9 +185,13 @@ export default function LoginScreen() {
               autoComplete="email"
               textContentType="emailAddress"
               accessibilityLabel={t.auth.accessibility.email}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
             />
 
             <TextField
+              ref={passwordInputRef}
               label={t.auth.passwordLabel}
               placeholder={t.auth.passwordPlaceholder}
               value={password}
@@ -192,6 +203,13 @@ export default function LoginScreen() {
               autoComplete="password"
               textContentType="password"
               accessibilityLabel={t.auth.accessibility.password}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              onFocus={() => {
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
             />
           </View>
 
@@ -238,67 +256,76 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.app,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
   },
-  card: { padding: theme.spacing["3xl"] },
+  card: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+  },
   topHeader: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
   },
-  logo: {
+  headerLogo: {
     ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
-    textAlign: "center",
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.bold,
+  },
+  headingSection: {
+    alignItems: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
-    alignSelf: "center",
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.xs,
   },
   title: {
     ...Typography.pageTitle,
+    fontSize: theme.fontSizes["2xl"],
+    lineHeight: theme.lineHeights["2xl"],
     color: theme.colors.text.primary,
     textAlign: "center",
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    ...Typography.body,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    marginBottom: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.sm,
   },
   infoBox: {
     width: "100%",
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
   infoTitle: {
     ...Typography.label,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.xxs,
   },
   infoText: {
     ...Typography.supporting,
     color: theme.colors.text.secondary,
   },
-  form: { width: "100%", gap: theme.spacing.lg },
+  form: { width: "100%", gap: theme.spacing.md },
   errorText: {
     ...Typography.supporting,
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
     color: theme.colors.text.danger,
     textAlign: "center",
   },
   buttonGroup: {
     width: "100%",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
   },
   button: { width: "100%" },
 });

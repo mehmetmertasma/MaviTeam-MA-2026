@@ -1,12 +1,14 @@
 import { router } from "expo-router";
+import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppScreenLayout } from "@/components/AppScreenLayout";
 import { Card } from "@/components/Card";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { PageHeader } from "@/components/PageHeader";
 import { theme } from "@/constants/theme";
 import { useTranslation } from "@/localization";
-import { StyleSheet, Text, View } from "react-native";
 
 type LegalSection = { title: string; body: string };
 
@@ -136,10 +138,22 @@ function getCopy(language: "tr" | "en") {
 export default function TermsOfServiceScreen() {
   const { language } = useTranslation();
   const copy = getCopy(language === "en" ? "en" : "tr");
+  const insets = useSafeAreaInsets();
 
   return (
-    <AppScreenLayout variant="standard">
-      <AppBackButton fallbackHref="/" onPress={() => (router.canGoBack() ? router.back() : router.replace("/" as never))} />
+    <AppScreenLayout
+      variant="standard"
+      scrollContentStyle={{ paddingTop: insets.top + theme.spacing.lg }}
+    >
+      <View style={styles.topHeader}>
+        <AppBackButton
+          fallbackHref="/"
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/" as never))}
+          style={styles.backButton}
+        />
+        <LanguageSelector compact />
+      </View>
+
       <PageHeader eyebrow={copy.eyebrow} title={copy.title} subtitle={copy.subtitle} />
 
       <Card style={styles.introCard}>
@@ -159,6 +173,16 @@ export default function TermsOfServiceScreen() {
 }
 
 const styles = StyleSheet.create({
+  topHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.lg,
+  },
+  backButton: {
+    marginBottom: 0,
+  },
   introCard: { marginBottom: theme.spacing["2xl"] },
   introText: {
     fontSize: theme.fontSizes.lg,

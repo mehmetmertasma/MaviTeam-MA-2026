@@ -14,26 +14,26 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.screen} overScrollMode="never">
       <ScreenCard centered style={styles.card}>
-        <View style={styles.languageContainer}>
+        <View style={styles.topHeader}>
+          <Text style={styles.headerLogo}>{t.common.appName}</Text>
           <LanguageSelector compact />
         </View>
 
-        <Text style={styles.logo}>{t.common.appName}</Text>
-
-        <StatusBadge label={t.home.badge} tone="info" style={styles.badge} />
-
-        <Text style={styles.title}>{t.home.title}</Text>
-
-        <Text style={styles.subtitle}>{t.home.subtitle}</Text>
+        <View style={styles.headingSection}>
+          <Text style={styles.title}>{t.home.title}</Text>
+          <Text style={styles.subtitle}>{t.home.subtitle}</Text>
+        </View>
 
         <View style={styles.featureBox}>
           <Text style={styles.featureTitle}>{t.home.featuresTitle}</Text>
 
-          {t.home.features.map((feature) => (
-            <Text key={feature} style={styles.featureText}>
-              ✓ {feature}
-            </Text>
-          ))}
+          <View style={styles.featureList}>
+            {t.home.features.map((feature) => (
+              <Text key={feature} style={styles.featureText}>
+                ✓ {feature}
+              </Text>
+            ))}
+          </View>
         </View>
 
         <View style={styles.buttonGroup}>
@@ -64,17 +64,19 @@ export default function HomeScreen() {
           </Link>
         </View>
 
-        <Text style={styles.footerText}>{t.home.footerText}</Text>
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerText}>{t.home.footerText}</Text>
 
-        <Text style={styles.legalLinksText}>
-          <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
-            {t.home.legalPrivacy}
+          <Text style={styles.legalLinksText}>
+            <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
+              {t.home.legalPrivacy}
+            </Text>
+            {t.home.legalAnd}
+            <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
+              {t.home.legalTerms}
+            </Text>
           </Text>
-          {t.home.legalAnd}
-          <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
-            {t.home.legalTerms}
-          </Text>
-        </Text>
+        </View>
       </ScreenCard>
     </ScrollView>
   );
@@ -90,79 +92,93 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.app,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.md,
   },
   card: {
-    padding: theme.spacing["3xl"],
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
   },
-  languageContainer: {
-    alignSelf: "flex-end",
-    marginBottom: theme.spacing.lg,
+  topHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
   },
-  logo: {
-    fontSize: theme.fontSizes["3xl"],
+  headerLogo: {
+    fontSize: theme.fontSizes.xl,
     fontWeight: theme.fontWeights.bold,
     color: theme.colors.brand.primary,
+  },
+  headingSection: {
+    alignItems: "center",
     marginBottom: theme.spacing.md,
-    textAlign: "center",
   },
   badge: {
-    alignSelf: "center",
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.xs,
   },
   title: {
-    fontSize: theme.fontSizes["5xl"],
+    fontSize: theme.fontSizes["2xl"],
     fontWeight: theme.fontWeights.bold,
     color: theme.colors.text.primary,
     textAlign: "center",
-    lineHeight: theme.lineHeights["5xl"],
-    marginBottom: theme.spacing.lg,
+    lineHeight: theme.lineHeights["2xl"],
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    fontSize: theme.fontSizes.lg,
+    fontSize: theme.fontSizes.sm,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    lineHeight: theme.lineHeights.xl,
-    marginBottom: theme.spacing["2xl"],
+    lineHeight: theme.lineHeights.sm,
+    paddingHorizontal: theme.spacing.xs,
   },
   featureBox: {
     width: "100%",
     backgroundColor: theme.colors.background.subtle,
-    borderRadius: theme.radius.xl,
-    padding: theme.spacing.xl,
-    marginBottom: theme.spacing["2xl"],
+    borderRadius: theme.radius.lg,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border.default,
   },
   featureTitle: {
-    fontSize: theme.fontSizes.lg,
+    fontSize: theme.fontSizes.sm,
     fontWeight: theme.fontWeights.semibold,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xxs,
+  },
+  featureList: {
+    gap: 3,
   },
   featureText: {
-    fontSize: theme.fontSizes.md,
+    fontSize: theme.fontSizes.xs,
     color: theme.colors.text.secondary,
     fontWeight: theme.fontWeights.regular,
-    lineHeight: theme.lineHeights.lg,
-    marginBottom: theme.spacing.sm,
+    lineHeight: theme.lineHeights.xs,
   },
   buttonGroup: {
     width: "100%",
-    gap: theme.spacing.md,
+    gap: theme.spacing.xs,
   },
   button: {
     width: "100%",
   },
+  footerContainer: {
+    marginTop: theme.spacing.md,
+    alignItems: "center",
+  },
   footerText: {
-    marginTop: theme.spacing["2xl"],
-    fontSize: theme.fontSizes.sm,
+    fontSize: theme.fontSizes.xs,
     color: theme.colors.text.muted,
     textAlign: "center",
     fontWeight: theme.fontWeights.medium,
-    lineHeight: theme.lineHeights.md,
+    lineHeight: theme.lineHeights.xs,
   },
   legalLinksText: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.fontSizes.sm,
+    marginTop: theme.spacing.xxs,
+    fontSize: theme.fontSizes.xs,
     color: theme.colors.text.muted,
     textAlign: "center",
   },

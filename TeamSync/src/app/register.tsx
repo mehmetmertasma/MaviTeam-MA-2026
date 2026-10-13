@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
@@ -36,6 +36,10 @@ export default function RegisterScreen() {
   const { next } = useLocalSearchParams();
   const { t, language } = useTranslation();
   const firebaseIsReady = authService.isConfigured();
+
+  const emailInputRef = useRef<TextInput>(null);
+  const passwordInputRef = useRef<TextInput>(null);
+  const confirmPasswordInputRef = useRef<TextInput>(null);
   const registerCopy = language === "tr"
     ? {
         accountSetupTitle: "Güvenli hesap kurulumu",
@@ -188,13 +192,14 @@ export default function RegisterScreen() {
         <ScreenCard style={styles.card}>
           <View style={styles.topHeader}>
             <AppBackButton fallbackHref="/" />
+            <Text style={styles.headerLogo}>{t.common.appName}</Text>
             <LanguageSelector compact />
           </View>
 
-          <Text style={styles.logo}>{t.common.appName}</Text>
-          <StatusBadge label={t.auth.registerBadge} tone="info" style={styles.badge} />
-          <Text style={styles.title}>{t.auth.registerTitle}</Text>
-          <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
+          <View style={styles.headingSection}>
+            <Text style={styles.title}>{t.auth.registerTitle}</Text>
+            <Text style={styles.subtitle}>{t.auth.registerSubtitle}</Text>
+          </View>
 
           <View style={styles.form}>
             <TextField
@@ -208,9 +213,13 @@ export default function RegisterScreen() {
               autoComplete="name"
               textContentType="name"
               accessibilityLabel={t.auth.accessibility.fullName}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => emailInputRef.current?.focus()}
             />
 
             <TextField
+              ref={emailInputRef}
               label={t.auth.emailLabel}
               value={email}
               onChangeText={(value) => {
@@ -223,9 +232,13 @@ export default function RegisterScreen() {
               autoComplete="email"
               textContentType="emailAddress"
               accessibilityLabel={t.auth.accessibility.email}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
             />
 
             <TextField
+              ref={passwordInputRef}
               label={t.auth.passwordLabel}
               value={password}
               onChangeText={(value) => {
@@ -237,9 +250,13 @@ export default function RegisterScreen() {
               autoComplete="new-password"
               textContentType="newPassword"
               accessibilityLabel={t.auth.accessibility.password}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => confirmPasswordInputRef.current?.focus()}
             />
 
             <TextField
+              ref={confirmPasswordInputRef}
               label={t.auth.confirmPasswordLabel}
               value={confirmPassword}
               onChangeText={(value) => {
@@ -251,12 +268,9 @@ export default function RegisterScreen() {
               autoComplete="new-password"
               textContentType="newPassword"
               accessibilityLabel={t.auth.accessibility.confirmPassword}
+              returnKeyType="done"
+              onSubmitEditing={handleContinue}
             />
-          </View>
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>{registerCopy.accountSetupTitle}</Text>
-            <Text style={styles.infoText}>{registerCopy.accountSetupText}</Text>
           </View>
 
           <Pressable
@@ -329,52 +343,61 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.app,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
   },
-  card: { padding: theme.spacing["3xl"] },
+  card: {
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
+  },
   topHeader: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
   },
-  logo: {
+  headerLogo: {
     ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
-    textAlign: "center",
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.bold,
+  },
+  headingSection: {
+    alignItems: "center",
     marginBottom: theme.spacing.lg,
   },
   badge: {
-    alignSelf: "center",
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.xs,
   },
   title: {
     ...Typography.pageTitle,
+    fontSize: theme.fontSizes["2xl"],
+    lineHeight: theme.lineHeights["2xl"],
     color: theme.colors.text.primary,
     textAlign: "center",
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    ...Typography.body,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    marginBottom: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.sm,
   },
-  form: { width: "100%", gap: theme.spacing.lg },
+  form: { width: "100%", gap: theme.spacing.md },
   infoBox: {
     width: "100%",
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginTop: theme.spacing["2xl"],
+    padding: theme.spacing.md,
+    marginTop: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
   infoTitle: {
     ...Typography.label,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.xxs,
   },
   infoText: {
     ...Typography.supporting,
@@ -384,7 +407,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: theme.spacing.sm,
-    marginTop: theme.spacing["2xl"],
+    marginTop: theme.spacing.lg,
   },
   checkbox: {
     width: 22,
@@ -418,7 +441,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...Typography.supporting,
-    marginTop: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
     color: theme.colors.text.secondary,
     textAlign: "center",
   },
@@ -427,8 +450,8 @@ const styles = StyleSheet.create({
   },
   buttonGroup: {
     width: "100%",
-    gap: theme.spacing.md,
-    marginTop: theme.spacing["2xl"],
+    gap: theme.spacing.sm,
+    marginTop: theme.spacing.lg,
   },
   button: { width: "100%" },
 });

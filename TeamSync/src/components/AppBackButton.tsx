@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import type { StyleProp, ViewStyle } from "react-native";
 import { Pressable, StyleSheet, Text } from "react-native";
 
 import { theme } from "@/constants/theme";
@@ -7,9 +8,10 @@ type AppBackButtonProps = {
   label?: string;
   fallbackHref?: string;
   onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
 };
 
-export function AppBackButton({ label = "Geri dön", fallbackHref = "/dashboard", onPress }: AppBackButtonProps) {
+export function AppBackButton({ label = "Geri dön", fallbackHref = "/dashboard", onPress, style }: AppBackButtonProps) {
   function handlePress() {
     if (onPress) {
       onPress();
@@ -30,7 +32,7 @@ export function AppBackButton({ label = "Geri dön", fallbackHref = "/dashboard"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.button, pressed ? styles.pressed : null]}
+      style={({ pressed }) => [styles.button, style, pressed ? styles.pressed : null]}
     >
       <Text style={styles.icon}>←</Text>
       <Text style={styles.label}>{label}</Text>

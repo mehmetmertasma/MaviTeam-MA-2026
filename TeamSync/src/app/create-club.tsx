@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 
 import { AppBackButton } from "@/components/AppBackButton";
 import { AppButton } from "@/components/AppButton";
+import { LanguageSelector } from "@/components/LanguageSelector";
 import { ScreenCard } from "@/components/ScreenCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TextField } from "@/components/TextField";
@@ -237,15 +238,16 @@ export default function CreateClubScreen() {
         overScrollMode="never"
       >
         <ScreenCard style={styles.card}>
-          <AppBackButton fallbackHref="/" />
+          <View style={styles.topHeader}>
+            <AppBackButton fallbackHref="/" />
+            <Text style={styles.headerLogo}>{t.common.appName}</Text>
+            <LanguageSelector compact />
+          </View>
 
-          <Text style={styles.logo}>{t.common.appName}</Text>
-
-          <StatusBadge label={t.createClub.badge} tone="info" style={styles.badge} />
-
-          <Text style={styles.title}>{t.createClub.title}</Text>
-
-          <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
+          <View style={styles.headingSection}>
+            <Text style={styles.title}>{t.createClub.title}</Text>
+            <Text style={styles.subtitle}>{t.createClub.subtitle}</Text>
+          </View>
 
           {phase === "waiting" ? (
             <View style={styles.waitingBox}>
@@ -389,38 +391,49 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background.app,
     alignItems: "center",
     justifyContent: "center",
-    padding: theme.spacing["2xl"],
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.lg,
   },
   card: {
-    padding: theme.spacing["3xl"],
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.xl,
   },
-  logo: {
+  topHeader: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  headerLogo: {
     ...Typography.sectionTitle,
     color: theme.colors.brand.primary,
-    textAlign: "center",
-    marginBottom: theme.spacing.lg,
+    fontSize: theme.fontSizes.lg,
+    fontWeight: theme.fontWeights.bold,
   },
-  badge: {
-    alignSelf: "center",
-    marginBottom: theme.spacing["2xl"],
+  headingSection: {
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
   },
   title: {
     ...Typography.pageTitle,
+    fontSize: theme.fontSizes["2xl"],
+    lineHeight: theme.lineHeights["2xl"],
     color: theme.colors.text.primary,
     textAlign: "center",
-    marginBottom: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   subtitle: {
-    ...Typography.body,
+    ...Typography.supporting,
     color: theme.colors.text.secondary,
     textAlign: "center",
-    marginBottom: theme.spacing["2xl"],
+    marginBottom: theme.spacing.md,
   },
   waitingBox: {
     width: "100%",
     backgroundColor: theme.colors.state.infoSoft,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.xl,
+    padding: theme.spacing.lg,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
@@ -439,21 +452,21 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: theme.colors.background.subtle,
     borderRadius: theme.radius.lg,
-    padding: theme.spacing.lg,
-    marginBottom: theme.spacing["2xl"],
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.md,
     borderWidth: 1,
     borderColor: theme.colors.border.default,
   },
   ownerLabel: {
     ...Typography.label,
     color: theme.colors.text.primary,
-    marginBottom: theme.spacing.xs,
+    marginBottom: theme.spacing.xxs,
   },
   ownerText: {
     ...Typography.supporting,
     color: theme.colors.text.secondary,
   },
-  form: { width: "100%", gap: theme.spacing.lg },
+  form: { width: "100%", gap: theme.spacing.md },
   countryLabel: {
     ...Typography.label,
     color: theme.colors.text.primary,

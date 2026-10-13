@@ -175,7 +175,7 @@ export function AppDataDrawer({ visible, onClose }: AppDataDrawerProps) {
     }
 
     onClose();
-    router.push(route as never);
+    router.replace(route as never);
   }
 
   async function handleLogout() {

@@ -14,13 +14,13 @@
         "buildType": "apk"
       },
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "EXPO_PUBLIC_SENTRY_DSN": "https://975cb71892709848f8d808b136548dc5@o4511978898587648.ingest.de.sentry.io/4511978911367248"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+        "EXPO_PUBLIC_SENTRY_DSN": "https://975cb71892709848f8d808b136548dc5@o4511978898587648.ingest.de.sentry.io/4511978911367248"
       }
     }
   },

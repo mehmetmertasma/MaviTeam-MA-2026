@@ -105,6 +105,45 @@ const workspaceSetupRoutes = [
   "/terms-of-service",
 ];
 
+const SITE_URL = "https://maviteam.com";
+const DEFAULT_DESCRIPTION =
+  "MaviTeam, spor kulüpleri için takım yönetimi, antrenman takvimi, yoklama, aidat takibi ve mesajlaşma platformu. Kulüp sahipleri, koçlar, veliler ve sporcular için.";
+
+// Only these routes are meant for search engines; everything else is behind
+// sign-in and gets a noindex tag (see public/robots.txt and public/sitemap.xml).
+const indexablePageMeta: Record<string, { title: string; description: string }> = {
+  "/": {
+    title: "MaviTeam | Spor Kulübü Yönetim Platformu",
+    description: DEFAULT_DESCRIPTION,
+  },
+  "/login": {
+    title: "Giriş Yap | MaviTeam",
+    description: "MaviTeam hesabınıza giriş yapın ve kulübünüzü tek yerden yönetin.",
+  },
+  "/register": {
+    title: "Kayıt Ol | MaviTeam",
+    description: "Ücretsiz MaviTeam hesabı oluşturun: kulübünüzü kurun ya da takım koduyla bir kulübe katılın.",
+  },
+  "/privacy-policy": {
+    title: "Gizlilik Politikası | MaviTeam",
+    description: "MaviTeam'in hangi kişisel verileri topladığı, nasıl kullandığı ve haklarınız.",
+  },
+  "/terms-of-service": {
+    title: "Kullanım Koşulları | MaviTeam",
+    description: "MaviTeam spor kulübü yönetim platformunun kullanım koşulları.",
+  },
+};
+
+function getPageMeta(pathname: string) {
+  const meta = indexablePageMeta[pathname];
+
+  if (meta !== undefined) {
+    return { ...meta, indexable: true };
+  }
+
+  return { title: "MaviTeam", description: DEFAULT_DESCRIPTION, indexable: false };
+}
+
 function AppProviders({ children }: PropsWithChildren) {
   return (
     <SafeAreaProvider>
@@ -157,6 +196,7 @@ function AppContent() {
   const { t, isLanguageReady } = useTranslation();
   const { user, isAuthReady, isFirebaseAuthConfigured, isSignedIn } = useAuthContext();
   const { appData } = useAppDataContext();
+  const pageMeta = getPageMeta(pathname);
   const routeIsPublic = publicAuthRoutes.includes(pathname);
   const routeIsWorkspaceSetup = workspaceSetupRoutes.includes(pathname);
   const showGlobalNavigation = !routesWithoutGlobalNavigation.includes(pathname);
@@ -295,8 +335,13 @@ function AppContent() {
   return (
     <View style={{ flex: 1, backgroundColor: APP_BACKGROUND_COLOR }}>
       <Head>
-        <title>MaviTeam | Spor Kulübü Yönetim Platformu</title>
-        <meta name="description" content="MaviTeam spor kulüpleri için takım yönetimi, antrenman takvimi, yoklama ve mesajlaşma platformu." />
+        <title>{pageMeta.title}</title>
+        <meta name="description" content={pageMeta.description} />
+        {pageMeta.indexable ? (
+          <link rel="canonical" href={`${SITE_URL}${pathname === "/" ? "/" : pathname}`} />
+        ) : (
+          <meta name="robots" content="noindex, nofollow" />
+        )}
       </Head>
       <StatusBar style="light" />
 

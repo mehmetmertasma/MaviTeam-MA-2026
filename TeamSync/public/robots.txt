@@ -1,3 +1,23 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /messages
+Disallow: /members
+Disallow: /teams
+Disallow: /announcements
+Disallow: /schedule
+Disallow: /attendance
+Disallow: /availability
+Disallow: /statistics
+Disallow: /replays
+Disallow: /payments
+Disallow: /pending-approvals
+Disallow: /create-club
+Disallow: /join-club
+Disallow: /join-request-sent
+Disallow: /verify-email
+Disallow: /subscription-locked
+
+Sitemap: https://maviteam.com/sitemap.xml

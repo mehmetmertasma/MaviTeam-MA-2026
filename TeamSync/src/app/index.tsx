@@ -1,4 +1,4 @@
-import { Link, router } from "expo-router";
+import { Link } from "expo-router";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "@/components/AppButton";
@@ -68,13 +68,13 @@ export default function HomeScreen() {
           <Text style={styles.footerText}>{t.home.footerText}</Text>
 
           <Text style={styles.legalLinksText}>
-            <Text style={styles.legalLink} onPress={() => router.push("/privacy-policy" as never)}>
+            <Link href={"/privacy-policy" as never} style={styles.legalLink}>
               {t.home.legalPrivacy}
-            </Text>
+            </Link>
             {t.home.legalAnd}
-            <Text style={styles.legalLink} onPress={() => router.push("/terms-of-service" as never)}>
+            <Link href={"/terms-of-service" as never} style={styles.legalLink}>
               {t.home.legalTerms}
-            </Text>
+            </Link>
           </Text>
         </View>
       </ScreenCard>
